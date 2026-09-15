@@ -1304,6 +1304,73 @@ var Calc = {
     });
   },
 
+  /* ---------- CUSTO FIXO MENSAL, VINDO DAS CONTAS CADASTRADAS ---------- */
+  fixoMensal: function(){
+    var contas = (Store.dados.contas||[]).filter(function(c){
+      return c.ativo!==false && c.recorrencia!=='unica';
+    });
+    var pro = 0, outros = 0, lista = [];
+    contas.forEach(function(c){
+      var ehPro = (c.categoria==='Pró-labore') || /pró-labore|pro-labore/i.test(c.nome||'');
+      if(ehPro) pro += U.n(c.valor); else outros += U.n(c.valor);
+      lista.push({nome:c.nome, valor:U.n(c.valor), proLabore:ehPro});
+    });
+    return {proLabore:pro, operacional:outros, total:pro+outros, lista:lista};
+  },
+
+  /* ---------- CENÁRIO MENSAL ----------
+     Projeta um mês inteiro a partir de uma oferta e de um volume de pedidos.
+     Usa custo fixo real (contas cadastradas), não percentual. ---------- */
+  cenario: function(o){
+    var c = Calc.cfg();
+    var r = Calc.simular(Object.assign({}, o, {operacionalPct:0}));
+    var pedidos = Math.max(0, U.n(o.pedidosMes));
+    var dias = U.diasNoMes(o.ym || U.ymAtual());
+    var fixo = Calc.fixoMensal();
+    if(o.incluirProLabore===false) fixo = {proLabore:0, operacional:fixo.operacional, total:fixo.operacional, lista:fixo.lista};
+
+    var x = {
+      qtd:r.qtd, preco:r.preco, receitaFrete:r.receitaFrete, totalPedido:r.total,
+      pedidos:pedidos, dias:dias,
+      camisetas: pedidos * r.qtd,
+      pedidosDia: U.div(pedidos, dias)
+    };
+    x.faturamento = pedidos * r.preco;
+    x.receitaFreteTotal = pedidos * r.receitaFrete;
+    x.receitaTotal = x.faturamento + x.receitaFreteTotal;
+
+    x.cmv        = pedidos * r.cmv;
+    x.embalagem  = pedidos * r.embalagem;
+    x.frete      = pedidos * r.frete;
+    x.marketing  = pedidos * r.marketing;
+    x.gateway    = pedidos * r.gateway;
+    x.checkout   = pedidos * r.checkout;
+    x.imposto    = pedidos * r.imposto;
+    x.operacional= fixo.operacional;
+    x.proLabore  = fixo.proLabore;
+    x.fixo       = fixo;
+
+    x.variaveis = x.cmv + x.embalagem + x.frete + x.marketing + x.gateway + x.checkout + x.imposto;
+    x.custoTotal = x.variaveis + x.operacional + x.proLabore;
+    x.lucro = x.receitaTotal - x.custoTotal;
+    x.margem = U.div(x.lucro, x.receitaTotal)*100;
+    x.lucroPorPedido = U.div(x.lucro, pedidos);
+
+    /* contribuição por pedido: o que sobra para pagar o fixo */
+    x.contribPedido = r.contribuicao;
+    x.contribTotal = pedidos * r.contribuicao;
+    x.pedidosEquilibrio = r.contribuicao>0 ? Math.ceil(fixo.total / r.contribuicao) : null;
+    x.faturamentoEquilibrio = x.pedidosEquilibrio!==null ? x.pedidosEquilibrio * r.total : null;
+
+    /* quantos pedidos para atingir a margem alvo */
+    var alvo = U.n(o.margemAlvo, c.metaMargem)/100;
+    var porPedido = r.contribuicao - alvo*r.total;
+    x.margemAlvo = alvo*100;
+    x.pedidosParaAlvo = porPedido>0 ? Math.ceil(fixo.total / porPedido) : null;
+    x.unit = r;
+    return x;
+  },
+
   /* ---------- DIAGNÓSTICOS ---------- */
   diagnosticar: function(a, p, cx){
     var c = Calc.cfgM(a.ym), d = [];
@@ -1632,6 +1699,7 @@ var ABAS_FIN = [
   {id:'lancamentos', nome:'Lançamentos'},
   {id:'projecao', nome:'Projeção diária'},
   {id:'simulador', nome:'Simulador de ofertas'},
+  {id:'cenario', nome:'Cenário do mês'},
   {id:'produto', nome:'CMV & Produto'},
   {id:'frete', nome:'Frete & Logística'},
   {id:'canal', nome:'Vendas por canal'},
@@ -2331,6 +2399,169 @@ Views.canal = function(){
       (ufs.semUf>0 ? '<div class="info" style="margin-top:12px">'+U.brl(ufs.semUf,0)+' em vendas sem estado informado ficaram fora desta tabela.</div>' : '');
   }
   h += '</div>';
+  return h;
+};
+
+/* ============ CENÁRIO DO MÊS ============ */
+Views.cen = null;
+Views.cenPadrao = function(){
+  var c = Calc.cfg();
+  var ref = (Store.dados.ofertas||[]).find(function(o){ return U.n(o.camisetas)===2; })
+         || (Store.dados.ofertas||[])[0] || Views.simPadrao();
+  return Object.assign({}, ref, {
+    pedidosMes: 288,
+    marketingPct: U.n(c.marketingBase),
+    modoMkt: 'pct',
+    incluirProLabore: true,
+    margemAlvo: U.n(c.metaMargem)
+  });
+};
+
+Views.cenario = function(){
+  if(!Views.cen) Views.cen = Views.cenPadrao();
+  var s = Views.cen, c = Calc.cfg();
+  var ofs = Store.dados.ofertas || [];
+  var h = '';
+
+  h += '<div class="info">Aqui você monta o mês que quer ter. O resto do painel mostra o mês que você tem. '+
+    'Quando o cenário fizer sentido, use o botão no fim para transformá-lo na meta — aí a projeção diária passa a medir se você está chegando lá.</div>';
+
+  h += '<div class="grade" style="grid-template-columns:340px 1fr;gap:12px;align-items:start" id="cenGrade">';
+
+  /* ---- controles ---- */
+  h += '<div class="cartao">'+
+    '<div class="cartao-tit">Premissas do cenário</div>'+
+    '<div class="cartao-sub">Custos e taxas vêm de Configurações. Aqui você escolhe a oferta e o volume.</div>'+
+    '<div class="campo"><label>Oferta base</label><select id="cenOferta">'+
+      ofs.map(function(o){
+        return '<option value="'+o.id+'"'+(o.id===s.id?' selected':'')+'>'+U.esc(o.nome||('Oferta '+o.camisetas+' un'))+'</option>';
+      }).join('')+
+      '<option value="__sim"'+(s.id?'':' selected')+'>O que está no simulador agora</option>'+
+    '</select></div>'+
+    '<div class="campo"><label>Pedidos no mês — '+U.num(s.pedidosMes)+' '+
+      UI.ajuda('Todos na oferta escolhida. É a premissa mais forte do cenário: mude aqui primeiro.')+'</label>'+
+      '<input type="range" id="cenPedR" min="0" max="1200" step="1" value="'+U.n(s.pedidosMes)+'">'+
+      '<input type="number" id="cenPed" step="1" value="'+U.n(s.pedidosMes)+'" style="margin-top:8px"></div>'+
+    '<div class="campo"><label>Marketing (% do faturamento)</label>'+
+      '<input type="range" id="cenMktR" min="0" max="50" step="0.5" value="'+U.n(s.marketingPct)+'">'+
+      '<div class="leg"><span>0%</span><span style="font-weight:600;color:var(--texto)">'+U.pct(s.marketingPct)+'</span><span>50%</span></div></div>'+
+    '<div class="campo"><label>Margem líquida alvo (%)</label>'+
+      '<input type="number" id="cenAlvo" step="0.5" value="'+U.n(s.margemAlvo)+'"></div>'+
+    '<label class="chk" style="margin-bottom:14px"><input type="checkbox" id="cenPro" '+(s.incluirProLabore!==false?'checked':'')+'> '+
+      'Incluir pró-labore no cálculo</label>'+
+    '<button class="btn sec bloco" id="cenReset">Restaurar cenário padrão</button>'+
+  '</div>';
+
+  h += '<div id="cenResultado">'+Views.cenResultado()+'</div>';
+  h += '</div>';
+  return h;
+};
+
+Views.cenResultado = function(){
+  var s = Views.cen, c = Calc.cfg();
+  var x = Calc.cenario(s);
+  var r = x.unit;
+  var nivel = x.margem >= x.margemAlvo ? 'ok' : (x.margem >= x.margemAlvo*0.7 ? 'at' : 'cr');
+  var h = '';
+
+  /* veredito do cenário */
+  h += '<div class="veredito '+(nivel==='ok'?'':(nivel==='at'?'atencao':'critico'))+'" style="margin-bottom:12px">'+
+    '<div class="veredito-frase">'+(
+      x.lucro<0 ? 'Nesse volume, o mês fecha no prejuízo.'
+      : nivel==='ok' ? 'Esse cenário entrega a margem que você quer.'
+      : 'Esse cenário fecha no azul, mas abaixo do alvo.')+'</div>'+
+    '<div class="veredito-apoio">'+
+      U.num(x.pedidos)+' pedidos de '+U.brl(x.totalPedido)+' dão '+U.brl(x.receitaTotal,0)+' de receita e '+
+      U.brl(x.lucro,0)+' de lucro, '+U.pct(x.margem)+' de margem. '+
+      'São '+U.num(x.pedidosDia,1)+' pedidos por dia num mês de '+x.dias+' dias.'+
+      (x.pedidosEquilibrio!==null ? ' O mês só começa a dar lucro a partir de '+U.num(x.pedidosEquilibrio)+' pedidos.' : '')+
+    '</div>'+
+  '</div>';
+
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Faturamento', val:U.brl(x.faturamento,0), destaque:true, nota:U.num(x.camisetas)+' camisetas'})+
+    UI.kpi({rot:'Lucro do mês', val:U.brl(x.lucro,0), destaque:true, classe:x.lucro<0?'neg':'',
+      nota:'depois do pró-labore'+(s.incluirProLabore===false?' (fora do cálculo)':'')})+
+    UI.kpi({rot:'Margem', val:U.pct(x.margem), pt:nivel, nota:'alvo '+U.pct(x.margemAlvo,0)})+
+    UI.kpi({rot:'Lucro por pedido', val:U.brl(x.lucroPorPedido), pequeno:true, nota:'contribuição '+U.brl(x.contribPedido)})+
+  '</div>';
+
+  /* a tabela — o coração da tela */
+  var linha = function(rot, calc, val, op){
+    op = op||{};
+    return '<tr'+(op.total?' class="total"':'')+'>'+
+      '<td'+(op.destaque?' style="color:var(--vinho);font-weight:600"':'')+'>'+rot+'</td>'+
+      '<td style="color:var(--texto-fraco);font-size:12px">'+(calc||'')+'</td>'+
+      '<td class="r"'+(op.cor?' style="color:'+op.cor+'"':'')+'>'+U.brl(val)+'</td>'+
+      '<td class="r" style="color:var(--texto-medio)">'+(x.receitaTotal?U.pct(U.div(val,x.receitaTotal)*100):'—')+'</td>'+
+    '</tr>';
+  };
+
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Cenário mensal — '+U.esc(s.nome||('oferta de '+x.qtd+' camisetas'))+'</div>'+
+    '<div class="cartao-sub">Mantendo '+U.num(x.pedidos)+' pedidos no mês, todos nessa oferta</div>'+
+
+    '<div class="tabela-env" style="margin-bottom:14px"><table><thead><tr>'+
+      '<th>Volume de vendas</th><th></th><th class="r">Quantidade</th><th></th></tr></thead><tbody>'+
+      '<tr><td>Pedidos no mês</td><td></td><td class="r">'+U.num(x.pedidos)+'</td><td></td></tr>'+
+      '<tr><td>Camisetas vendidas</td><td style="color:var(--texto-fraco);font-size:12px">'+U.num(x.pedidos)+' × '+x.qtd+'</td><td class="r">'+U.num(x.camisetas)+'</td><td></td></tr>'+
+      '<tr><td>Pedidos por dia</td><td style="color:var(--texto-fraco);font-size:12px">mês de '+x.dias+' dias</td><td class="r">'+U.num(x.pedidosDia,1)+'</td><td></td></tr>'+
+      '<tr><td>Ticket por pedido</td><td style="color:var(--texto-fraco);font-size:12px">'+(x.receitaFrete>0?'produto + frete cobrado':'frete grátis')+'</td><td class="r">'+U.brl(x.totalPedido)+'</td><td></td></tr>'+
+    '</tbody></table></div>'+
+
+    '<div class="tabela-env"><table><thead><tr>'+
+      '<th>Financeiro mensal</th><th>Cálculo</th><th class="r">Valor</th><th class="r">% da receita</th>'+
+    '</tr></thead><tbody>'+
+      linha('<b>Faturamento</b>', U.num(x.pedidos)+' × '+U.brl(x.preco), x.faturamento, {destaque:true})+
+      (x.receitaFreteTotal>0 ? linha('Frete cobrado do cliente', U.num(x.pedidos)+' × '+U.brl(x.receitaFrete), x.receitaFreteTotal) : '')+
+      (x.receitaFreteTotal>0 ? linha('<b>Receita total</b>', '', x.receitaTotal, {total:true}) : '')+
+      linha('Camisetas prontas, já estampadas', U.num(x.camisetas)+' × '+U.brl(Calc.custoCamiseta()), x.cmv)+
+      linha('Brindes e embalagens', U.num(x.pedidos)+' × '+U.brl(r.embalagem), x.embalagem)+
+      linha('Frete pago pela Arcanju', U.num(x.pedidos)+' × '+U.brl(r.frete), x.frete)+
+      linha('Marketing', U.pct(r.marketingPct), x.marketing, {destaque:true})+
+      linha('Appmax — gateway', U.pct(r.pctGateway), x.gateway - x.pedidos*r.gatewayFixo)+
+      (r.gatewayFixo>0 ? linha('Gateway e antifraude', U.num(x.pedidos)+' × '+U.brl(r.gatewayFixo), x.pedidos*r.gatewayFixo) : '')+
+      linha('Tarifa Nuvemshop', U.pct(r.pctCheckout), x.checkout)+
+      linha('Imposto', U.pct(r.pctImposto), x.imposto)+
+      linha('<b>Margem de contribuição</b>', 'o que sobra para pagar o fixo', x.contribTotal, {total:true})+
+      linha('Operacional, sem pró-labore', 'fixo mensal', x.operacional)+
+      linha('Seu pró-labore', s.incluirProLabore===false?'fora do cálculo':'fixo mensal', x.proLabore)+
+      linha('<b>Total de custos e despesas</b>', '', x.custoTotal, {total:true})+
+      linha('<b>Lucro estimado</b>', s.incluirProLabore===false?'antes do pró-labore':'depois do pró-labore', x.lucro,
+        {total:true, cor: x.lucro<0?'var(--rubro)':'var(--verde)'})+
+      '<tr class="total"><td><b>Margem estimada</b></td><td></td>'+
+        '<td class="r"><span class="pt '+nivel+'"></span> '+U.pct(x.margem)+'</td><td class="r"></td></tr>'+
+      '<tr class="total"><td><b>Lucro por pedido</b></td><td></td>'+
+        '<td class="r">'+U.brl(x.lucroPorPedido)+'</td><td class="r"></td></tr>'+
+    '</tbody></table></div>'+
+  '</div>';
+
+  /* pontos de virada */
+  h += '<div class="grade g3" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Pedidos para não ter prejuízo', val: x.pedidosEquilibrio!==null?U.num(x.pedidosEquilibrio):'—', pequeno:true,
+      nota: x.pedidosEquilibrio!==null ? (U.num(U.div(x.pedidosEquilibrio,x.dias),1)+' por dia · '+U.brl(x.faturamentoEquilibrio,0)) : 'a oferta não cobre o fixo',
+      ajuda:'Abaixo disso o mês fecha no vermelho, por melhor que seja a oferta.'})+
+    UI.kpi({rot:'Pedidos para atingir '+U.pct(x.margemAlvo,0), val: x.pedidosParaAlvo!==null?U.num(x.pedidosParaAlvo):'impossível', pequeno:true,
+      classe: x.pedidosParaAlvo===null?'neg':'',
+      nota: x.pedidosParaAlvo!==null ? (U.num(U.div(x.pedidosParaAlvo,x.dias),1)+' por dia') : 'reduza marketing ou suba o preço'})+
+    UI.kpi({rot:'CPA máximo desta oferta', val: r.cpaMaxAlvo>0?U.brl(r.cpaMaxAlvo):'—', pequeno:true,
+      nota: r.cpaMaxAlvo>0 ? ('ROAS mínimo '+U.num(r.roasMinAlvo,2)) : 'o preço não comporta a margem alvo'})+
+  '</div>';
+
+  /* virar meta */
+  var m = Store.meta(UI.ym);
+  h += '<div class="cartao">'+
+    '<div class="cartao-tit">Usar este cenário como meta</div>'+
+    '<div class="cartao-sub">Vira a meta de '+U.nomeMes(UI.ym)+'. A partir daí a projeção diária mede se o ritmo chega lá.</div>'+
+    '<div class="grade g4" style="margin-bottom:14px">'+
+      UI.kpi({rot:'Meta de faturamento', val:U.brl(x.faturamento,0), pequeno:true, nota:'hoje: '+(U.n(m.faturamento)?U.brl(m.faturamento,0):'não definida')})+
+      UI.kpi({rot:'Meta de lucro', val:U.brl(x.lucro,0), pequeno:true, nota:'hoje: '+(U.n(m.lucro)?U.brl(m.lucro,0):'não definida')})+
+      UI.kpi({rot:'Meta de pedidos', val:U.num(x.pedidos), pequeno:true, nota:'hoje: '+(U.n(m.pedidos)?U.num(m.pedidos):'não definida')})+
+      UI.kpi({rot:'CPA máximo', val:r.cpaMaxAlvo>0?U.brl(r.cpaMaxAlvo,0):'—', pequeno:true, nota:'hoje: '+(U.n(m.cpaMax)?U.brl(m.cpaMax,0):'não definido')})+
+    '</div>'+
+    '<button class="btn" id="cenVirarMeta">Definir como meta de '+U.nomeMes(UI.ym)+'</button>'+
+  '</div>';
+
   return h;
 };
 /* ============ CAIXA & RESERVA ============ */
@@ -3994,6 +4225,9 @@ var App = {
     /* simulador */
     if(q('simResultado')) App.simEventos();
 
+    /* cenário do mês */
+    if(q('cenResultado')) App.cenEventos();
+
     /* metas */
     if(q('mSalvar')){
       q('mSalvar').addEventListener('click', function(){
@@ -4239,6 +4473,65 @@ var App = {
       Store.dados.ofertas.push(o); Store.commit('Cenário salvo'); App.render();
     });
     App.simEscada();
+  },
+
+  cenEventos: function(){
+    var q = function(id){ return document.getElementById(id); };
+    var s = Views.cen;
+    var atualizar = function(){
+      var alvo = q('cenResultado');
+      if(alvo){ alvo.innerHTML = Views.cenResultado(); App.cenBotoes(); }
+    };
+    if(q('cenOferta')) q('cenOferta').addEventListener('change', function(){
+      var v = this.value;
+      var base = v==='__sim' ? (Views.sim || Views.simPadrao())
+                             : (Store.dados.ofertas||[]).find(function(o){ return o.id===v; });
+      if(base) Views.cen = Object.assign({}, base, {
+        pedidosMes:s.pedidosMes, marketingPct:s.marketingPct,
+        incluirProLabore:s.incluirProLabore, margemAlvo:s.margemAlvo, modoMkt:'pct'
+      });
+      App.render();
+    });
+    if(q('cenPedR')) q('cenPedR').addEventListener('input', function(){
+      s.pedidosMes = U.n(this.value); q('cenPed').value = s.pedidosMes;
+      var lab = this.parentNode.querySelector('label');
+      if(lab) lab.innerHTML = 'Pedidos no mês — '+U.num(s.pedidosMes)+' '+UI.ajuda('Todos na oferta escolhida. É a premissa mais forte do cenário: mude aqui primeiro.');
+      atualizar();
+    });
+    if(q('cenPed')) q('cenPed').addEventListener('input', function(){
+      s.pedidosMes = U.n(this.value);
+      if(q('cenPedR')) q('cenPedR').value = s.pedidosMes;
+      atualizar();
+    });
+    if(q('cenMktR')) q('cenMktR').addEventListener('input', function(){
+      s.marketingPct = U.n(this.value);
+      var leg = this.parentNode.querySelector('.leg span:nth-child(2)');
+      if(leg) leg.textContent = U.pct(s.marketingPct);
+      atualizar();
+    });
+    if(q('cenAlvo')) q('cenAlvo').addEventListener('input', function(){ s.margemAlvo = U.n(this.value); atualizar(); });
+    if(q('cenPro')) q('cenPro').addEventListener('change', function(){ s.incluirProLabore = this.checked; atualizar(); });
+    if(q('cenReset')) q('cenReset').addEventListener('click', function(){ Views.cen = Views.cenPadrao(); App.render(); });
+    App.cenBotoes();
+  },
+
+  cenBotoes: function(){
+    var b = document.getElementById('cenVirarMeta');
+    if(!b) return;
+    b.addEventListener('click', function(){
+      var x = Calc.cenario(Views.cen);
+      UI.confirmar('Definir como meta de '+U.nomeMes(UI.ym)+'?',
+        'Faturamento '+U.brl(x.faturamento,0)+', lucro '+U.brl(x.lucro,0)+', '+U.num(x.pedidos)+' pedidos e CPA máximo de '+
+        (x.unit.cpaMaxAlvo>0?U.brl(x.unit.cpaMaxAlvo):'—')+'. Substitui as metas atuais do mês.',
+        function(){
+          Store.setMeta(UI.ym, {
+            faturamento: Math.round(x.faturamento), lucro: Math.round(x.lucro),
+            pedidos: Math.round(x.pedidos), margem: U.n(Views.cen.margemAlvo, Calc.cfg().metaMargem),
+            cpaMax: x.unit.cpaMaxAlvo>0 ? Math.round(x.unit.cpaMaxAlvo) : 0
+          });
+          UI.tela='financeiro'; UI.aba='projecao'; App.render();
+        }, 'Definir meta');
+    });
   },
 
   simEscada: function(){
