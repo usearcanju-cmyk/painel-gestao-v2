@@ -538,6 +538,7 @@ function estadoPadrao(){
     ],
     fechamento: {}, /* '2026-09': {conciliadoAte, ofertaAprovada, custosConferidos, falhasApuradas, aprendizado, acao, fechado} */
     vigencias: [],  /* [{desde:'2026-09', premissas:{...}, obs:''}] — histórico de custos */
+    ajusteFrete: {},/* '2026-09': valor real total pago em etiquetas no mês */
     campanhas: [],  /* desempenho por campanha vindo da Meta */
     integracoes: {
       proxyUrl:'/api', chave:'', autoSync:true,
@@ -626,6 +627,7 @@ var Store = {
     if(!Array.isArray(d.contas)) d.contas = [];
     if(!Array.isArray(d.campanhas)) d.campanhas = [];
     if(!d.fechamento || typeof d.fechamento!=='object') d.fechamento = {};
+    if(!d.ajusteFrete || typeof d.ajusteFrete!=='object') d.ajusteFrete = {};
     d.integracoes = Object.assign({}, base.integracoes, d.integracoes||{});
     d.integracoes.loja = Object.assign({}, base.integracoes.loja, d.integracoes.loja||{});
     d.integracoes.ads = Object.assign({}, base.integracoes.ads, d.integracoes.ads||{});
@@ -739,6 +741,17 @@ var Store = {
   removerVigencia: function(desde){
     Store.dados.vigencias = Store.dados.vigencias.filter(function(v){ return v.desde!==desde; });
     Store.commit('Vigência removida');
+  },
+
+  /* ---- Ajuste do frete real do mês ---- */
+  ajusteFreteDe: function(ym){
+    var v = Store.dados.ajusteFrete[ym];
+    return (v===undefined || v===null || v==='') ? null : U.n(v);
+  },
+  setAjusteFrete: function(ym, valor){
+    if(valor===null) delete Store.dados.ajusteFrete[ym];
+    else Store.dados.ajusteFrete[ym] = U.n(valor);
+    Store.commit(valor===null ? 'Ajuste removido' : 'Frete do mês ajustado');
   },
 
   /* ---- Fechamento do mês ---- */
@@ -975,6 +988,12 @@ var Calc = {
       }
     });
     ['marketing','comissao','falha','outros'].forEach(function(g){ a.custo[g] = a.manual[g]; });
+
+    /* Frete real informado no fechamento do mês vence qualquer estimativa. */
+    a.fretePrevisto = a.custo.frete;
+    var aj = Store.ajusteFreteDe(ym);
+    a.freteAjustado = (aj !== null);
+    if(a.freteAjustado) a.custo.frete = aj;
 
     a.despesaTotal = Object.keys(a.custo).reduce(function(s,g){ return s+a.custo[g]; },0);
     a.receitaTotal = a.faturamento + a.outrasReceitas + a.freteCobrado;
@@ -2204,19 +2223,46 @@ Views.frete = function(){
 
   h += '<div class="grade g4" style="margin-bottom:12px">'+
     UI.kpi({rot:'Frete médio configurado', val:U.brl(c.freteMedio), destaque:true, nota:'premissa usada nos cálculos'})+
-    UI.kpi({rot:'Frete do mês', val:U.brl(a.custo.frete,0), pequeno:true, nota:U.pct(a.fretePct)+' do faturamento'})+
+    UI.kpi({rot:'Frete do mês', val:U.brl(a.custo.frete,0), pequeno:true,
+      nota:U.pct(a.fretePct)+' do faturamento'+(a.freteAjustado?' · valor real':' · estimado'),
+      pt: a.freteAjustado?'ok':'nu'})+
     UI.kpi({rot:'Frete por pedido', val:U.brl(a.fretePorPedido), pequeno:true,
       nota: a.pedidos ? (a.fretePorPedido<=U.n(c.freteMedio)?'dentro da premissa':'acima da premissa') : 'sem pedidos no mês',
       pt: a.pedidos ? (a.fretePorPedido<=U.n(c.freteMedio)?'ok':'at') : 'nu'})+
     UI.kpi({rot:'Frete de reenvio e extravio', val:U.brl(reenvio,0), pequeno:true, classe:reenvio>0?'neg':'', nota:'entra no custo da falha'})+
   '</div>';
 
+  var aj = Store.ajusteFreteDe(UI.ym);
+  var difAj = aj===null ? 0 : (aj - previsto);
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Fechar o frete de '+U.nomeMes(UI.ym)+'</div>'+
+    '<div class="cartao-sub">No fim do mês, informe quanto você realmente pagou em etiquetas. '+
+      'Esse valor substitui a estimativa de pedidos × frete médio e recalcula margem, lucro e caixa.</div>'+
+    '<div class="linha-campos lc2" style="align-items:end">'+
+      '<div class="campo" style="margin-bottom:0"><label>Total pago em etiquetas (R$)</label>'+
+        '<input type="number" id="ajFrete" step="0.01" placeholder="'+U.n(previsto,2)+'" value="'+(aj===null?'':U.n(aj))+'"></div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn" id="ajSalvar">Salvar frete real</button>'+
+        (aj!==null?'<button class="btn sec" id="ajLimpar">Voltar à estimativa</button>':'')+
+      '</div>'+
+    '</div>'+
+    (aj!==null
+      ? '<div class="'+(Math.abs(difAj)>0.009?'aviso':'info')+'" style="margin:14px 0 0">'+
+        'Usando o valor real de '+U.brl(aj)+'. A estimativa dava '+U.brl(previsto)+' — '+
+        (Math.abs(difAj)<0.01 ? 'praticamente igual.'
+          : (difAj>0 ? 'você pagou '+U.brl(difAj)+' a mais do que a premissa previa, e isso saiu do lucro.'
+                     : 'você pagou '+U.brl(-difAj)+' a menos, e isso virou lucro.'))+
+        (a.pedidos ? ' Frete real por pedido: '+U.brl(aj/a.pedidos)+'.' : '')+'</div>'
+      : '<div class="info" style="margin:14px 0 0">Enquanto você não informar, o painel usa '+
+        U.num(a.pedidos)+' pedido(s) × '+U.brl(c.freteMedio)+' = <b>'+U.brl(previsto)+'</b>.</div>')+
+  '</div>';
+
   h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Premissa × realidade</div>'+
     '<div class="cartao-sub">Se o frete real ficar sistematicamente acima da premissa, toda margem calculada está otimista</div>'+
     Chart.barras([
-      {rot:'Frete previsto ('+U.num(a.pedidos)+' pedidos × '+U.brl(c.freteMedio)+')', valor:previsto, cor:'#b08a84'},
-      {rot:'Frete lançado manualmente no mês', valor:real, cor:'#5a332e'},
-      {rot:'Frete considerado no resultado', valor:a.custo.frete, cor:'#1f9d6c'}
+      {rot:'Estimativa ('+U.num(a.pedidos)+' pedidos × '+U.brl(c.freteMedio)+')', valor:previsto, cor:'#b08a84'},
+      {rot:'Lançado manualmente no mês', valor:real, cor:'#5a332e'},
+      {rot:'Considerado no resultado'+(a.freteAjustado?' (valor real informado)':''), valor:a.custo.frete, cor:'#1f9d6c'}
     ])+
     '<div class="info" style="margin-top:14px">O grupo Frete está no modo <b>'+(c.modo.frete==='auto'?'automático':'manual')+'</b>. '+
       (c.modo.frete==='auto'
@@ -4132,6 +4178,16 @@ var App = {
     if(q('btnAporte')){
       q('btnAporte').addEventListener('click', function(){ Form.reserva('aporte'); });
       q('btnRetirada').addEventListener('click', function(){ Form.reserva('retirada'); });
+    }
+    if(q('ajSalvar')){
+      q('ajSalvar').addEventListener('click', function(){
+        var v = q('ajFrete').value;
+        if(v==='' || v===null){ UI.toast('Informe o total pago em etiquetas.'); return; }
+        Store.setAjusteFrete(UI.ym, U.n(v)); App.render();
+      });
+      if(q('ajLimpar')) q('ajLimpar').addEventListener('click', function(){
+        Store.setAjusteFrete(UI.ym, null); App.render();
+      });
     }
     if(q('addConta')) q('addConta').addEventListener('click', function(){ Form.conta(); });
     if(q('addProduto')) q('addProduto').addEventListener('click', function(){ Form.produto(); });
