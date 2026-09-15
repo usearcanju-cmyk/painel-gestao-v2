@@ -317,6 +317,28 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
   .veredito-linha{gap:16px}
   .mini{min-width:calc(50% - 8px)}
 }
+/* ---------------- Planilha do gestor ---------------- */
+.plan{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--carta)}
+.plan th{background:#f6f2ef;color:var(--vinho);font-family:var(--serif);font-size:14px;font-weight:600;
+  padding:11px 14px;text-align:left;border-bottom:1px solid var(--linha-forte)}
+.plan td{padding:10px 14px;border-bottom:1px solid #f1ece8}
+.plan tr:last-child td{border-bottom:none}
+.plan .rot{font-weight:500;width:42%}
+.plan .pc{text-align:right;color:var(--texto-medio);font-variant-numeric:tabular-nums;width:17%}
+.plan .vl{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;width:24%}
+.plan .nt{font-size:11.5px;color:var(--texto-fraco);font-weight:400;margin-top:2px}
+.plan tr.entrada td{background:#eef7f2}
+.plan tr.entrada .vl{color:#136c4a}
+.plan tr.saida .vl{color:var(--vinho)}
+.plan tr.resultado td{background:#fbf8f6;border-top:1px solid var(--linha-forte);font-weight:700}
+.plan tr.resultado td{padding-top:13px;padding-bottom:13px}
+.plan input{border:1px solid #bcd9cb;background:#fff;text-align:right;font-weight:600;
+  padding:6px 9px;border-radius:var(--r-sm);width:100%;max-width:150px;margin-left:auto;display:block}
+.plan input:focus{border-color:var(--verde);box-shadow:0 0 0 3px rgba(31,157,108,.12)}
+.plan .editavel{position:relative}
+.legenda-cores{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--texto-medio);margin-top:12px}
+.legenda-cores i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-1px}
+
 /* ---------------- Tela de acesso ---------------- */
 .trava{position:fixed;inset:0;z-index:500;background:var(--rail-fundo);display:flex;align-items:center;justify-content:center;padding:24px}
 .trava-caixa{width:100%;max-width:372px;text-align:center}
@@ -1318,6 +1340,125 @@ var Calc = {
     return {proLabore:pro, operacional:outros, total:pro+outros, lista:lista};
   },
 
+  /* ---------- MIX DE PEDIDOS ----------
+     Quantos pedidos saem com 1, 2, 3, 4+ camisetas, em todo o histórico.
+     Fonte primária: a contagem de peças do pedido, já sem capelinha e brindes.
+     Fonte alternativa: faixas de valor, para conferência. ---------- */
+  mix: function(){
+    var vendas = Store.dados.lancamentos.filter(function(l){
+      return l.grupo==='vendas' && U.n(l.pedidos)>0 && U.n(l.valor)>0;
+    });
+    var faixas = {}, semPeca = 0, totPed = 0, totCam = 0, totFat = 0;
+    vendas.forEach(function(l){
+      var ped = U.n(l.pedidos);
+      var cam = U.n(l.camisetas);
+      var v = U.n(l.valor) + U.n(l.freteCobrado);
+      totPed += ped; totFat += v;
+      if(!cam){ semPeca += ped; return; }
+      totCam += cam;
+      var q = Math.max(1, Math.round(cam/ped));
+      if(q>=5) q = 5;
+      if(!faixas[q]) faixas[q] = {qtd:q, pedidos:0, fat:0, camisetas:0};
+      faixas[q].pedidos += ped;
+      faixas[q].fat += v;
+      faixas[q].camisetas += cam;
+    });
+    var comPeca = totPed - semPeca;
+    var lista = Object.keys(faixas).map(function(k){ return faixas[k]; })
+      .sort(function(a,b){ return a.qtd-b.qtd; });
+    lista.forEach(function(f){
+      f.part = U.div(f.pedidos, comPeca)*100;
+      f.ticket = U.div(f.fat, f.pedidos);
+    });
+    return {
+      faixas: lista,
+      pedidos: totPed, comPeca: comPeca, semPeca: semPeca,
+      camisetas: totCam, faturamento: totFat,
+      mediaCamisetas: U.div(totCam, comPeca),
+      ticketMedio: U.div(totFat, totPed),
+      temDados: comPeca > 0
+    };
+  },
+
+  /* Mesma leitura, mas classificando por valor do pedido — para conferir o mix */
+  mixPorValor: function(cortes){
+    cortes = cortes || [];
+    var vendas = Store.dados.lancamentos.filter(function(l){
+      return l.grupo==='vendas' && U.n(l.pedidos)>0 && U.n(l.valor)>0;
+    });
+    var baldes = cortes.map(function(c){ return {rot:c.rot, qtd:c.qtd, de:c.de, ate:c.ate, pedidos:0, fat:0}; });
+    var totPed = 0;
+    vendas.forEach(function(l){
+      var v = (U.n(l.valor)+U.n(l.freteCobrado)) / Math.max(1,U.n(l.pedidos));
+      var ped = U.n(l.pedidos); totPed += ped;
+      for(var i=0;i<baldes.length;i++){
+        if(v >= baldes[i].de && v < baldes[i].ate){ baldes[i].pedidos += ped; baldes[i].fat += U.n(l.valor)+U.n(l.freteCobrado); break; }
+      }
+    });
+    baldes.forEach(function(b){ b.part = U.div(b.pedidos, totPed)*100; b.ticket = U.div(b.fat, b.pedidos); });
+    return {baldes:baldes, pedidos:totPed};
+  },
+
+  /* ---------- VISÃO DO GESTOR ----------
+     Parte do faturamento desejado e abre todos os custos. ---------- */
+  gestor: function(o){
+    var c = Calc.cfg();
+    var fat = U.n(o.faturamento);
+    var camPorPedido = Math.max(0.01, U.n(o.camisetasPorPedido, 2));
+    var ticket = Math.max(0.01, U.n(o.ticket, 249.90));
+    var dias = U.diasNoMes(o.ym || U.ymAtual());
+
+    var g = {faturamento:fat, ticket:ticket, camisetasPorPedido:camPorPedido, dias:dias};
+    g.pedidos = fat / ticket;
+    g.camisetas = g.pedidos * camPorPedido;
+    g.pedidosDia = g.pedidos / dias;
+    g.camisetasDia = g.camisetas / dias;
+
+    g.custoCamiseta = U.n(o.custoCamiseta, Calc.custoCamiseta());
+    g.freteUnit = U.n(o.freteMedio, c.freteMedio);
+    g.embalagemUnit = U.n(o.embalagemUnit, Calc.kitEmbalagem(camPorPedido) + Calc.insumosPorPedido());
+
+    g.cmv        = g.camisetas * g.custoCamiseta;
+    g.frete      = g.pedidos * g.freteUnit;
+    g.embalagem  = g.pedidos * g.embalagemUnit;
+    g.marketing  = fat * U.n(o.marketingPct, c.marketingBase)/100;
+    g.gateway    = fat * U.n(o.gatewayPct, c.gateway)/100 + g.pedidos * U.n(o.gatewayFixo, c.gatewayFixo);
+    g.checkout   = fat * U.n(o.checkoutPct, c.checkout)/100;
+    g.imposto    = fat * U.n(o.impostoPct, c.imposto)/100;
+    g.operacional= U.n(o.operacional, Calc.fixoMensal().total);
+
+    g.linhas = [
+      {id:'operacional', rot:'Custo operacional', valor:g.operacional, editavel:true, nota:'fixo mensal, vem da Agenda'},
+      {id:'cmv',        rot:'CMV', valor:g.cmv,       nota:U.num(g.camisetas,0)+' camisetas × '+U.brl(g.custoCamiseta)},
+      {id:'embalagem',  rot:'Embalagem e brindes', valor:g.embalagem, nota:U.num(g.pedidos,0)+' pedidos × '+U.brl(g.embalagemUnit)},
+      {id:'marketing',  rot:'Marketing', valor:g.marketing, editavel:true, nota:'% do faturamento'},
+      {id:'gateway',    rot:'Gateway', valor:g.gateway,  nota:U.pct(U.n(o.gatewayPct,c.gateway),2)+(U.n(o.gatewayFixo,c.gatewayFixo)?' + '+U.brl(U.n(o.gatewayFixo,c.gatewayFixo))+' por pedido':'')},
+      {id:'checkout',   rot:'Checkout', valor:g.checkout, nota:U.pct(U.n(o.checkoutPct,c.checkout),2)+' do faturamento'},
+      {id:'frete',      rot:'Frete', valor:g.frete,     nota:U.num(g.pedidos,0)+' pedidos × '+U.brl(g.freteUnit)},
+      {id:'imposto',    rot:'Imposto', valor:g.imposto, nota:U.pct(U.n(o.impostoPct,c.imposto),2)+' do faturamento'}
+    ];
+    g.linhas.forEach(function(l){ l.pct = U.div(l.valor, fat)*100; });
+
+    g.custoTotal = g.linhas.reduce(function(s,l){ return s+l.valor; },0);
+    g.margem = fat - g.custoTotal;
+    g.margemPct = U.div(g.margem, fat)*100;
+    g.lucroPorPedido = U.div(g.margem, g.pedidos);
+    g.custoMedioCamisetaFrete = U.div(g.cmv + g.frete + g.embalagem, g.pedidos);
+
+    /* ponto de equilíbrio em pedidos */
+    var variavelPorPedido = (g.cmv + g.frete + g.embalagem + g.marketing + g.gateway + g.checkout + g.imposto) / Math.max(1,g.pedidos);
+    g.contribPedido = ticket - variavelPorPedido;
+    g.pedidosEquilibrio = g.contribPedido>0 ? Math.ceil(g.operacional / g.contribPedido) : null;
+    g.pedidosDiaEquilibrio = g.pedidosEquilibrio!==null ? g.pedidosEquilibrio/dias : null;
+
+    var alvo = U.n(o.margemAlvo, c.metaMargem)/100;
+    var porPedidoAlvo = g.contribPedido - alvo*ticket;
+    g.pedidosParaAlvo = porPedidoAlvo>0 ? Math.ceil(g.operacional / porPedidoAlvo) : null;
+    g.faturamentoParaAlvo = g.pedidosParaAlvo!==null ? g.pedidosParaAlvo*ticket : null;
+    g.margemAlvo = alvo*100;
+    return g;
+  },
+
   /* ---------- CENÁRIO MENSAL ----------
      Projeta um mês inteiro a partir de uma oferta e de um volume de pedidos.
      Usa custo fixo real (contas cadastradas), não percentual. ---------- */
@@ -1676,6 +1817,7 @@ var UI = {
 var NAV = [
   {g:'Operação', itens:[
     {id:'geral', nome:'Visão Geral', ico:'M3 12l9-9 9 9M5 10v10h14V10'},
+    {id:'gestor', nome:'Visão do Gestor', ico:'M3 3v18h18M7 15l4-4 3 3 5-6'},
     {id:'financeiro', nome:'Financeiro', ico:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'},
     {id:'metas', nome:'Metas do mês', ico:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'},
     {id:'agenda', nome:'Agenda de pagamentos', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'}
@@ -3071,6 +3213,179 @@ Views._historicoCustos = function(){
 Views._cfgNum = function(rot, id, val, passo){
   return '<div class="campo"><label>'+rot+'</label><input type="number" id="'+id+'" value="'+U.n(val)+'" step="'+passo+'"></div>';
 };
+
+/* ============================================================
+   VISÃO DO GESTOR — a planilha
+============================================================ */
+Views.gest = null;
+Views.gestPadrao = function(){
+  var c = Calc.cfg(), mx = Calc.mix();
+  return {
+    faturamento: 50000,
+    ticket: mx.temDados ? Math.round(mx.ticketMedio*100)/100 : 249.90,
+    camisetasPorPedido: mx.temDados ? Math.round(mx.mediaCamisetas*100)/100 : 2,
+    custoCamiseta: Calc.custoCamiseta(),
+    freteMedio: U.n(c.freteMedio),
+    embalagemUnit: Calc.kitEmbalagem(mx.temDados?mx.mediaCamisetas:2) + Calc.insumosPorPedido(),
+    marketingPct: U.n(c.marketingBase),
+    gatewayPct: U.n(c.gateway),
+    gatewayFixo: U.n(c.gatewayFixo),
+    checkoutPct: U.n(c.checkout),
+    impostoPct: U.n(c.imposto),
+    operacional: Calc.fixoMensal().total,
+    margemAlvo: U.n(c.metaMargem)
+  };
+};
+
+Views.gestor = function(){
+  if(!Views.gest) Views.gest = Views.gestPadrao();
+  var h = '';
+  h += '<div class="info">Os campos em <b>verde</b> são seus: você digita. Todo o resto é calculado. '+
+    'Mudou um verde, a planilha inteira se refaz.</div>';
+  h += '<div id="gestTudo">'+Views.gestConteudo()+'</div>';
+  return h;
+};
+
+Views.gestConteudo = function(){
+  var s = Views.gest, g = Calc.gestor(Object.assign({}, s, {ym:UI.ym}));
+  var mx = Calc.mix();
+  var nivel = g.margemPct >= g.margemAlvo ? 'ok' : (g.margemPct >= g.margemAlvo*0.7 ? 'at' : 'cr');
+  var h = '';
+
+  /* ---------- a planilha ---------- */
+  h += '<div class="grade" style="grid-template-columns:1.25fr 1fr;gap:12px;align-items:start;margin-bottom:12px">';
+
+  h += '<div class="cartao" style="padding:0;overflow:hidden">'+
+    '<table class="plan"><thead><tr><th class="rot">Cenário</th><th class="pc">% do faturamento</th><th class="vl">Valor</th></tr></thead><tbody>'+
+    '<tr class="entrada"><td class="rot">Faturamento<div class="nt">o que você quer faturar no mês</div></td>'+
+      '<td class="pc">100%</td>'+
+      '<td class="vl editavel"><input type="number" id="gFat" step="1000" value="'+U.n(s.faturamento)+'"></td></tr>';
+
+  g.linhas.forEach(function(l){
+    var campo = '';
+    if(l.id==='marketing'){
+      campo = '<td class="pc"><input type="number" id="gMkt" step="0.5" value="'+U.n(s.marketingPct)+'" style="max-width:82px"></td>';
+    } else {
+      campo = '<td class="pc">'+U.pct(l.pct)+'</td>';
+    }
+    var valorCel = (l.id==='operacional')
+      ? '<td class="vl editavel"><input type="number" id="gOper" step="10" value="'+U.n(s.operacional)+'"></td>'
+      : '<td class="vl">'+U.brl(l.valor)+'</td>';
+    h += '<tr class="saida'+(l.editavel?' entrada':'')+'"><td class="rot">'+U.esc(l.rot)+
+      '<div class="nt">'+U.esc(l.nota)+'</div></td>'+campo+valorCel+'</tr>';
+  });
+
+  h += '<tr class="resultado"><td class="rot">Total de custos</td>'+
+      '<td class="pc">'+U.pct(U.div(g.custoTotal,g.faturamento)*100)+'</td>'+
+      '<td class="vl">'+U.brl(g.custoTotal)+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Margem<div class="nt">alvo '+U.pct(g.margemAlvo,0)+'</div></td>'+
+      '<td class="pc"><span class="pt '+nivel+'"></span> '+U.pct(g.margemPct)+'</td>'+
+      '<td class="vl" style="color:'+(g.margem<0?'var(--rubro)':'var(--verde)')+'">'+U.brl(g.margem)+'</td></tr>'+
+    '</tbody></table>'+
+    '<div class="legenda-cores" style="padding:12px 14px 14px">'+
+      '<span><i style="background:#eef7f2;border:1px solid #bcd9cb"></i>você digita</span>'+
+      '<span><i style="background:#fff;border:1px solid var(--linha-forte)"></i>o sistema calcula</span>'+
+    '</div>'+
+  '</div>';
+
+  /* ---------- volume ---------- */
+  h += '<div class="cartao" style="padding:0;overflow:hidden">'+
+    '<table class="plan"><thead><tr><th class="rot">Volume necessário</th><th class="pc"></th><th class="vl">Quantidade</th></tr></thead><tbody>'+
+    '<tr class="entrada"><td class="rot">Ticket médio por pedido<div class="nt">média real do seu histórico</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="gTicket" step="1" value="'+U.n(s.ticket)+'"></td></tr>'+
+    '<tr class="entrada"><td class="rot">Camisetas por pedido<div class="nt">média real do seu histórico</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="gCamPed" step="0.01" value="'+U.n(s.camisetasPorPedido)+'"></td></tr>'+
+    '<tr class="saida"><td class="rot">Vendas no mês<div class="nt">faturamento ÷ ticket</div></td><td class="pc"></td>'+
+      '<td class="vl">'+U.num(g.pedidos,0)+'</td></tr>'+
+    '<tr class="saida"><td class="rot">Camisetas no mês</td><td class="pc"></td><td class="vl">'+U.num(g.camisetas,0)+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Vendas por dia<div class="nt">mês de '+g.dias+' dias</div></td><td class="pc"></td>'+
+      '<td class="vl" style="font-size:17px">'+U.num(g.pedidosDia,1)+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Camisetas por dia</td><td class="pc"></td>'+
+      '<td class="vl">'+U.num(g.camisetasDia,1)+'</td></tr>'+
+    '<tr class="saida"><td class="rot">Custo médio por pedido<div class="nt">camiseta + embalagem + frete</div></td><td class="pc"></td>'+
+      '<td class="vl">'+U.brl(g.custoMedioCamisetaFrete)+'</td></tr>'+
+    '<tr class="saida"><td class="rot">Lucro por pedido</td><td class="pc"></td>'+
+      '<td class="vl" style="color:'+(g.lucroPorPedido<0?'var(--rubro)':'var(--verde)')+'">'+U.brl(g.lucroPorPedido)+'</td></tr>'+
+    '</tbody></table></div>';
+  h += '</div>';
+
+  /* ---------- pontos de virada ---------- */
+  h += '<div class="grade g3" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Vendas por dia para não ter prejuízo',
+      val: g.pedidosDiaEquilibrio!==null ? U.num(g.pedidosDiaEquilibrio,1) : '—', destaque:true,
+      nota: g.pedidosEquilibrio!==null ? (U.num(g.pedidosEquilibrio)+' no mês · '+U.brl(g.pedidosEquilibrio*g.ticket,0)) : 'a oferta não cobre o fixo',
+      ajuda:'Abaixo disso o mês fecha no vermelho, independente do quanto você venda bem.'})+
+    UI.kpi({rot:'Vendas por dia para atingir '+U.pct(g.margemAlvo,0),
+      val: g.pedidosParaAlvo!==null ? U.num(g.pedidosParaAlvo/g.dias,1) : 'impossível', destaque:true,
+      classe: g.pedidosParaAlvo===null?'neg':'',
+      nota: g.pedidosParaAlvo!==null ? (U.num(g.pedidosParaAlvo)+' no mês · '+U.brl(g.faturamentoParaAlvo,0)) : 'reduza marketing ou suba o ticket'})+
+    UI.kpi({rot:'Contribuição por pedido', val:U.brl(g.contribPedido), pequeno:true,
+      nota:'é o que sobra para pagar o fixo', ajuda:'Ticket menos todos os custos que variam com a venda.'})+
+  '</div>';
+
+  /* ---------- mix real ---------- */
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:220px"><div class="cartao-tit">Mix real dos seus pedidos</div>'+
+      '<div class="cartao-sub">Todo o histórico importado, contando peças de verdade — capelinha e brindes ficam de fora</div></div>'+
+      (mx.temDados?'<button class="btn sec sm" id="gUsarMix">Usar este mix na planilha</button>':'')+
+    '</div>';
+  if(!mx.temDados){
+    h += '<div style="font-size:13px;color:var(--texto-fraco);margin-top:10px">Ainda não há pedidos com contagem de peças. Traga o histórico em Integrações.</div>';
+  }else{
+    h += '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Pedidos com</th><th class="r">Pedidos</th><th class="r">Participação</th><th class="r">Ticket médio</th><th class="r">Faturamento</th></tr></thead><tbody>'+
+      mx.faixas.map(function(f){
+        return '<tr><td style="font-weight:500">'+f.qtd+(f.qtd>=5?'+ camisetas':(f.qtd>1?' camisetas':' camiseta'))+'</td>'+
+          '<td class="r">'+U.num(f.pedidos)+'</td><td class="r">'+U.pct(f.part,1)+'</td>'+
+          '<td class="r">'+U.brl(f.ticket,0)+'</td><td class="r">'+U.brl(f.fat,0)+'</td></tr>';
+      }).join('')+
+      '<tr class="total"><td>Média geral</td><td class="r">'+U.num(mx.comPeca)+'</td><td class="r">100%</td>'+
+      '<td class="r">'+U.brl(mx.ticketMedio,0)+'</td><td class="r">'+U.brl(mx.faturamento,0)+'</td></tr>'+
+      '</tbody></table></div>'+
+      '<div class="info" style="margin-top:12px">Média de <b>'+U.num(mx.mediaCamisetas,2)+' camisetas por pedido</b> e ticket médio de <b>'+U.brl(mx.ticketMedio)+'</b>.'+
+      (mx.semPeca>0 ? ' '+U.num(mx.semPeca)+' pedido(s) sem contagem de peças ficaram de fora desta média.' : '')+'</div>';
+  }
+  h += '</div>';
+
+  /* ---------- projeção do mês corrente ---------- */
+  var a = Calc.apurar(UI.ym), p = Calc.projetar(a);
+  h += '<div class="cartao"><div class="cartao-tit">Projeção de '+U.nomeMes(UI.ym)+'</div>'+
+    '<div class="cartao-sub">Onde o mês termina no ritmo atual, comparado com o cenário acima</div>'+
+    '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Item</th><th class="r">Realizado até agora</th><th class="r">Projeção do mês</th><th class="r">Cenário</th><th class="r">Diferença</th>'+
+    '</tr></thead><tbody>'+
+    (function(){
+      var proj = function(v){ return p.encerrado ? v : U.div(v, Math.max(1,p.decorridos)) * p.dias; };
+      var itens = [
+        ['Faturamento', a.faturamento, proj(a.faturamento), g.faturamento],
+        ['Pedidos', a.pedidos, proj(a.pedidos), g.pedidos],
+        ['Marketing', a.custo.marketing, proj(a.custo.marketing), g.marketing],
+        ['CMV', a.custo.cmv, proj(a.custo.cmv), g.cmv],
+        ['Frete', a.custo.frete, proj(a.custo.frete), g.frete],
+        ['Embalagem', a.custo.embalagem, proj(a.custo.embalagem), g.embalagem],
+        ['Imposto', a.custo.imposto, proj(a.custo.imposto), g.imposto],
+        ['Lucro', a.lucro, p.projLucro, g.margem]
+      ];
+      return itens.map(function(i){
+        var ehQtd = i[0]==='Pedidos';
+        var fmt = ehQtd ? function(v){ return U.num(v,0); } : function(v){ return U.brl(v,0); };
+        var dif = i[2] - i[3];
+        var bom = (i[0]==='Faturamento'||i[0]==='Pedidos'||i[0]==='Lucro') ? dif>=0 : dif<=0;
+        return '<tr'+(i[0]==='Lucro'?' class="total"':'')+'><td style="font-weight:500">'+i[0]+'</td>'+
+          '<td class="r">'+fmt(i[1])+'</td><td class="r" style="font-weight:600">'+fmt(i[2])+'</td>'+
+          '<td class="r" style="color:var(--texto-fraco)">'+fmt(i[3])+'</td>'+
+          '<td class="r" style="color:'+(bom?'var(--verde)':'var(--rubro)')+'">'+(dif>=0?'+':'−')+' '+fmt(Math.abs(dif))+'</td></tr>';
+      }).join('');
+    })()+
+    '</tbody></table></div>'+
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'+
+      '<button class="btn" id="gVirarMeta">Usar o cenário como meta de '+U.nomeMes(UI.ym)+'</button>'+
+      '<button class="btn sec" id="gRestaurar">Restaurar padrão</button>'+
+    '</div>'+
+  '</div>';
+  return h;
+};
 /* ============================================================
    AGENDA DE PAGAMENTOS
    Junta contas fixas recorrentes + lançamentos pendentes
@@ -4179,7 +4494,7 @@ var App = {
     document.querySelectorAll('.nav-item').forEach(function(b){
       b.classList.toggle('ativo', b.getAttribute('data-tela')===UI.tela);
     });
-    var mostraPeriodo = ['geral','financeiro','metas','agenda','integracoes'].indexOf(UI.tela)>=0;
+    var mostraPeriodo = ['geral','gestor','financeiro','metas','agenda','integracoes'].indexOf(UI.tela)>=0;
     document.getElementById('periodoCtrl').style.display = mostraPeriodo ? '' : 'none';
 
     var h = '';
@@ -4191,6 +4506,7 @@ var App = {
       h += fn ? fn() : Views.dashboard();
     }
     else if(UI.tela==='geral') h = Views.geral();
+    else if(UI.tela==='gestor') h = Views.gestor();
     else if(UI.tela==='metas') h = Views.metas();
     else if(UI.tela==='agenda') h = Views.agenda();
     else if(UI.tela==='integracoes') h = Views.integracoes();
@@ -4227,6 +4543,9 @@ var App = {
 
     /* cenário do mês */
     if(q('cenResultado')) App.cenEventos();
+
+    /* visão do gestor */
+    if(q('gestTudo')) App.gestEventos();
 
     /* metas */
     if(q('mSalvar')){
@@ -4513,6 +4832,59 @@ var App = {
     if(q('cenPro')) q('cenPro').addEventListener('change', function(){ s.incluirProLabore = this.checked; atualizar(); });
     if(q('cenReset')) q('cenReset').addEventListener('click', function(){ Views.cen = Views.cenPadrao(); App.render(); });
     App.cenBotoes();
+  },
+
+  gestEventos: function(){
+    var q = function(id){ return document.getElementById(id); };
+    var s = Views.gest;
+    var atualizar = function(foco){
+      var alvo = q('gestTudo');
+      if(!alvo) return;
+      alvo.innerHTML = Views.gestConteudo();
+      App.gestEventos();
+      if(foco){
+        var el = document.getElementById(foco);
+        if(el){ el.focus(); var v=el.value; el.value=''; el.value=v; }
+      }
+    };
+    var liga = function(id, campo){
+      var el = q(id); if(!el) return;
+      var t;
+      el.addEventListener('input', function(){
+        s[campo] = U.n(this.value);
+        clearTimeout(t); t = setTimeout(function(){ atualizar(id); }, 420);
+      });
+    };
+    liga('gFat','faturamento');
+    liga('gMkt','marketingPct');
+    liga('gOper','operacional');
+    liga('gTicket','ticket');
+    liga('gCamPed','camisetasPorPedido');
+
+    if(q('gUsarMix')) q('gUsarMix').addEventListener('click', function(){
+      var mx = Calc.mix();
+      s.ticket = Math.round(mx.ticketMedio*100)/100;
+      s.camisetasPorPedido = Math.round(mx.mediaCamisetas*100)/100;
+      s.embalagemUnit = Calc.kitEmbalagem(mx.mediaCamisetas) + Calc.insumosPorPedido();
+      UI.toast('Mix real aplicado: '+U.num(mx.mediaCamisetas,2)+' camisetas por pedido');
+      atualizar();
+    });
+    if(q('gRestaurar')) q('gRestaurar').addEventListener('click', function(){
+      Views.gest = Views.gestPadrao(); App.render();
+    });
+    if(q('gVirarMeta')) q('gVirarMeta').addEventListener('click', function(){
+      var g = Calc.gestor(Object.assign({}, s, {ym:UI.ym}));
+      UI.confirmar('Definir como meta de '+U.nomeMes(UI.ym)+'?',
+        'Faturamento '+U.brl(g.faturamento,0)+', lucro '+U.brl(g.margem,0)+' e '+U.num(g.pedidos,0)+' pedidos. Substitui as metas atuais.',
+        function(){
+          Store.setMeta(UI.ym, {
+            faturamento: Math.round(g.faturamento), lucro: Math.round(g.margem),
+            pedidos: Math.round(g.pedidos), margem: U.n(s.margemAlvo, Calc.cfg().metaMargem),
+            cpaMax: Math.max(0, Math.round(g.contribPedido - (U.n(s.margemAlvo)/100)*g.ticket + U.div(g.marketing,g.pedidos)))
+          });
+          App.render();
+        }, 'Definir meta');
+    });
   },
 
   cenBotoes: function(){
