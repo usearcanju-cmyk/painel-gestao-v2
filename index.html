@@ -645,6 +645,8 @@ var Store = {
         referencia: l.referencia || '',
         valor: U.n(l.valor),
         freteCobrado: U.n(l.freteCobrado),
+        valorBruto: U.n(l.valorBruto),
+        desconto: U.n(l.desconto),
         uf: l.uf || '',
         pedidos: U.n(l.pedidos),
         camisetas: U.n(l.camisetas),
@@ -3105,7 +3107,8 @@ var Integra = {
         data:String(x.data).slice(0,10), tipo:'receita', grupo:'vendas',
         categoria:x.categoria||'Venda online', descricao:x.descricao||('Pedido '+id),
         canal:x.canal||'Loja (Nuvemshop)', referencia:id, valor:U.n(x.valor),
-        freteCobrado:U.n(x.freteCobrado), uf:(x.uf||'').toUpperCase(),
+        freteCobrado:U.n(x.freteCobrado), valorBruto:U.n(x.valorBruto), desconto:U.n(x.desconto),
+        uf:(x.uf||'').toUpperCase(),
         pedidos:U.n(x.pedidos,1)||1, camisetas:U.n(x.camisetas), pagamento:x.pagamento||'',
         status:(x.status==='pendente'?'pendente':'pago'), obs:'', origem:'loja', externoId:id
       };
@@ -3298,18 +3301,26 @@ Form.lancamento = function(id, presets){
   var resumo = '';
   if(id && l.tipo==='receita' && l.grupo==='vendas'){
     var fr = U.n(l.freteCobrado), tt = U.n(l.valor)+fr;
+    var bruto = U.n(l.valorBruto), desc = U.n(l.desconto);
+    var linha = function(rot, val, cor){
+      return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0'+(cor?';color:'+cor:'')+'">'+
+        '<span>'+rot+'</span><span class="num">'+val+'</span></div>';
+    };
     resumo =
       '<div class="cartao" style="margin-bottom:16px;padding:14px 16px;background:#fdfbfa">'+
         '<div style="font-size:12px;color:var(--texto-medio);margin-bottom:8px">Como este pedido foi registrado</div>'+
-        '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">'+
-          '<span>Produtos</span><span class="num">'+U.brl(l.valor)+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">'+
-          '<span>Frete cobrado do cliente</span><span class="num">'+U.brl(fr)+'</span></div>'+
+        (bruto>0 ? linha('Produtos (preço de tabela)', U.brl(bruto)) : '')+
+        (desc>0 ? linha('Desconto, cupom ou promoção', '− '+U.brl(desc), 'var(--rubro)') : '')+
+        (bruto>0 || desc>0
+          ? linha('<b>Produtos líquidos</b>', '<b>'+U.brl(l.valor)+'</b>')
+          : linha('Produtos', U.brl(l.valor)))+
+        linha('Frete cobrado do cliente', U.brl(fr))+
         '<div style="display:flex;justify-content:space-between;font-size:14px;padding:7px 0 0;margin-top:5px;border-top:1px solid var(--linha);font-weight:700">'+
           '<span>Total pago</span><span class="num">'+U.brl(tt)+'</span></div>'+
         (l.origem==='loja'
           ? '<div style="font-size:11.5px;color:var(--texto-fraco);line-height:1.5;margin-top:10px">'+
-            'Este é o valor que o cliente efetivamente pagou, já com desconto e promoção aplicados. '+
+            'Este é o valor que o cliente efetivamente pagou. '+
+            (desc>0 ? 'O desconto foi abatido dos produtos, não do frete. ' : '')+
             'Se não bater com a loja, confira se o pedido teve alteração depois da última busca.</div>'
           : '')+
         '<div style="font-size:11.5px;color:var(--texto-fraco);line-height:1.5;margin-top:8px">'+
