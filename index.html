@@ -529,28 +529,37 @@ function estadoPadrao(){
       /* Kit de embalagem por tamanho do pedido. É o jeito mais fiel: o custo dá um salto
          quando o pedido deixa de caber na embalagem menor. */
       embalagemFaixas: [
-        {ate:3,  custo:9.15},
-        {ate:99, custo:13.55}
+        {ate:3,  custo:0.50},
+        {ate:99, custo:0.90}
       ],
       /* Quando ligado, os brindes de cada oferta são escolhidos na tela da promoção
          e os insumos abaixo deixam de ser somados automaticamente em todo pedido. */
-      brindesPorOferta: false,
+      brindesPorOferta: true,
       /* Catálogo de brindes e itens cobrados por fora do kit */
       insumos: [
-        {id:'i1', nome:'Capelinha',  custo:0, base:'pedido', ativo:true, aDefinir:true},
-        {id:'i2', nome:'Sacolinha',  custo:0, base:'pedido', ativo:true, aDefinir:true},
-        {id:'i5', nome:'Cartinha',   custo:0, base:'pedido', ativo:true, aDefinir:true},
-        {id:'i6', nome:'Cheirinho',  custo:0, base:'pedido', ativo:true, aDefinir:true}
+        {id:'i1', nome:'Capelinha',             custo:4,    base:'pedido', ativo:true},
+        {id:'i2', nome:'Sacolinha',             custo:4,    base:'pedido', ativo:true},
+        {id:'i3', nome:'Saquinho transparente', custo:0.40, base:'pedido', ativo:true},
+        {id:'i5', nome:'Cartinha',              custo:0,    base:'pedido', ativo:true, aDefinir:true},
+        {id:'i6', nome:'Cheirinho',             custo:0,    base:'pedido', ativo:true, aDefinir:true}
       ],
       canais: ['Loja (Nuvemshop)','Instagram','WhatsApp','Revenda','Representantes','Feira/Evento','Outro']
     },
     lancamentos: [],
     metas: {},      /* '2026-09': {faturamento, lucro, pedidos, margem, cpaMax} */
-    ofertas: [      /* escada em estudo, preços atuais */
-      {id:'o1', nome:'1 camiseta — R$ 139,90 + frete cobrado', camisetas:1, preco:139.90, freteGratis:false, freteCobrado:18, frete:18, modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{}},
-      {id:'o2', nome:'2 camisetas — R$ 249,90 + frete grátis', camisetas:2, preco:249.90, freteGratis:true,  freteCobrado:0,  frete:18, modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{}},
-      {id:'o3', nome:'3 camisetas — R$ 319,90 + frete grátis', camisetas:3, preco:319.90, freteGratis:true,  freteCobrado:0,  frete:18, modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{}},
-      {id:'o4', nome:'4 camisetas — R$ 399,90 + frete grátis', camisetas:4, preco:399.90, freteGratis:true,  freteCobrado:0,  frete:18, modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{}}
+    ofertas: [      /* promoções: o que está no ar hoje */
+      {id:'o1', nome:'1 camiseta', camisetas:1, preco:139.90, freteGratis:false, freteCobrado:18, frete:18,
+       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
+       ativa:true, itens:['i3'], obs:''},
+      {id:'o2', nome:'2 camisetas + frete grátis', camisetas:2, preco:249.90, freteGratis:true, freteCobrado:0, frete:18,
+       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
+       ativa:true, itens:['i1','i2','i3'], obs:'capelinha e sacolinha de presente'},
+      {id:'o3', nome:'3 camisetas + frete grátis', camisetas:3, preco:319.90, freteGratis:true, freteCobrado:0, frete:18,
+       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
+       ativa:true, itens:['i1','i2','i3'], obs:''},
+      {id:'o4', nome:'4 camisetas + frete grátis', camisetas:4, preco:399.90, freteGratis:true, freteCobrado:0, frete:18,
+       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
+       ativa:true, itens:['i1','i2','i3'], obs:''}
     ],
     reservaMovs: [],/* aportes e retiradas da reserva */
     contas: [
@@ -651,6 +660,12 @@ var Store = {
     if(!Array.isArray(d.config.canais) || !d.config.canais.length) d.config.canais = base.config.canais;
     if(!Array.isArray(d.lancamentos)) d.lancamentos = [];
     if(!Array.isArray(d.ofertas)) d.ofertas = [];
+    d.ofertas = d.ofertas.map(function(o){
+      if(o.ativa===undefined) o.ativa = true;
+      if(!Array.isArray(o.itens)) o.itens = [];
+      if(o.obs===undefined) o.obs = '';
+      return o;
+    });
     if(!Array.isArray(d.reservaMovs)) d.reservaMovs = [];
     if(!Array.isArray(d.contas)) d.contas = [];
     if(!Array.isArray(d.campanhas)) d.campanhas = [];
@@ -876,6 +891,22 @@ var Store = {
       out.push(atual); return out;
     }
   },
+  /* ---- Promoções ---- */
+  promocoes: function(somenteAtivas){
+    var l = Store.dados.ofertas || [];
+    return somenteAtivas ? l.filter(function(o){ return o.ativa!==false; }) : l;
+  },
+  addPromocao: function(o){ o.id = U.id(); Store.dados.ofertas.push(o); Store.commit('Promoção criada'); return o.id; },
+  editPromocao: function(id, o){
+    var i = Store.dados.ofertas.findIndex(function(x){ return x.id===id; });
+    if(i<0) return; o.id = id; Store.dados.ofertas[i] = o; Store.commit('Promoção atualizada');
+  },
+  delPromocao: function(id){
+    Store.dados.ofertas = Store.dados.ofertas.filter(function(x){ return x.id!==id; });
+    Store.commit('Promoção removida');
+  },
+  getPromocao: function(id){ return (Store.dados.ofertas||[]).find(function(x){ return x.id===id; }); },
+
   /* ---- Contas da agenda ---- */
   addConta: function(c){ c.id=U.id(); c.pagos=c.pagos||{}; Store.dados.contas.push(c); Store.commit('Conta salva'); },
   editConta: function(id,c){
@@ -976,11 +1007,30 @@ var Calc = {
     if(U.n(l.camisetas)>0) return U.n(l.camisetas);
     return U.n(l.pedidos) * U.n(Calc.cfg().camisetasPorPedidoPadrao, 1);
   },
+  /* Custo médio de brindes por pedido, quando os brindes são escolhidos por promoção.
+     Pondera as promoções ativas pela distribuição real de pedidos. */
+  brindeMedio: function(ym){
+    var c = Calc.cfgM(ym);
+    if(!c.brindesPorOferta) return 0;
+    var ativas = Store.promocoes(true);
+    if(!ativas.length) return 0;
+    var dist = Calc.distribuicaoReal().dist;
+    var soma = 0, peso = 0;
+    ativas.forEach(function(o){
+      var q = U.clamp(Math.round(U.n(o.camisetas,1)),1,5);
+      var pt = dist[q];
+      if(pt===undefined) pt = 1;           /* sem histórico, peso igual */
+      soma += pt * Calc.custoBrindes(o.itens, ym);
+      peso += pt;
+    });
+    return peso ? soma/peso : 0;
+  },
+
   /* embalagem de um conjunto de pedidos, pela média de peças por pedido */
   embalagemDe: function(pedidos, camisetas, ym){
     if(!pedidos) return 0;
     var media = U.div(camisetas, pedidos);
-    return pedidos * (Calc.kitEmbalagem(media, ym) + Calc.insumosPorPedido(ym))
+    return pedidos * (Calc.kitEmbalagem(media, ym) + Calc.insumosPorPedido(ym) + Calc.brindeMedio(ym))
          + camisetas * Calc.insumosPorCamiseta(ym);
   },
 
@@ -1267,7 +1317,7 @@ var Calc = {
     var kit = (o.kit!==undefined && o.kit!=='') ? U.n(o.kit) : Calc.kitEmbalagem(qtd);
     var insumoPed = (o.insumoPedido!==undefined && o.insumoPedido!=='') ? U.n(o.insumoPedido) : Calc.insumosPorPedido();
     var insumoCam = (o.insumoCamiseta!==undefined && o.insumoCamiseta!=='') ? U.n(o.insumoCamiseta) : Calc.insumosPorCamiseta();
-    var brindes = U.n(o.brindes);
+    var brindes = U.n(o.brindes) + Calc.custoBrindes(o.itens);
     var frete = U.n(o.frete!==undefined&&o.frete!==''?o.frete:c.freteMedio);
     /* se o frete não é grátis, o cliente paga: vira receita e não sai da margem */
     var receitaFrete = o.freteGratis===false ? U.n(o.freteCobrado!==undefined&&o.freteCobrado!==''?o.freteCobrado:frete) : 0;
@@ -1416,6 +1466,27 @@ var Calc = {
     });
     baldes.forEach(function(b){ b.part = U.div(b.pedidos, totPed)*100; b.ticket = U.div(b.fat, b.pedidos); });
     return {baldes:baldes, pedidos:totPed};
+  },
+
+  /* economia de uma promoção cadastrada */
+  promoEconomia: function(p){
+    var r = Calc.simular(p);
+    r.promo = p;
+    return r;
+  },
+
+  /* mix esperado a partir das promoções ativas + distribuição real */
+  promoMix: function(brindesPorQtd){
+    var ativas = Store.promocoes(true);
+    var real = Calc.distribuicaoReal().dist;
+    var precos = {}, partes = {}, itens = {};
+    ativas.forEach(function(o){
+      var q = U.clamp(Math.round(U.n(o.camisetas,1)),1,5);
+      precos[q] = U.n(o.preco) + (o.freteGratis===false ? U.n(o.freteCobrado) : 0);
+      itens[q] = (o.itens||[]).slice();
+      partes[q] = real[q]!==undefined ? real[q] : 0;
+    });
+    return {precos:precos, partes:partes, itens:itens, ativas:ativas, real:real};
   },
 
   /* ---------- CAIXA ACUMULADO ----------
@@ -1649,9 +1720,9 @@ var Calc = {
     if(a.faturamento>0){
       var alvo = U.n(c.metaMargem,30);
       if(a.margem >= alvo) d.push({n:'ok', t:'Margem dentro da meta', x:'Margem líquida de '+U.pct(a.margem)+' contra meta de '+U.pct(alvo,0)+'.'});
-      else if(a.margem >= alvo*0.7) d.push({n:'at', t:'Margem abaixo da meta', x:'Margem líquida de '+U.pct(a.margem)+' contra meta de '+U.pct(alvo,0)+'. Faltam '+U.pct(alvo-a.margem)+' para o alvo estrutural.', acao:'Revisar a oferta no simulador', ir:'fin:simulador'});
-      else if(a.margem >= 0) d.push({n:'cr', t:'Margem crítica', x:'Margem líquida de '+U.pct(a.margem)+'. A operação está trabalhando perto do limite.', acao:'Revisar preço e marketing', ir:'fin:simulador'});
-      else d.push({n:'cr', t:'Prejuízo no período', x:'O resultado do mês está negativo em '+U.brl(Math.abs(a.lucro))+'. Cada venda adicional nas condições atuais aumenta a perda.', acao:'Revisar a oferta agora', ir:'fin:simulador'});
+      else if(a.margem >= alvo*0.7) d.push({n:'at', t:'Margem abaixo da meta', x:'Margem líquida de '+U.pct(a.margem)+' contra meta de '+U.pct(alvo,0)+'. Faltam '+U.pct(alvo-a.margem)+' para o alvo estrutural.', acao:'Revisar a oferta no simulador', ir:'planejamento:simulador'});
+      else if(a.margem >= 0) d.push({n:'cr', t:'Margem crítica', x:'Margem líquida de '+U.pct(a.margem)+'. A operação está trabalhando perto do limite.', acao:'Revisar preço e marketing', ir:'planejamento:simulador'});
+      else d.push({n:'cr', t:'Prejuízo no período', x:'O resultado do mês está negativo em '+U.brl(Math.abs(a.lucro))+'. Cada venda adicional nas condições atuais aumenta a perda.', acao:'Revisar a oferta agora', ir:'planejamento:simulador'});
     }
 
     /* Marketing / CPA */
@@ -1677,31 +1748,31 @@ var Calc = {
       }else{
         d.push({n:'at', t:'No ritmo atual a meta de lucro não será atingida',
           x:'Projeção de '+U.brl(p.projLucro)+' contra meta de '+U.brl(p.metaLucro)+'. Faltam '+U.brl(p.faltaLucro)+' em '+p.restantes+' dia(s): '+U.brl(p.precisaLucroDia)+' de lucro por dia.',
-          acao:'Ver projeção diária', ir:'fin:projecao'});
+          acao:'Ver projeção diária', ir:'planejamento:cenario'});
       }
     }else{
-      d.push({n:'nu', t:'Sem meta definida para o mês', x:'Sem meta, o sistema mostra o que aconteceu mas não consegue dizer se está bom.', acao:'Definir metas do mês', ir:'fin:metas'});
+      d.push({n:'nu', t:'Sem meta definida para o mês', x:'Sem meta, o sistema mostra o que aconteceu mas não consegue dizer se está bom.', acao:'Definir metas do mês', ir:'planejamento:cenario'});
     }
 
     /* Custo da falha */
     if(a.custo.falha>0){
-      if(a.falhaPct>=3) d.push({n:'cr', t:'Custo da falha alto', x:U.brl(a.custo.falha)+' gastos corrigindo erros ('+U.pct(a.falhaPct)+' do faturamento, '+U.brl(a.falhaPorPedido)+' por pedido). Esse dinheiro sai inteiro do lucro.', acao:'Abrir custo da falha', ir:'fin:falha'});
-      else if(a.falhaPct>=1) d.push({n:'at', t:'Custo da falha em observação', x:U.brl(a.custo.falha)+' ('+U.pct(a.falhaPct)+' do faturamento) foram gastos corrigindo problemas.', acao:'Abrir custo da falha', ir:'fin:falha'});
+      if(a.falhaPct>=3) d.push({n:'cr', t:'Custo da falha alto', x:U.brl(a.custo.falha)+' gastos corrigindo erros ('+U.pct(a.falhaPct)+' do faturamento, '+U.brl(a.falhaPorPedido)+' por pedido). Esse dinheiro sai inteiro do lucro.', acao:'Abrir custo da falha', ir:'resultados:falha'});
+      else if(a.falhaPct>=1) d.push({n:'at', t:'Custo da falha em observação', x:U.brl(a.custo.falha)+' ('+U.pct(a.falhaPct)+' do faturamento) foram gastos corrigindo problemas.', acao:'Abrir custo da falha', ir:'resultados:falha'});
       else d.push({n:'ok', t:'Custo da falha sob controle', x:U.brl(a.custo.falha)+' ('+U.pct(a.falhaPct)+' do faturamento).'});
     }
 
     /* Caixa e reserva */
-    if(cx.atual < 0) d.push({n:'cr', t:'Caixa negativo', x:'O caixa apurado está em '+U.brl(cx.atual)+'. Confira o saldo inicial em Configurações e os lançamentos pendentes.', acao:'Abrir caixa', ir:'fin:caixa'});
+    if(cx.atual < 0) d.push({n:'cr', t:'Caixa negativo', x:'O caixa apurado está em '+U.brl(cx.atual)+'. Confira o saldo inicial em Configurações e os lançamentos pendentes.', acao:'Abrir caixa', ir:'caixa:saldo'});
     else if(cx.custoFixoMensal>0 && cx.metaReserva>0){
       if(cx.pctReserva>=100) d.push({n:'ok', t:'Reserva operacional completa', x:'A reserva cobre '+U.num(cx.mesesProtegidos,1)+' mês(es) de custo fixo.'});
-      else if(cx.pctReserva>=50) d.push({n:'at', t:'Reserva em construção', x:U.pct(cx.pctReserva,0)+' da reserva formada — protege '+U.num(cx.mesesProtegidos,1)+' mês(es). Reserva não é lucro disponível.', acao:'Abrir caixa e reserva', ir:'fin:caixa'});
-      else d.push({n:'cr', t:'Reserva insuficiente', x:'Apenas '+U.pct(cx.pctReserva,0)+' da reserva está formada. A empresa está exposta a qualquer imprevisto de produção ou logística.', acao:'Abrir caixa e reserva', ir:'fin:caixa'});
+      else if(cx.pctReserva>=50) d.push({n:'at', t:'Reserva em construção', x:U.pct(cx.pctReserva,0)+' da reserva formada — protege '+U.num(cx.mesesProtegidos,1)+' mês(es). Reserva não é lucro disponível.', acao:'Abrir caixa e reserva', ir:'caixa:saldo'});
+      else d.push({n:'cr', t:'Reserva insuficiente', x:'Apenas '+U.pct(cx.pctReserva,0)+' da reserva está formada. A empresa está exposta a qualquer imprevisto de produção ou logística.', acao:'Abrir caixa e reserva', ir:'caixa:saldo'});
     }
 
     /* Conflito de apuração */
     if(a.conflitos.length){
       var nomes = a.conflitos.map(function(k){ return GRUPOS[k.grupo].nome; }).join(', ');
-      d.push({n:'at', t:'Lançamentos ignorados no cálculo', x:'Estes grupos estão no modo automático e têm lançamentos manuais no mês: '+nomes+'. O sistema usou o valor calculado para não contar duas vezes.', acao:'Ajustar modo de apuração', ir:'config'});
+      d.push({n:'at', t:'Lançamentos ignorados no cálculo', x:'Estes grupos estão no modo automático e têm lançamentos manuais no mês: '+nomes+'. O sistema usou o valor calculado para não contar duas vezes.', acao:'Ajustar modo de apuração', ir:'custos'});
     }
 
     /* Recomendação de escala */
@@ -1936,21 +2007,16 @@ var UI = {
    NAVEGAÇÃO
 ------------------------------------------------------------ */
 var NAV = [
-  {g:'Operação', itens:[
-    {id:'geral', nome:'Visão Geral', ico:'M3 12l9-9 9 9M5 10v10h14V10'},
-    {id:'gestor', nome:'Visão do Gestor', ico:'M3 3v18h18M7 15l4-4 3 3 5-6'},
-    {id:'financeiro', nome:'Financeiro', ico:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'},
-    {id:'metas', nome:'Metas do mês', ico:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'},
-    {id:'agenda', nome:'Agenda de pagamentos', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
-    {id:'reserva', nome:'Caixa acumulado', ico:'M3 10h18M7 15h4M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'}
+  {g:'Dia a dia', itens:[
+    {id:'hoje', nome:'Hoje', ico:'M3 12l9-9 9 9M5 10v10h14V10'},
+    {id:'agenda', nome:'Agenda', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
+    {id:'lancamentos', nome:'Lançamentos', ico:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h6'}
   ]},
-  {g:'Em breve', itens:[
-    {id:'vendas', nome:'Vendas', breve:true, ico:'M3 3v18h18'},
-    {id:'produto', nome:'Produto', breve:true, ico:'M20 7 12 3 4 7v10l8 4 8-4z'},
-    {id:'producao', nome:'Produção', breve:true, ico:'M3 21h18M5 21V9l5 3V9l5 3V6l4 3v12'},
-    {id:'logistica', nome:'Logística', breve:true, ico:'M1 3h15v13H1zM16 8h4l3 3v5h-7z'},
-    {id:'atendimento', nome:'Atendimento', breve:true, ico:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'},
-    {id:'gestao', nome:'Gestão', breve:true, ico:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'}
+  {g:'Decisão', itens:[
+    {id:'planejamento', nome:'Planejamento', ico:'M22 12h-4l-3 9L9 3l-3 9H2'},
+    {id:'resultados', nome:'Resultados', ico:'M3 3v18h18M7 15l4-4 3 3 5-6'},
+    {id:'caixa', nome:'Caixa', ico:'M3 10h18M7 15h4M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'},
+    {id:'custos', nome:'Custos', ico:'M20 7 12 3 4 7v10l8 4 8-4zM12 11v10M4 7l8 4 8-4'}
   ]},
   {g:'Sistema', itens:[
     {id:'integracoes', nome:'Integrações', ico:'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'},
@@ -1958,20 +2024,25 @@ var NAV = [
   ]}
 ];
 
-var ABAS_FIN = [
-  {id:'dashboard', nome:'Dashboard'},
-  {id:'lancamentos', nome:'Lançamentos'},
-  {id:'projecao', nome:'Projeção diária'},
-  {id:'simulador', nome:'Simulador de ofertas'},
-  {id:'cenario', nome:'Cenário do mês'},
-  {id:'produto', nome:'CMV & Produto'},
-  {id:'frete', nome:'Frete & Logística'},
-  {id:'canal', nome:'Vendas por canal'},
-  {id:'campanhas', nome:'Campanhas'},
-  {id:'caixa', nome:'Caixa & Reserva'},
-  {id:'falha', nome:'Custo da falha'},
-  {id:'metas', nome:'Metas & Histórico'}
-];
+/* abas internas de cada tela */
+var ABAS = {
+  planejamento: [
+    {id:'promocoes', nome:'Promoções'},
+    {id:'cenario', nome:'Cenário e meta'},
+    {id:'simulador', nome:'Simulador'}
+  ],
+  resultados: [
+    {id:'historico', nome:'Mês a mês'},
+    {id:'campanhas', nome:'Campanhas'},
+    {id:'canal', nome:'Canais e estados'},
+    {id:'falha', nome:'Custo da falha'},
+    {id:'frete', nome:'Frete'}
+  ],
+  caixa: [
+    {id:'saldo', nome:'Caixa e contas'},
+    {id:'reserva', nome:'Caixa acumulado'}
+  ]
+};
 /* ------------------------------------------------------------
    TELAS
 ------------------------------------------------------------ */
@@ -2152,7 +2223,7 @@ Views._metaBarra = function(rot, real, meta, inteiro){
     '</div>'+
     (meta>0
       ? '<div class="barra-prog"><span class="'+cls+'" style="width:'+U.clamp(pct,0,100)+'%"></span></div><div class="leg"><span>'+U.pct(pct,0)+' da meta</span><span>'+(pct>=100?'meta batida':'faltam '+fmt(Math.max(0,meta-real)))+'</span></div>'
-      : '<div class="leg"><span style="color:var(--texto-fraco)">Meta não definida</span><button class="diag-acao" data-ir="fin:metas" style="font-size:12px">Definir meta</button></div>')+
+      : '<div class="leg"><span style="color:var(--texto-fraco)">Meta não definida</span><button class="diag-acao" data-ir="planejamento:cenario" style="font-size:12px">Definir meta</button></div>')+
   '</div>';
 };
 
@@ -3077,7 +3148,7 @@ Views.geral = function(){
         '<div class="diag-tit">'+U.esc(x.t)+'</div><div class="diag-txt">'+U.esc(x.x)+'</div>'+
         (x.acao?'<button class="diag-acao" data-ir="'+U.esc(x.ir||'')+'">'+U.esc(x.acao)+'</button>':'')+'</div></div>';
     }).join('') : '<div class="cartao">Nada pendente neste período.</div>')+
-    '<button class="btn sec" data-ir="financeiro" style="margin-top:6px">Abrir o Financeiro completo</button>'+
+    '<button class="btn sec" data-ir="hoje" style="margin-top:6px">Abrir o Financeiro completo</button>'+
   '</div>';
 
   h += '<div class="cartao"><div class="cartao-tit">Departamentos</div>'+
@@ -3122,7 +3193,7 @@ Views.breve = function(id){
     '<div class="breve-lista">'+txt.l.map(function(i){
       return '<div class="breve-item"><b>'+U.esc(i[0])+'</b><span>'+U.esc(i[1])+'</span></div>';
     }).join('')+'</div>'+
-    '<button class="btn" data-ir="financeiro" style="margin-top:22px">Voltar ao Financeiro</button>'+
+    '<button class="btn" data-ir="hoje" style="margin-top:22px">Voltar ao Financeiro</button>'+
   '</div>';
 };
 
@@ -3748,6 +3819,198 @@ Views.reserva = function(){
   h += '</div>';
   return h;
 };
+
+/* ============================================================
+   PREÇOS E CUSTOS — fonte única
+============================================================ */
+Views.precos = function(){
+  var c = Calc.cfg();
+  var h = '';
+
+  h += '<div class="info">Tudo que a empresa paga está nesta página. Mudou um preço aqui, todo o painel recalcula: '+
+    'CMV, margem, simulador, cenário, metas e caixa acumulado.</div>';
+
+  var lapis = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>';
+
+  /* ---- camisetas ---- */
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:220px"><div class="cartao-tit">Camisetas</div>'+
+      '<div class="cartao-sub">O produto marcado como padrão é o que alimenta o CMV</div></div>'+
+      '<button class="btn sec sm" id="addProduto">Nova camiseta</button></div>'+
+    '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Produto</th><th>Fornecedor</th><th class="r">Custo unitário</th><th class="c">Padrão</th><th></th></tr></thead><tbody>'+
+    c.produtos.map(function(pr){
+      return '<tr><td style="font-weight:500">'+U.esc(pr.nome)+'</td>'+
+        '<td style="color:var(--texto-medio)">'+U.esc(pr.fornecedor||'—')+'</td>'+
+        '<td class="r" style="font-weight:600">'+U.brl(pr.custo)+'</td>'+
+        '<td class="c">'+(pr.padrao?'<span class="etq rec">padrão</span>':'<button class="btn sec sm" data-padrao="'+pr.id+'">Tornar padrão</button>')+'</td>'+
+        '<td class="c" style="white-space:nowrap"><button class="btn-icone" data-editProduto="'+pr.id+'" title="Editar">'+lapis+'</button>'+
+        (c.produtos.length>1?'<button class="btn-icone" data-delProduto="'+pr.id+'" title="Excluir">✕</button>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+
+  /* ---- brindes ---- */
+  var brindes = c.insumos || [];
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:220px"><div class="cartao-tit">Brindes e itens que vão na caixa</div>'+
+      '<div class="cartao-sub">Cada promoção escolhe quais destes leva. O custo vem daqui.</div></div>'+
+      '<button class="btn sec sm" id="addInsumo">Novo item</button></div>'+
+    '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Item</th><th class="r">Custo</th><th>Cobrado</th><th>Usado nas promoções</th><th class="c">Ativo</th><th></th></tr></thead><tbody>'+
+    (brindes.length ? brindes.map(function(i){
+      var usos = Store.promocoes(false).filter(function(o){ return (o.itens||[]).indexOf(i.id)>=0; });
+      return '<tr><td style="font-weight:500">'+U.esc(i.nome)+
+          (i.aDefinir&&!U.n(i.custo)?' <span class="etq pen">custo a definir</span>':'')+'</td>'+
+        '<td class="r" style="font-weight:600">'+U.brl(i.custo)+'</td>'+
+        '<td style="color:var(--texto-medio)">'+(i.base==='camiseta'?'por camiseta':'por pedido')+'</td>'+
+        '<td style="font-size:12px;color:var(--texto-medio)">'+
+          (usos.length ? usos.map(function(o){ return U.esc(o.nome); }).join(', ') : '<span style="color:var(--texto-fraco)">nenhuma</span>')+'</td>'+
+        '<td class="c"><label class="chk" style="justify-content:center"><input type="checkbox" data-insumoAtivo="'+i.id+'" '+(i.ativo!==false?'checked':'')+'></label></td>'+
+        '<td class="c" style="white-space:nowrap"><button class="btn-icone" data-editInsumo="'+i.id+'" title="Editar">'+lapis+'</button>'+
+        '<button class="btn-icone" data-delInsumo="'+i.id+'" title="Excluir">✕</button></td></tr>';
+    }).join('') : '<tr><td colspan="6" style="color:var(--texto-fraco)">Nenhum item cadastrado.</td></tr>')+
+    '</tbody></table></div></div>';
+
+  /* ---- embalagem de envio ---- */
+  var faixas = (c.embalagemFaixas||[]).slice().sort(function(a,b){ return U.n(a.ate)-U.n(b.ate); });
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Embalagem de envio</div>'+
+    '<div class="cartao-sub">Só a embalagem em que o pedido viaja. Brindes ficam na tabela acima.</div>'+
+    '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Pedido com até</th><th class="r">Custo</th><th></th></tr></thead><tbody>'+
+    faixas.map(function(f,i){
+      return '<tr><td><input type="number" class="pfAte" data-faixa="'+i+'" value="'+U.n(f.ate)+'" step="1" min="1" style="width:80px;padding:5px 8px"> camiseta(s)</td>'+
+        '<td class="r"><input type="number" class="pfCusto" data-faixa="'+i+'" value="'+U.n(f.custo)+'" step="0.01" style="width:100px;padding:5px 8px;text-align:right"></td>'+
+        '<td class="c">'+(faixas.length>1?'<button class="btn-icone" data-delFaixa="'+i+'">✕</button>':'')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="display:flex;gap:8px;margin-top:12px">'+
+      '<button class="btn sec sm" id="pAddFaixa">Adicionar faixa</button>'+
+      '<button class="btn sm" id="pSalvarFaixas">Salvar embalagem</button>'+
+    '</div></div>';
+
+  /* ---- taxas ---- */
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Taxas, frete e imposto</div>'+
+    '<div class="cartao-sub">Percentuais aplicados sobre cada venda</div>'+
+    '<div class="linha-campos lc3" style="margin-top:12px">'+
+      Views._cfgNum('Gateway (%)','pGateway',c.gateway,'0.01')+
+      Views._cfgNum('Taxa fixa por pedido (R$)','pGwFixo',c.gatewayFixo,'0.01')+
+      Views._cfgNum('Checkout (%)','pCheckout',c.checkout,'0.01')+
+      Views._cfgNum('Imposto (%)','pImposto',c.imposto,'0.1')+
+      Views._cfgNum('Frete médio pago (R$)','pFrete',c.freteMedio,'0.5')+
+      Views._cfgNum('Marketing base (%)','pMkt',c.marketingBase,'0.5')+
+    '</div>'+
+    '<button class="btn" id="pSalvarTaxas">Salvar taxas</button>'+
+    '<div class="info" style="margin-top:12px">Estas alterações valem para todos os meses. '+
+      'Para registrar que um custo mudou a partir de uma data, use Configurações → Custos e taxas, que guarda o histórico.</div>'+
+  '</div>';
+
+  /* ---- resumo ---- */
+  var ativas = Store.promocoes(true);
+  h += '<div class="cartao"><div class="cartao-tit">Como fica o custo de cada promoção</div>'+
+    '<div class="cartao-sub">Com os preços acima, hoje</div>';
+  if(!ativas.length){
+    h += '<div style="font-size:13px;color:var(--texto-fraco);margin-top:10px">Nenhuma promoção ativa. Crie em Promoções.</div>';
+  }else{
+    h += '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Promoção</th><th class="r">Camisetas</th><th class="r">Embalagem</th><th class="r">Brindes</th>'+
+      '<th class="r">Frete</th><th class="r">Custo direto</th><th class="r">Preço</th><th class="r">Sobra bruta</th></tr></thead><tbody>'+
+      ativas.map(function(o){
+        var r = Calc.simular(o);
+        var cb = Calc.custoBrindes(o.itens);
+        var kit = Calc.kitEmbalagem(o.camsetas || o.camisetas);
+        var sobra = r.total - r.custoFisico;
+        return '<tr><td style="font-weight:500">'+U.esc(o.nome)+'</td>'+
+          '<td class="r">'+U.brl(r.cmv)+'</td><td class="r">'+U.brl(kit)+'</td>'+
+          '<td class="r">'+U.brl(cb)+'</td><td class="r">'+U.brl(r.frete)+'</td>'+
+          '<td class="r" style="font-weight:600">'+U.brl(r.custoFisico)+'</td>'+
+          '<td class="r">'+U.brl(r.total)+'</td>'+
+          '<td class="r" style="color:'+(sobra<0?'var(--rubro)':'var(--verde)')+';font-weight:600">'+U.brl(sobra)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+};
+
+/* ============================================================
+   PROMOÇÕES
+============================================================ */
+Views.promocoes = function(){
+  var todas = Store.promocoes(false);
+  var c = Calc.cfg();
+  var lapis = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>';
+  var h = '';
+
+  var ativas = todas.filter(function(o){ return o.ativa!==false; });
+  h += '<section class="veredito '+(ativas.length?'':'neutro')+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+(ativas.length
+      ? ativas.length+' promoção(ões) no ar.'
+      : 'Nenhuma promoção ativa.')+'</div>'+
+    '<div class="veredito-apoio">O que está marcado como ativo alimenta a Visão do Gestor, o cenário do mês e as metas. '+
+      'Desativar não apaga: a promoção fica guardada para você reativar quando quiser.</div></section>';
+
+  h += '<div style="display:flex;justify-content:flex-end;margin-bottom:12px">'+
+    '<button class="btn" id="addPromo">Nova promoção</button></div>';
+
+  if(!todas.length){
+    return h + UI.vazio('Nenhuma promoção cadastrada',
+      'Cadastre as ofertas que estão no site: quantas camisetas, por quanto, com quais brindes e se o frete é grátis.',
+      '<button class="btn" id="addPromo2">Criar primeira promoção</button>');
+  }
+
+  h += '<div class="grade g2" style="align-items:start">';
+  todas.forEach(function(o){
+    var r = Calc.simular(o);
+    var nivel = r.saudavel;
+    var itens = (o.itens||[]).map(function(id){
+      var i = (c.insumos||[]).find(function(x){ return x.id===id; });
+      return i ? i.nome : null;
+    }).filter(Boolean);
+
+    h += '<div class="cartao"'+(o.ativa===false?' style="opacity:.6"':'')+'>'+
+      '<div style="display:flex;gap:10px;align-items:flex-start">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="cartao-tit">'+U.esc(o.nome)+'</div>'+
+          '<div class="cartao-sub">'+U.num(o.camisetas)+' camiseta(s) · '+
+            (o.freteGratis===false ? 'frete cobrado de '+U.brl(o.freteCobrado) : 'frete grátis')+
+            (o.obs?' · '+U.esc(o.obs):'')+'</div></div>'+
+        '<span class="etq '+(o.ativa!==false?'rec':'pag')+'">'+(o.ativa!==false?'no ar':'pausada')+'</span>'+
+      '</div>'+
+
+      '<div style="display:flex;align-items:baseline;gap:10px;margin:6px 0 14px">'+
+        '<div style="font-family:var(--serif);font-size:28px;font-weight:600">'+U.brl(o.preco,0)+'</div>'+
+        '<div style="font-size:12.5px;color:var(--texto-fraco)">'+U.brl(U.n(o.preco)/Math.max(1,U.n(o.camisetas)),0)+' por camiseta</div>'+
+      '</div>'+
+
+      '<div style="font-size:12.5px;color:var(--texto-medio);margin-bottom:12px">'+
+        '<b>Leva:</b> '+(itens.length ? U.esc(itens.join(', ')) : 'nenhum brinde')+'</div>'+
+
+      '<div class="grade g2" style="gap:8px;margin-bottom:12px">'+
+        UI.kpi({rot:'Lucro por pedido', val:U.brl(r.lucro), pequeno:true, classe:r.lucro<0?'neg':''})+
+        UI.kpi({rot:'Margem', val:U.pct(r.margem), pequeno:true, pt:nivel, nota:'alvo '+U.pct(c.metaMargem,0)})+
+      '</div>'+
+
+      '<div class="tabela-env" style="margin-bottom:12px"><table><tbody>'+
+        '<tr><td>Camisetas</td><td class="r">'+U.brl(r.cmv)+'</td></tr>'+
+        '<tr><td>Embalagem e brindes</td><td class="r">'+U.brl(r.embalagem)+'</td></tr>'+
+        '<tr><td>Frete</td><td class="r">'+U.brl(r.frete)+'</td></tr>'+
+        '<tr><td>Taxas e imposto</td><td class="r">'+U.brl(r.taxas+r.imposto)+'</td></tr>'+
+        '<tr><td>Marketing ('+U.pct(r.marketingPct)+')</td><td class="r">'+U.brl(r.marketing)+'</td></tr>'+
+        '<tr class="total"><td>CPA máximo para '+U.pct(r.margemAlvo,0)+'</td><td class="r">'+(r.cpaMaxAlvo>0?U.brl(r.cpaMaxAlvo):'—')+'</td></tr>'+
+      '</tbody></table></div>'+
+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn sec sm" data-editPromo="'+o.id+'">'+lapis+' Editar</button>'+
+        '<button class="btn sec sm" data-togglePromo="'+o.id+'">'+(o.ativa!==false?'Pausar':'Ativar')+'</button>'+
+        '<button class="btn sec sm" data-simPromo="'+o.id+'">Abrir no simulador</button>'+
+        '<button class="btn-icone" data-delPromo="'+o.id+'" title="Excluir">✕</button>'+
+      '</div>'+
+    '</div>';
+  });
+  h += '</div>';
+  return h;
+};
 /* ============================================================
    AGENDA DE PAGAMENTOS
    Junta contas fixas recorrentes + lançamentos pendentes
@@ -4238,6 +4501,336 @@ Views.campanhas = function(){
   return h;
 };
 /* ============================================================
+   TELA "HOJE" — no formato da planilha, com o veredito em cima
+============================================================ */
+Views.hoje = function(){
+  var ym = UI.ym, c = Calc.cfgM(ym);
+  var a = Calc.apurar(ym), p = Calc.projetar(a), cx = Calc.caixa();
+  var diags = Calc.diagnosticar(a, p, cx);
+  var v = Calc.veredito(a, p, cx, diags);
+  var res = Calc.planoReserva();
+  var h = '';
+
+  /* ---- veredito ---- */
+  h += '<section class="veredito '+(v.n==='ok'?'':v.n)+'">'+
+    '<div class="veredito-frase">'+U.esc(v.frase)+'</div>'+
+    '<div class="veredito-apoio">'+U.esc(v.apoio)+'</div>'+
+  '</section>';
+
+  if(!a.temDados){
+    h += UI.vazio('Nada registrado em '+U.nomeMes(ym),
+      'As vendas entram sozinhas se o conector estiver ligado. Os gastos você lança aqui.',
+      '<button class="btn" data-acao="novo">Novo lançamento</button> '+
+      '<button class="btn sec" data-ir="integracoes">Abrir Integrações</button>');
+    return h;
+  }
+
+  /* ---- os quatro números ---- */
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Faturamento', val:U.brl(a.faturamento,0), destaque:true,
+      nota: p.metaFat>0 ? U.pct(p.pctMetaFat,0)+' da meta de '+U.brl(p.metaFat,0) : 'sem meta definida',
+      pt: p.metaFat>0 ? (p.pctMetaFat>=100?'ok':(p.pctProjMetaFat>=100?'at':'cr')) : 'nu'})+
+    UI.kpi({rot:'Vendas', val:U.num(a.pedidos), destaque:true,
+      nota:U.num(a.camisetas)+' camisetas · '+U.num(a.camisetasPorPedido,2)+' por pedido'})+
+    UI.kpi({rot:'Ticket médio', val:U.brl(a.ticket,0), destaque:true,
+      nota:'lucro por pedido '+U.brl(a.lucroPorPedido)})+
+    UI.kpi({rot:'Margem', val:U.pct(a.margem), destaque:true, pt:UI.nivelMargem(a.margem),
+      nota:U.brl(a.lucro,0)+' de lucro · meta '+U.pct(c.metaMargem,0)})+
+  '</div>';
+
+  /* ---- tabela de custos, estilo planilha ---- */
+  var auto = function(g){ return c.modo[g]==='auto'; };
+  var linhas = [
+    {g:'operacional', rot:'Custo operacional'},
+    {g:'cmv',         rot:'CMV'},
+    {g:'embalagem',   rot:'Embalagem e brindes'},
+    {g:'marketing',   rot:'Marketing'},
+    {g:'comissao',    rot:'Comissões'},
+    {g:'taxas',       rot:'Gateway e checkout'},
+    {g:'frete',       rot:'Frete'},
+    {g:'imposto',     rot:'Imposto'},
+    {g:'falha',       rot:'Custo da falha'},
+    {g:'outros',      rot:'Outros'}
+  ];
+
+  var statusDe = function(g, pct){
+    if(g==='marketing'){
+      if(!a.custo.marketing) return {t:'não lançado', n:'nu'};
+      return pct<=U.n(c.marketingBase) ? {t:'OK', n:'ok'} : {t:'atenção', n:'at'};
+    }
+    if(g==='falha'){
+      if(!a.custo.falha) return {t:'OK', n:'ok'};
+      return a.falhaPct>=3 ? {t:'crítico', n:'cr'} : (a.falhaPct>=1 ? {t:'atenção', n:'at'} : {t:'OK', n:'ok'});
+    }
+    if(auto(g)) return {t:'automático', n:'nu'};
+    return {t:'OK', n:'ok'};
+  };
+
+  h += '<div class="grade" style="grid-template-columns:1.35fr 1fr;gap:12px;align-items:start;margin-bottom:12px">';
+
+  h += '<div class="cartao" style="padding:0;overflow:hidden">'+
+    '<table class="plan"><thead><tr><th class="rot">Para onde foi o dinheiro</th>'+
+      '<th class="pc">% do faturamento</th><th class="vl">Valor</th><th class="pc">Situação</th></tr></thead><tbody>';
+  linhas.forEach(function(l){
+    var val = a.custo[l.g]||0;
+    if(!val && ['comissao','falha','outros'].indexOf(l.g)>=0) return;
+    var pct = U.div(val, a.faturamento)*100;
+    var st = statusDe(l.g, pct);
+    h += '<tr class="saida"><td class="rot">'+l.rot+'</td>'+
+      '<td class="pc">'+U.pct(pct)+'</td>'+
+      '<td class="vl">'+U.brl(val)+'</td>'+
+      '<td class="pc"><span class="pt '+st.n+'"></span> '+st.t+'</td></tr>';
+  });
+  h += '<tr class="resultado"><td class="rot">Total de custos</td>'+
+      '<td class="pc">'+U.pct(U.div(a.despesaTotal,a.faturamento)*100)+'</td>'+
+      '<td class="vl">'+U.brl(a.despesaTotal)+'</td>'+
+      '<td class="pc">'+(a.margem>=U.n(c.metaMargem)?'<span class="pt ok"></span> saudável':(a.margem>=0?'<span class="pt at"></span> apertado':'<span class="pt cr"></span> no vermelho'))+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Lucro</td>'+
+      '<td class="pc"><span class="pt '+UI.nivelMargem(a.margem)+'"></span> '+U.pct(a.margem)+'</td>'+
+      '<td class="vl" style="color:'+(a.lucro<0?'var(--rubro)':'var(--verde)')+'">'+U.brl(a.lucro)+'</td>'+
+      '<td class="pc">'+(p.metaLucro>0 ? (a.lucro>=p.metaLucro?'meta batida':U.pct(p.pctMetaLucro,0)+' da meta') : 'sem meta')+'</td></tr>'+
+    '</tbody></table></div>';
+
+  /* ---- coluna da direita: caixa necessário + projeção ---- */
+  h += '<div>';
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Caixa necessário</div>'+
+    '<div class="cartao-sub">Para '+U.num(res.meses)+' meses de operação garantida</div>'+
+    '<div style="font-family:var(--serif);font-size:26px;font-weight:600;margin:10px 0 4px">'+U.brl(res.meta,0)+'</div>'+
+    '<div class="barra-prog"><span class="'+(res.pct>=100?'':(res.pct>=50?'at':'cr'))+'" style="width:'+U.clamp(res.pct,0,100)+'%"></span></div>'+
+    '<div class="leg"><span>já temos '+U.brl(res.atual,0)+'</span><span>'+U.pct(res.pct,0)+'</span></div>'+
+    '<button class="diag-acao" data-ir="caixa" style="margin-top:10px">Abrir caixa acumulado</button>'+
+  '</div>';
+
+  h += '<div class="cartao">'+
+    '<div class="cartao-tit">Se o ritmo se mantiver</div>'+
+    '<div class="cartao-sub">'+(p.encerrado?'mês encerrado':p.restantes+' dia(s) restantes')+'</div>'+
+    '<div class="tabela-env" style="margin-top:10px"><table><tbody>'+
+      '<tr><td>Faturamento</td><td class="r" style="font-weight:600">'+U.brl(p.projFat,0)+'</td></tr>'+
+      '<tr><td>Lucro</td><td class="r" style="font-weight:600;color:'+(p.projLucro<0?'var(--rubro)':'var(--verde)')+'">'+U.brl(p.projLucro,0)+'</td></tr>'+
+      '<tr><td>Margem</td><td class="r">'+U.pct(p.projMargem)+'</td></tr>'+
+      (p.metaFat>0 ? '<tr class="total"><td>Falta faturar por dia</td><td class="r">'+U.brl(p.precisaFatDia,0)+'</td></tr>' : '')+
+    '</tbody></table></div></div>';
+  h += '</div></div>';
+
+  /* ---- o que exige decisão ---- */
+  var topo = diags.filter(function(x){ return x.n!=='ok'; }).slice(0,3);
+  if(topo.length){
+    h += '<div class="cartao-tit" style="margin-bottom:10px">O que exige decisão</div>'+
+      topo.map(function(x){
+        return '<div class="diag '+x.n+'"><span class="pt '+x.n+'" style="margin-top:5px"></span><div class="diag-corpo">'+
+          '<div class="diag-tit">'+U.esc(x.t)+'</div><div class="diag-txt">'+U.esc(x.x)+'</div>'+
+          (x.acao?'<button class="diag-acao" data-ir="'+U.esc(x.ir||'')+'">'+U.esc(x.acao)+'</button>':'')+
+        '</div></div>';
+      }).join('');
+    h += '<div style="height:12px"></div>';
+  }
+
+  /* ---- evolução ---- */
+  var hist = Calc.historico().slice(-12);
+  if(hist.length>1){
+    h += '<div class="cartao"><div class="cartao-tit">Evolução</div>'+
+      '<div class="cartao-sub">Faturamento, custos e lucro nos últimos meses</div>'+
+      Chart.linha({labels:hist.map(function(x){ return U.nomeMesCurto(x.ym); }), altura:220, series:[
+        {nome:'Faturamento', cor:'#5a332e', pontos:hist.map(function(x){ return x.a.faturamento; })},
+        {nome:'Custos', cor:'#b07a1e', pontos:hist.map(function(x){ return x.a.despesaTotal; })},
+        {nome:'Lucro', cor:'#1f9d6c', pontos:hist.map(function(x){ return x.a.lucro; }), area:true, marcarFim:true}
+      ]})+
+      '<div class="tabela-env" style="margin-top:14px"><table><thead><tr>'+
+        '<th>Mês</th><th class="r">Faturamento</th><th class="r">Custos</th><th class="r">Lucro</th>'+
+        '<th class="r">Margem</th><th class="r">Vendas</th><th class="r">Ticket</th></tr></thead><tbody>'+
+      hist.slice().reverse().map(function(x){
+        return '<tr'+(x.ym===ym?' style="background:#fdf7f0"':'')+'>'+
+          '<td><button data-mes="'+x.ym+'" style="font-weight:600;color:var(--vinho);text-transform:capitalize">'+U.nomeMes(x.ym)+'</button></td>'+
+          '<td class="r">'+U.brl(x.a.faturamento,0)+'</td>'+
+          '<td class="r">'+U.brl(x.a.despesaTotal,0)+'</td>'+
+          '<td class="r" style="font-weight:600;color:'+(x.a.lucro<0?'var(--rubro)':'var(--texto)')+'">'+U.brl(x.a.lucro,0)+'</td>'+
+          '<td class="r">'+(x.a.faturamento?'<span class="pt '+UI.nivelMargem(x.a.margem)+'"></span> '+U.pct(x.a.margem):'—')+'</td>'+
+          '<td class="r">'+U.num(x.a.pedidos)+'</td>'+
+          '<td class="r">'+(x.a.pedidos?U.brl(x.a.ticket,0):'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+  }
+  return h;
+};
+
+/* ============================================================
+   PLANEJAMENTO
+============================================================ */
+Views.planejamento = function(){
+  if(UI.aba==='promocoes') return Views.promocoes();
+  if(UI.aba==='simulador') return Views.simulador();
+  return Views.cenarioEMeta();
+};
+
+Views.cenarioEMeta = function(){
+  return Views.cenario() + '<div style="height:12px"></div>' + Views.metasBloco();
+};
+
+/* metas do mês, sem o histórico (que foi para Resultados) */
+Views.metasBloco = function(){
+  var ym = UI.ym, m = Store.meta(ym), a = Calc.apurar(ym), p = Calc.projetar(a);
+  var f = Store.fecho(ym);
+  var h = '';
+
+  h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Metas de '+U.nomeMes(ym)+'</div>'+
+    '<div class="cartao-sub">Sem meta, o painel mostra o que aconteceu mas não diz se está bom</div>'+
+    '<div class="linha-campos lc3">'+
+      '<div class="campo"><label>Faturamento (R$)</label><input type="number" id="mFat" value="'+U.n(m.faturamento)+'" step="100"></div>'+
+      '<div class="campo"><label>Lucro (R$)</label><input type="number" id="mLucro" value="'+U.n(m.lucro)+'" step="100"></div>'+
+      '<div class="campo"><label>Pedidos</label><input type="number" id="mPed" value="'+U.n(m.pedidos)+'" step="1"></div>'+
+    '</div>'+
+    '<div class="linha-campos lc3">'+
+      '<div class="campo"><label>Margem mínima (%)</label><input type="number" id="mMargem" value="'+U.n(m.margem, Calc.cfg().metaMargem)+'" step="0.5"></div>'+
+      '<div class="campo"><label>CPA máximo (R$)</label><input type="number" id="mCpa" value="'+U.n(m.cpaMax)+'" step="1"></div>'+
+      '<div class="campo"><label>&nbsp;</label><button class="btn bloco" id="mSalvar">Salvar metas</button></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn sec sm" id="mSugerir">Sugerir a partir da margem alvo</button>'+
+      '<button class="btn sec sm" id="mCopiar">Copiar do mês anterior</button>'+
+    '</div>'+
+  '</div>';
+
+  if(m.faturamento>0 || m.lucro>0){
+    h += '<div class="grade g2" style="margin-bottom:12px">'+
+      '<div class="cartao"><div class="cartao-tit">Onde o mês está</div>'+
+        Views._metaBarra('Faturamento', a.faturamento, p.metaFat)+
+        Views._metaBarra('Lucro', a.lucro, p.metaLucro)+
+        Views._metaBarra('Pedidos', a.pedidos, p.metaPedidos, true)+'</div>'+
+      '<div class="cartao"><div class="cartao-tit">Onde o mês termina</div>'+
+        Views._metaBarra('Faturamento projetado', p.projFat, p.metaFat)+
+        Views._metaBarra('Lucro projetado', p.projLucro, p.metaLucro)+
+        Views._metaBarra('Pedidos projetados', p.projPedidos, p.metaPedidos, true)+'</div>'+
+    '</div>';
+  }
+
+  h += '<div class="cartao">'+
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:200px"><div class="cartao-tit">Fechamento de '+U.nomeMes(ym)+'</div>'+
+      '<div class="cartao-sub">O que já foi conferido, e o que o mês ensinou</div></div>'+
+      '<span class="etq '+(f.fechado?'rec':'pen')+'">'+(f.fechado?'fechado':'aberto')+'</span></div>'+
+    '<div class="linha-campos lc2">'+
+      '<div class="campo"><label>Conciliado até</label><input type="date" id="fConc" value="'+U.esc(f.conciliadoAte)+'"></div>'+
+      '<div class="campo"><label>Confirmações</label>'+
+        '<label class="chk" style="margin-bottom:6px"><input type="checkbox" id="fOferta" '+(f.ofertaAprovada?'checked':'')+'> Oferta aprovada</label>'+
+        '<label class="chk" style="margin-bottom:6px"><input type="checkbox" id="fCustos" '+(f.custosConferidos?'checked':'')+'> Custos completos</label>'+
+        '<label class="chk"><input type="checkbox" id="fFalhas" '+(f.falhasApuradas?'checked':'')+'> Falhas apuradas</label></div>'+
+    '</div>'+
+    '<div class="campo"><label>O que aprendemos</label><textarea id="fAprend" placeholder="O que funcionou? O que piorou?">'+U.esc(f.aprendizado)+'</textarea></div>'+
+    '<div class="campo"><label>Próxima ação</label><textarea id="fAcao" placeholder="Qual mudança evita que o problema se repita?">'+U.esc(f.acao)+'</textarea></div>'+
+    '<button class="btn" id="fSalvar">Salvar</button> '+
+    '<button class="btn sec" id="fFechar">'+(f.fechado?'Reabrir mês':'Fechar mês')+'</button>'+
+  '</div>';
+  return h;
+};
+
+/* ============================================================
+   RESULTADOS
+============================================================ */
+Views.resultados = function(){
+  if(UI.aba==='campanhas') return Views.campanhas();
+  if(UI.aba==='canal') return Views.canal();
+  if(UI.aba==='falha') return Views.falha();
+  if(UI.aba==='frete') return Views.frete();
+  return Views.historicoBloco();
+};
+
+Views.historicoBloco = function(){
+  var hist = Calc.historico(), ym = UI.ym;
+  if(!hist.length) return UI.vazio('Sem histórico ainda','Traga os meses passados em Integrações.',
+    '<button class="btn" data-ir="integracoes">Abrir Integrações</button>');
+
+  var comDados = hist.filter(function(x){ return x.a.faturamento>0; });
+  var tot = comDados.reduce(function(s,x){
+    s.fat+=x.a.faturamento; s.lucro+=x.a.lucro; s.ped+=x.a.pedidos; s.mkt+=x.a.custo.marketing; return s;
+  }, {fat:0, lucro:0, ped:0, mkt:0});
+
+  var h = '';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Faturamento acumulado', val:U.brl(tot.fat,0), destaque:true, nota:comDados.length+' mês(es) com venda'})+
+    UI.kpi({rot:'Lucro acumulado', val:U.brl(tot.lucro,0), destaque:true, classe:tot.lucro<0?'neg':'',
+      nota:'margem média '+U.pct(U.div(tot.lucro,tot.fat)*100)})+
+    UI.kpi({rot:'Pedidos', val:U.num(tot.ped), pequeno:true, nota:'ticket médio '+U.brl(U.div(tot.fat,tot.ped),0)})+
+    UI.kpi({rot:'Marketing', val:U.brl(tot.mkt,0), pequeno:true,
+      nota:'CPA médio '+U.brl(U.div(tot.mkt,tot.ped))+' · ROAS '+U.num(U.div(tot.fat,tot.mkt),2)})+
+  '</div>';
+
+  h += '<div class="grade g2" style="margin-bottom:12px">'+
+    '<div class="cartao"><div class="cartao-tit">Faturamento por mês</div>'+
+      Chart.colunas(hist.map(function(x){ return {rot:U.nomeMesCurto(x.ym), valor:x.a.faturamento, cor:x.ym===ym?'#5a332e':'#b08a84'}; }))+'</div>'+
+    '<div class="cartao"><div class="cartao-tit">Lucro por mês</div>'+
+      Chart.colunas(hist.map(function(x){ return {rot:U.nomeMesCurto(x.ym), valor:x.a.lucro, cor:x.a.lucro<0?'#a8322c':'#1f9d6c'}; }))+'</div>'+
+  '</div>';
+
+  h += '<div class="tabela-env"><table><thead><tr>'+
+    '<th>Mês</th><th class="r">Faturamento</th><th class="r">Meta</th><th class="r">Lucro</th>'+
+    '<th class="r">Margem</th><th class="r">Pedidos</th><th class="r">Ticket</th><th class="r">CPA</th>'+
+    '<th class="r">Falha</th><th class="c">Situação</th></tr></thead><tbody>';
+  hist.slice().reverse().forEach(function(x){
+    h += '<tr'+(x.ym===ym?' style="background:#fdf7f0"':'')+'>'+
+      '<td><button data-mes="'+x.ym+'" style="font-weight:600;color:var(--vinho);text-transform:capitalize">'+U.nomeMes(x.ym)+'</button></td>'+
+      '<td class="r">'+U.brl(x.a.faturamento,0)+'</td>'+
+      '<td class="r" style="color:var(--texto-fraco)">'+(x.p.metaFat?U.brl(x.p.metaFat,0):'—')+'</td>'+
+      '<td class="r" style="font-weight:600;color:'+(x.a.lucro<0?'var(--rubro)':'var(--texto)')+'">'+U.brl(x.a.lucro,0)+'</td>'+
+      '<td class="r">'+(x.a.faturamento?'<span class="pt '+UI.nivelMargem(x.a.margem)+'"></span> '+U.pct(x.a.margem):'—')+'</td>'+
+      '<td class="r">'+U.num(x.a.pedidos)+'</td>'+
+      '<td class="r">'+(x.a.pedidos?U.brl(x.a.ticket,0):'—')+'</td>'+
+      '<td class="r">'+(x.a.custo.marketing?U.brl(x.a.cpa,0):'—')+'</td>'+
+      '<td class="r" style="color:'+(x.a.custo.falha>0?'var(--rubro)':'var(--texto-fraco)')+'">'+(x.a.custo.falha?U.brl(x.a.custo.falha,0):'—')+'</td>'+
+      '<td class="c"><span class="etq '+(Store.fecho(x.ym).fechado?'rec':'pen')+'">'+(Store.fecho(x.ym).fechado?'fechado':'aberto')+'</span></td></tr>';
+  });
+  h += '</tbody></table></div>';
+
+  var comAprendizado = hist.filter(function(x){ return Store.fecho(x.ym).aprendizado || Store.fecho(x.ym).acao; });
+  if(comAprendizado.length){
+    h += '<div class="cartao" style="margin-top:12px"><div class="cartao-tit">O que cada mês ensinou</div>'+
+      comAprendizado.slice().reverse().map(function(x){
+        var f = Store.fecho(x.ym);
+        return '<div style="padding:12px 0;border-bottom:1px solid var(--linha)">'+
+          '<div style="font-weight:600;text-transform:capitalize;margin-bottom:4px">'+U.nomeMes(x.ym)+'</div>'+
+          (f.aprendizado?'<div style="font-size:13px;color:var(--texto-medio);line-height:1.6">'+U.esc(f.aprendizado)+'</div>':'')+
+          (f.acao?'<div style="font-size:13px;color:var(--vinho);margin-top:5px"><b>Próxima ação:</b> '+U.esc(f.acao)+'</div>':'')+
+        '</div>';
+      }).join('')+'</div>';
+  }
+  return h;
+};
+
+/* ============================================================
+   CAIXA
+============================================================ */
+Views.caixaTela = function(){
+  if(UI.aba==='reserva') return Views.reserva();
+  return Views.caixa() + '<div style="height:12px"></div>' + Views.projecaoBloco();
+};
+
+Views.projecaoBloco = function(){
+  var ym = UI.ym, a = Calc.apurar(ym), p = Calc.projetar(a), serie = Calc.serieDiaria(ym);
+  if(!a.temDados) return '';
+  var h = '';
+  h += '<div class="cartao"><div class="cartao-tit">Entrada e saída de '+U.nomeMes(ym)+'</div>'+
+    '<div class="cartao-sub">Dia a dia, com o acumulado</div>'+
+    Chart.colunas(serie.slice(0,Math.max(1,p.decorridos)).map(function(d){
+      return {rot:String(d.dia), valor:d.fat, cor:d.fat>0?'#5a332e':'#e7e1db'};
+    }))+
+    '<div class="tabela-env" style="margin-top:14px"><table><thead><tr>'+
+      '<th>Dia</th><th class="r">Faturamento</th><th class="r">Pedidos</th><th class="r">Marketing</th>'+
+      '<th class="r">Lucro</th><th class="r">Acumulado</th></tr></thead><tbody>';
+  var hojeIso = U.hoje();
+  serie.forEach(function(d){
+    if(d.data>hojeIso && !d.fat) return;
+    h += '<tr'+(d.data===hojeIso?' class="hoje"':'')+'>'+
+      '<td style="white-space:nowrap">'+d.dia+' <span style="color:var(--texto-fraco);font-size:11.5px">'+U.diaSemana(d.data)+'</span></td>'+
+      '<td class="r">'+(d.fat?U.brl(d.fat,0):'—')+'</td>'+
+      '<td class="r">'+(d.pedidos?U.num(d.pedidos):'—')+'</td>'+
+      '<td class="r">'+(d.mkt?U.brl(d.mkt,0):'—')+'</td>'+
+      '<td class="r" style="font-weight:600;color:'+(d.lucro<0?'var(--rubro)':(d.lucro>0?'var(--verde)':'var(--texto-fraco)'))+'">'+
+        (d.fat||d.mkt||d.outrasDesp||d.falha?U.brl(d.lucro,0):'—')+'</td>'+
+      '<td class="r" style="color:var(--texto-medio)">'+U.brl(d.accLucro,0)+'</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+};
+/* ============================================================
    FORMULÁRIOS
 ============================================================ */
 var Form = {};
@@ -4375,6 +4968,111 @@ Form.lancamento = function(id, presets){
         };
         if(id) Store.editLancamento(id, novo); else Store.addLancamento(novo);
         if(U.ym(data)!==UI.ym){ UI.ym = U.ym(data); }
+        fechar(); App.render();
+      });
+    }
+  });
+};
+
+Form.promocao = function(id){
+  var c = Calc.cfg();
+  var o = id ? Object.assign({}, Store.getPromocao(id)) : {
+    nome:'', camisetas:2, preco:'', freteGratis:true, freteCobrado:0, frete:U.n(c.freteMedio),
+    modoMkt:'pct', marketingPct:U.n(c.marketingBase), cpa:60, brindes:0,
+    operacionalPct:U.n(c.operacionalPct), margemAlvo:U.n(c.metaMargem), precos:{},
+    ativa:true, itens:[], obs:''
+  };
+  var cat = (c.insumos||[]).filter(function(i){ return i.ativo!==false; });
+
+  var corpo =
+    '<div class="campo"><label>Nome da promoção</label>'+
+      '<input type="text" id="oNome" placeholder="2 camisetas + frete grátis" value="'+U.esc(o.nome)+'"></div>'+
+    '<div class="linha-campos lc2">'+
+      '<div class="campo"><label>Camisetas no pedido</label>'+
+        '<div class="segm" style="display:flex">'+[1,2,3,4,5].map(function(q){
+          return '<button data-oq="'+q+'" class="'+(U.n(o.camisetas)===q?'ativo':'')+'" style="flex:1">'+q+'</button>';
+        }).join('')+'</div></div>'+
+      '<div class="campo"><label>Preço de venda (R$)</label>'+
+        '<input type="number" id="oPreco" step="0.01" value="'+(o.preco===''?'':U.n(o.preco))+'"></div>'+
+    '</div>'+
+    '<div class="campo"><label class="chk"><input type="checkbox" id="oFreteG" '+(o.freteGratis!==false?'checked':'')+'> Frete grátis</label>'+
+      '<div class="linha-campos lc2" style="margin-top:8px">'+
+        '<div><label style="font-size:11.5px;color:var(--texto-fraco)">Custo do frete</label>'+
+          '<input type="number" id="oFrete" step="0.5" value="'+U.n(o.frete)+'"></div>'+
+        '<div><label style="font-size:11.5px;color:var(--texto-fraco)">Cobrado do cliente</label>'+
+          '<input type="number" id="oFreteCob" step="0.5" value="'+U.n(o.freteCobrado)+'" '+(o.freteGratis!==false?'disabled':'')+'></div>'+
+      '</div></div>'+
+    '<div class="campo"><label>Brindes que acompanham</label>'+
+      (cat.length
+        ? '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">'+cat.map(function(i){
+            return '<label class="chk"><input type="checkbox" data-oitem="'+i.id+'" '+
+              ((o.itens||[]).indexOf(i.id)>=0?'checked':'')+'> '+U.esc(i.nome)+
+              ' <span style="color:var(--texto-fraco)">'+U.brl(i.custo)+'</span></label>';
+          }).join('')+'</div>'
+        : '<div style="font-size:12.5px;color:var(--texto-fraco)">Cadastre os brindes em Custos.</div>')+'</div>'+
+    '<div class="campo"><label>Observação</label><input type="text" id="oObs" placeholder="capelinha de presente, por exemplo" value="'+U.esc(o.obs)+'"></div>'+
+    '<label class="chk"><input type="checkbox" id="oAtiva" '+(o.ativa!==false?'checked':'')+'> Promoção no ar</label>'+
+    '<div id="oPrevia" style="margin-top:14px"></div>';
+
+  UI.modal({
+    titulo: id?'Editar promoção':'Nova promoção',
+    larga:true,
+    corpo: corpo,
+    rodape:'<button class="btn sec" data-fechar>Cancelar</button><button class="btn" id="oSalvar">Salvar promoção</button>',
+    aoAbrir: function(el, fechar){
+      var qtd = U.n(o.camisetas,2);
+      var ler = function(){
+        var itens = [];
+        el.querySelectorAll('[data-oitem]').forEach(function(x){ if(x.checked) itens.push(x.getAttribute('data-oitem')); });
+        var freteG = el.querySelector('#oFreteG').checked;
+        return {
+          nome: el.querySelector('#oNome').value.trim(),
+          camisetas: qtd, preco: U.n(el.querySelector('#oPreco').value),
+          freteGratis: freteG, frete: U.n(el.querySelector('#oFrete').value),
+          freteCobrado: freteG ? 0 : U.n(el.querySelector('#oFreteCob').value),
+          modoMkt:'pct', marketingPct:U.n(o.marketingPct, c.marketingBase), cpa:U.n(o.cpa,60), brindes:0,
+          operacionalPct:U.n(o.operacionalPct, c.operacionalPct), margemAlvo:U.n(o.margemAlvo, c.metaMargem),
+          precos:o.precos||{}, ativa: el.querySelector('#oAtiva').checked,
+          itens: itens, obs: el.querySelector('#oObs').value.trim()
+        };
+      };
+      var previa = function(){
+        var d = ler();
+        if(!d.preco){ el.querySelector('#oPrevia').innerHTML = ''; return; }
+        var r = Calc.simular(d);
+        el.querySelector('#oPrevia').innerHTML =
+          '<div class="cartao" style="padding:14px 16px;background:#fdfbfa">'+
+            '<div style="font-size:12px;color:var(--texto-medio);margin-bottom:8px">Como fica esta promoção</div>'+
+            '<div class="grade g3" style="gap:8px">'+
+              UI.kpi({rot:'Custo direto', val:U.brl(r.custoFisico), pequeno:true,
+                nota:'camisetas '+U.brl(r.cmv)+' · embalagem '+U.brl(r.embalagem)})+
+              UI.kpi({rot:'Lucro por pedido', val:U.brl(r.lucro), pequeno:true, classe:r.lucro<0?'neg':''})+
+              UI.kpi({rot:'Margem', val:U.pct(r.margem), pequeno:true, pt:r.saudavel,
+                nota:'CPA máx '+(r.cpaMaxAlvo>0?U.brl(r.cpaMaxAlvo):'—')})+
+            '</div></div>';
+      };
+      el.querySelectorAll('[data-oq]').forEach(function(b){
+        b.addEventListener('click', function(){
+          qtd = parseInt(b.getAttribute('data-oq'),10);
+          el.querySelectorAll('[data-oq]').forEach(function(x){ x.classList.toggle('ativo', x===b); });
+          previa();
+        });
+      });
+      el.querySelector('#oFreteG').addEventListener('change', function(){
+        el.querySelector('#oFreteCob').disabled = this.checked;
+        previa();
+      });
+      ['oPreco','oFrete','oFreteCob'].forEach(function(i){
+        el.querySelector('#'+i).addEventListener('input', previa);
+      });
+      el.querySelectorAll('[data-oitem]').forEach(function(x){ x.addEventListener('change', previa); });
+      previa();
+
+      el.querySelector('#oSalvar').addEventListener('click', function(){
+        var d = ler();
+        if(!d.nome){ UI.toast('Dê um nome à promoção.'); return; }
+        if(!d.preco){ UI.toast('Informe o preço de venda.'); return; }
+        if(id) Store.editPromocao(id, d); else Store.addPromocao(d);
         fechar(); App.render();
       });
     }
@@ -4800,6 +5498,7 @@ var App = {
     Store.carregar();
     UI.ym = U.ymAtual();
     Trava.iniciar(function(){
+      UI.tela = 'hoje';
       App.navHTML();
       App.eventos();
       App.render();
@@ -4833,20 +5532,29 @@ var App = {
     if(!destino) return;
     if(destino==='novo'){ Form.lancamento(); return; }
     if(destino==='novo-falha'){ Form.lancamento(null, {tipo:'despesa', grupo:'falha', categoria:'Reenvio por erro'}); return; }
-    if(destino.indexOf('fin:')===0){ UI.tela='financeiro'; UI.aba=destino.slice(4); }
-    else UI.tela = destino;
+    if(destino.indexOf(':')>0){
+      var pr = destino.split(':');
+      UI.tela = pr[0]; UI.aba = pr[1];
+    } else {
+      UI.tela = destino;
+      if(ABAS[destino]) UI.aba = App.abaPadrao(destino);
+    }
     window.scrollTo({top:0, behavior:'smooth'});
     App.render();
   },
 
   titulo: function(){
-    if(UI.tela==='financeiro'){
-      var ab = ABAS_FIN.find(function(a){ return a.id===UI.aba; });
-      return 'Financeiro'+(ab?' · '+ab.nome:'');
-    }
     var achou = null;
     NAV.forEach(function(g){ g.itens.forEach(function(i){ if(i.id===UI.tela) achou=i.nome; }); });
-    return achou || 'Arcanju OS';
+    if(ABAS[UI.tela]){
+      var ab = ABAS[UI.tela].find(function(a){ return a.id===UI.aba; });
+      if(ab) return achou+' · '+ab.nome;
+    }
+    return achou || 'Painel do Gestor';
+  },
+
+  abaPadrao: function(tela){
+    return ABAS[tela] ? ABAS[tela][0].id : null;
   },
 
   render: function(){
@@ -4856,25 +5564,28 @@ var App = {
     document.querySelectorAll('.nav-item').forEach(function(b){
       b.classList.toggle('ativo', b.getAttribute('data-tela')===UI.tela);
     });
-    var mostraPeriodo = ['geral','gestor','financeiro','metas','agenda','integracoes'].indexOf(UI.tela)>=0;
-    document.getElementById('periodoCtrl').style.display = mostraPeriodo ? '' : 'none';
+    var semPeriodo = ['custos','integracoes','config'];
+    document.getElementById('periodoCtrl').style.display = semPeriodo.indexOf(UI.tela)>=0 ? 'none' : '';
 
     var h = '';
-    if(UI.tela==='financeiro'){
-      h += '<div class="abas">'+ABAS_FIN.map(function(a){
+    if(ABAS[UI.tela]){
+      var abas = ABAS[UI.tela];
+      if(!abas.some(function(a){ return a.id===UI.aba; })) UI.aba = abas[0].id;
+      h += '<div class="abas">'+abas.map(function(a){
         return '<button class="aba'+(a.id===UI.aba?' ativa':'')+'" data-aba="'+a.id+'">'+U.esc(a.nome)+'</button>';
       }).join('')+'</div>';
-      var fn = Views[UI.aba];
-      h += fn ? fn() : Views.dashboard();
     }
-    else if(UI.tela==='geral') h = Views.geral();
-    else if(UI.tela==='gestor') h = Views.gestor();
-    else if(UI.tela==='metas') h = Views.metas();
-    else if(UI.tela==='agenda') h = Views.agenda();
-    else if(UI.tela==='reserva') h = Views.reserva();
-    else if(UI.tela==='integracoes') h = Views.integracoes();
-    else if(UI.tela==='config') h = Views.config();
-    else h = Views.breve(UI.tela);
+
+    if(UI.tela==='hoje') h += Views.hoje();
+    else if(UI.tela==='agenda') h += Views.agenda();
+    else if(UI.tela==='lancamentos') h += Views.lancamentos();
+    else if(UI.tela==='planejamento') h += Views.planejamento();
+    else if(UI.tela==='resultados') h += Views.resultados();
+    else if(UI.tela==='caixa') h += Views.caixaTela();
+    else if(UI.tela==='custos') h += Views.precos();
+    else if(UI.tela==='integracoes') h += Views.integracoes();
+    else if(UI.tela==='config') h += Views.config();
+    else h += Views.hoje();
 
     alvo.innerHTML = h;
     App.pos();
@@ -5136,6 +5847,36 @@ var App = {
       });
     }
     if(q('addConta')) q('addConta').addEventListener('click', function(){ Form.conta(); });
+    if(q('addPromo')) q('addPromo').addEventListener('click', function(){ Form.promocao(); });
+    if(q('addPromo2')) q('addPromo2').addEventListener('click', function(){ Form.promocao(); });
+
+    /* tela de custos */
+    if(q('pSalvarTaxas')){
+      q('pSalvarTaxas').addEventListener('click', function(){
+        var c = Calc.cfg();
+        c.gateway=U.n(q('pGateway').value); c.gatewayFixo=U.n(q('pGwFixo').value);
+        c.checkout=U.n(q('pCheckout').value); c.imposto=U.n(q('pImposto').value);
+        c.freteMedio=U.n(q('pFrete').value); c.marketingBase=U.n(q('pMkt').value);
+        Store.commit('Taxas salvas'); App.render();
+      });
+    }
+    if(q('pSalvarFaixas')){
+      q('pSalvarFaixas').addEventListener('click', function(){
+        var faixas = [];
+        document.querySelectorAll('.pfAte').forEach(function(el,i){
+          var custo = document.querySelectorAll('.pfCusto')[i];
+          var ate = U.n(el.value);
+          if(ate>0) faixas.push({ate:ate, custo:U.n(custo?custo.value:0)});
+        });
+        if(!faixas.length){ UI.toast('Deixe ao menos uma faixa.'); return; }
+        Calc.cfg().embalagemFaixas = faixas;
+        Store.commit('Embalagem salva'); App.render();
+      });
+    }
+    if(q('pAddFaixa')) q('pAddFaixa').addEventListener('click', function(){
+      Calc.cfg().embalagemFaixas.push({ate:99, custo:0});
+      Store.salvar(); App.render();
+    });
     if(q('addProduto')) q('addProduto').addEventListener('click', function(){ Form.produto(); });
     if(q('addInsumo')) q('addInsumo').addEventListener('click', function(){ Form.insumo(); });
   },
@@ -5359,7 +6100,7 @@ var App = {
             pedidos: Math.round(x.pedidos), margem: U.n(Views.cen.margemAlvo, Calc.cfg().metaMargem),
             cpaMax: x.unit.cpaMaxAlvo>0 ? Math.round(x.unit.cpaMaxAlvo) : 0
           });
-          UI.tela='financeiro'; UI.aba='projecao'; App.render();
+          UI.tela='caixa'; UI.aba='saldo'; App.render();
         }, 'Definir meta');
     });
   },
@@ -5395,7 +6136,8 @@ var App = {
       var g = function(a){ return t.getAttribute(a); };
 
       if(g('data-tela')){
-        UI.tela = g('data-tela'); if(UI.tela==='financeiro') UI.aba='dashboard';
+        UI.tela = g('data-tela');
+        if(ABAS[UI.tela]) UI.aba = App.abaPadrao(UI.tela);
         rail.classList.remove('aberto'); fundo.classList.remove('on');
         App.render(); return;
       }
@@ -5508,6 +6250,24 @@ var App = {
         UI.confirmar('Remover esta vigência?',
           'Os meses cobertos por ela voltam a usar os custos da vigência anterior.',
           function(){ Store.removerVigencia(dv); App.render(); });
+        return;
+      }
+      if(g('data-editPromo')){ Form.promocao(g('data-editPromo')); return; }
+      if(g('data-togglePromo')){
+        var op = Store.getPromocao(g('data-togglePromo'));
+        if(op){ op.ativa = (op.ativa===false); Store.commit(op.ativa?'Promoção ativada':'Promoção pausada'); App.render(); }
+        return;
+      }
+      if(g('data-delPromo')){
+        var idp2 = g('data-delPromo');
+        var op2 = Store.getPromocao(idp2);
+        UI.confirmar('Excluir promoção?','<b>'+U.esc(op2.nome)+'</b> some do planejamento. Os pedidos já vendidos não mudam.',
+          function(){ Store.delPromocao(idp2); App.render(); });
+        return;
+      }
+      if(g('data-simPromo')){
+        var op3 = Store.getPromocao(g('data-simPromo'));
+        if(op3){ Views.sim = Object.assign({}, op3, {precos:op3.precos||{}}); UI.tela='planejamento'; UI.aba='simulador'; App.render(); }
         return;
       }
       if(g('data-hist')){
