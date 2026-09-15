@@ -1871,7 +1871,7 @@ Views.lancamentos = function(){
     h += '<tr>'+
       '<td style="white-space:nowrap">'+U.dataBr(l.data)+'</td>'+
       '<td><div style="font-weight:500">'+U.esc(l.descricao||'(sem descrição)')+'</div>'+
-        (l.referencia?'<div style="font-size:11.5px;color:var(--texto-fraco)">Pedido '+U.esc(l.referencia)+'</div>':'')+'</td>'+
+        (l.referencia?'<div style="font-size:11.5px;color:var(--texto-fraco)">#'+U.esc(l.referencia)+'</div>':'')+'</td>'+
       '<td><span class="etq '+(l.grupo==='falha'?'fal':(l.tipo==='receita'?'rec':'des'))+'">'+U.esc(GRUPOS[l.grupo].nome)+'</span></td>'+
       '<td style="color:var(--texto-medio)">'+U.esc(l.categoria||'—')+'</td>'+
       '<td style="color:var(--texto-medio)">'+U.esc(l.canal||'—')+'</td>'+
@@ -3101,12 +3101,15 @@ var Integra = {
 
   mapear: function(fonte, x){
     var id = String(x.id||x.numero||x.pedido||x.referencia||'');
+    /* número visível do pedido (o de 4 dígitos). O id interno continua
+       sendo a chave de deduplicação, mas não é o que aparece na tela. */
+    var numero = String(x.referencia||x.numero||x.pedido||id);
     if(fonte==='loja'){
       if(!x.data || x.valor===undefined) return null;
       return {
         data:String(x.data).slice(0,10), tipo:'receita', grupo:'vendas',
-        categoria:x.categoria||'Venda online', descricao:x.descricao||('Pedido '+id),
-        canal:x.canal||'Loja (Nuvemshop)', referencia:id, valor:U.n(x.valor),
+        categoria:x.categoria||'Venda online', descricao:x.descricao||('Pedido #'+numero),
+        canal:x.canal||'Loja (Nuvemshop)', referencia:numero, valor:U.n(x.valor),
         freteCobrado:U.n(x.freteCobrado), valorBruto:U.n(x.valorBruto), desconto:U.n(x.desconto),
         uf:(x.uf||'').toUpperCase(),
         pedidos:U.n(x.pedidos,1)||1, camisetas:U.n(x.camisetas), pagamento:x.pagamento||'',
@@ -3126,8 +3129,8 @@ var Integra = {
       if(!x.data || x.valor===undefined) return null;
       return {
         data:String(x.data).slice(0,10), tipo:'despesa', grupo:'frete',
-        categoria:x.categoria||'Frete de envio', descricao:x.descricao||('Frete pedido '+id),
-        canal:'', referencia:id, valor:U.n(x.valor), pedidos:0, camisetas:0,
+        categoria:x.categoria||'Frete de envio', descricao:x.descricao||('Frete pedido #'+numero),
+        canal:'', referencia:numero, valor:U.n(x.valor), pedidos:0, camisetas:0,
         pagamento:'', status:'pago', obs:'', origem:'frete', externoId:id||('frete-'+String(x.data).slice(0,10))
       };
     }
