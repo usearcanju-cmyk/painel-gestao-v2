@@ -532,10 +532,15 @@ function estadoPadrao(){
         {ate:3,  custo:9.15},
         {ate:99, custo:13.55}
       ],
-      /* Itens cobrados por fora do kit */
+      /* Quando ligado, os brindes de cada oferta são escolhidos na tela da promoção
+         e os insumos abaixo deixam de ser somados automaticamente em todo pedido. */
+      brindesPorOferta: false,
+      /* Catálogo de brindes e itens cobrados por fora do kit */
       insumos: [
-        {id:'i5', nome:'Cartinha',  custo:0, base:'pedido', ativo:true, aDefinir:true},
-        {id:'i6', nome:'Cheirinho', custo:0, base:'pedido', ativo:true, aDefinir:true}
+        {id:'i1', nome:'Capelinha',  custo:0, base:'pedido', ativo:true, aDefinir:true},
+        {id:'i2', nome:'Sacolinha',  custo:0, base:'pedido', ativo:true, aDefinir:true},
+        {id:'i5', nome:'Cartinha',   custo:0, base:'pedido', ativo:true, aDefinir:true},
+        {id:'i6', nome:'Cheirinho',  custo:0, base:'pedido', ativo:true, aDefinir:true}
       ],
       canais: ['Loja (Nuvemshop)','Instagram','WhatsApp','Revenda','Representantes','Feira/Evento','Outro']
     },
@@ -561,6 +566,7 @@ function estadoPadrao(){
     fechamento: {}, /* '2026-09': {conciliadoAte, ofertaAprovada, custosConferidos, falhasApuradas, aprendizado, acao, fechado} */
     vigencias: [],  /* [{desde:'2026-09', premissas:{...}, obs:''}] — histórico de custos */
     ajusteFrete: {},/* '2026-09': valor real total pago em etiquetas no mês */
+    reservaPlano: { meses:3, caixaAtual:0, aporteMensal:null, pedidosMes:null, incluirImposto:false },
     campanhas: [],  /* desempenho por campanha vindo da Meta */
     integracoes: {
       proxyUrl:'/api', chave:'', autoSync:true,
@@ -650,6 +656,7 @@ var Store = {
     if(!Array.isArray(d.campanhas)) d.campanhas = [];
     if(!d.fechamento || typeof d.fechamento!=='object') d.fechamento = {};
     if(!d.ajusteFrete || typeof d.ajusteFrete!=='object') d.ajusteFrete = {};
+    d.reservaPlano = Object.assign({}, base.reservaPlano, d.reservaPlano||{});
     d.integracoes = Object.assign({}, base.integracoes, d.integracoes||{});
     d.integracoes.loja = Object.assign({}, base.integracoes.loja, d.integracoes.loja||{});
     d.integracoes.ads = Object.assign({}, base.integracoes.ads, d.integracoes.ads||{});
@@ -940,8 +947,20 @@ var Calc = {
     return U.n(faixas[faixas.length-1].custo);
   },
   insumosPorPedido: function(ym){
-    return (Calc.cfgM(ym).insumos||[]).filter(function(i){ return i.ativo!==false && i.base==='pedido'; })
+    var c = Calc.cfgM(ym);
+    /* com brindes por oferta, o catálogo não é somado em todo pedido */
+    if(c.brindesPorOferta) return 0;
+    return (c.insumos||[]).filter(function(i){ return i.ativo!==false && i.base==='pedido'; })
       .reduce(function(s,i){ return s+U.n(i.custo); },0);
+  },
+
+  /* custo dos brindes escolhidos para uma oferta */
+  custoBrindes: function(ids, ym){
+    var insumos = Calc.cfgM(ym).insumos || [];
+    return (ids||[]).reduce(function(s,id){
+      var i = insumos.find(function(x){ return x.id===id; });
+      return s + (i ? U.n(i.custo) : 0);
+    },0);
   },
   insumosPorCamiseta: function(ym){
     return (Calc.cfgM(ym).insumos||[]).filter(function(i){ return i.ativo!==false && i.base==='camiseta'; })
@@ -1399,27 +1418,90 @@ var Calc = {
     return {baldes:baldes, pedidos:totPed};
   },
 
+  /* ---------- CAIXA ACUMULADO ----------
+     Meta: meses de operação garantida. Conta estrutura fixa e produção dos
+     pedidos, porque os pedidos continuam chegando e precisam ser entregues.
+     Não conta marketing: sem caixa, a primeira coisa que se desliga é o tráfego. ---------- */
+  planoReserva: function(){
+    var pl = Store.dados.reservaPlano, c = Calc.cfg();
+    var fixo = Calc.fixoMensal();
+    var mx = Calc.mix();
+    var camPorPedido = mx.temDados ? mx.mediaCamisetas : U.n(c.camisetasPorPedidoPadrao, 2);
+
+    /* volume mensal de referência: média dos últimos meses com venda */
+    var hist = Calc.historico().filter(function(x){ return x.a.pedidos>0; });
+    var ultimos = hist.slice(-3);
+    var mediaPedidos = ultimos.length
+      ? ultimos.reduce(function(s,x){ return s+x.a.pedidos; },0) / ultimos.length : 0;
+    var pedidos = (pl.pedidosMes===null || pl.pedidosMes==='') ? mediaPedidos : U.n(pl.pedidosMes);
+
+    var custoPorPedido = camPorPedido*Calc.custoCamiseta()
+                       + Calc.kitEmbalagem(camPorPedido) + Calc.insumosPorPedido()
+                       + U.n(c.freteMedio);
+    var producao = pedidos * custoPorPedido;
+
+    var r = {
+      meses: U.n(pl.meses, 3),
+      fixo: fixo.total, fixoDetalhe: fixo,
+      pedidosMes: pedidos, mediaPedidos: mediaPedidos, pedidosManual: !(pl.pedidosMes===null||pl.pedidosMes===''),
+      camPorPedido: camPorPedido, custoPorPedido: custoPorPedido, producao: producao
+    };
+    r.custoMensal = r.fixo + r.producao;
+    r.meta = r.custoMensal * r.meses;
+
+    r.atual = U.n(pl.caixaAtual);
+    r.falta = Math.max(0, r.meta - r.atual);
+    r.pct = U.div(r.atual, r.meta)*100;
+    r.mesesCobertos = U.div(r.atual, r.custoMensal);
+
+    /* ritmo: quanto sobra por mês, pela média de lucro dos meses com venda */
+    var mediaLucro = ultimos.length
+      ? ultimos.reduce(function(s,x){ return s+x.a.lucro; },0) / ultimos.length : 0;
+    r.mediaLucro = mediaLucro;
+    r.aporteAuto = Math.max(0, mediaLucro);
+    r.aporte = (pl.aporteMensal===null || pl.aporteMensal==='') ? r.aporteAuto : U.n(pl.aporteMensal);
+    r.aporteManual = !(pl.aporteMensal===null||pl.aporteMensal==='');
+
+    if(r.falta<=0){ r.mesesParaMeta = 0; r.dataMeta = null; }
+    else if(r.aporte<=0){ r.mesesParaMeta = null; r.dataMeta = null; }
+    else {
+      r.mesesParaMeta = r.falta / r.aporte;
+      var d = new Date();
+      d.setMonth(d.getMonth() + Math.ceil(r.mesesParaMeta));
+      r.dataMeta = d.toLocaleDateString('pt-BR',{month:'long', year:'numeric'});
+    }
+    return r;
+  },
+
   /* ---------- TICKET A PARTIR DA PROMOÇÃO ----------
      Aplica a distribuição de pedidos (quantos saem com 1, 2, 3, 4 camisetas)
      sobre os preços da promoção escolhida. ---------- */
-  ticketDaPromo: function(precos, partes){
+  ticketDaPromo: function(precos, partes, brindes){
+    brindes = brindes || {};
     var linhas = [], somaPart = 0;
     [1,2,3,4,5].forEach(function(q){
       var pt = U.n(partes[q]);
       if(pt<=0) return;
       somaPart += pt;
-      linhas.push({qtd:q, preco:U.n(precos[q]), part:pt});
+      linhas.push({qtd:q, preco:U.n(precos[q]), part:pt, brindes:brindes[q]||[]});
     });
-    if(!somaPart) return {ticket:0, camPorPedido:0, linhas:[], somaPart:0};
-    var ticket = 0, cam = 0;
+    if(!somaPart) return {ticket:0, camPorPedido:0, linhas:[], somaPart:0, embalagemMedia:0, cmvMedio:0};
+    var ticket = 0, cam = 0, emb = 0;
     linhas.forEach(function(l){
       l.peso = l.part / somaPart;
+      l.kit = Calc.kitEmbalagem(l.qtd);
+      l.custoBrindes = Calc.custoBrindes(l.brindes);
+      l.embalagem = l.kit + l.custoBrindes + Calc.insumosPorPedido();
+      l.cmv = l.qtd * Calc.custoCamiseta();
+      l.custoDireto = l.cmv + l.embalagem;
       ticket += l.peso * l.preco;
       cam += l.peso * l.qtd;
+      emb += l.peso * l.embalagem;
       l.partNorm = l.peso * 100;
+      l.contribTicket = l.peso * l.preco;
     });
-    linhas.forEach(function(l){ l.contribTicket = l.peso * l.preco; });
-    return {ticket:ticket, camPorPedido:cam, linhas:linhas, somaPart:somaPart};
+    return {ticket:ticket, camPorPedido:cam, linhas:linhas, somaPart:somaPart,
+            embalagemMedia:emb, cmvMedio:cam*Calc.custoCamiseta()};
   },
 
   /* distribuição real, em percentual por quantidade de camisetas */
@@ -1850,7 +1932,8 @@ var NAV = [
     {id:'gestor', nome:'Visão do Gestor', ico:'M3 3v18h18M7 15l4-4 3 3 5-6'},
     {id:'financeiro', nome:'Financeiro', ico:'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'},
     {id:'metas', nome:'Metas do mês', ico:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'},
-    {id:'agenda', nome:'Agenda de pagamentos', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'}
+    {id:'agenda', nome:'Agenda de pagamentos', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
+    {id:'reserva', nome:'Caixa acumulado', ico:'M3 10h18M7 15h4M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'}
   ]},
   {g:'Em breve', itens:[
     {id:'vendas', nome:'Vendas', breve:true, ico:'M3 3v18h18'},
@@ -3264,7 +3347,8 @@ Views.gestPadrao = function(){
 
   var tp = Calc.ticketDaPromo(precos, partes);
   return {
-    precos: precos, partes: partes, usarPromo: false,
+    precos: precos, partes: partes, seguirMixReal: temReal,
+    brindes: {1:[], 2:[], 3:[], 4:[], 5:[]},
     faturamento: 100000,
     ticket: mx.temDados ? Math.round(mx.ticketMedio*100)/100 : Math.round(tp.ticket*100)/100,
     camisetasPorPedido: mx.temDados ? Math.round(mx.mediaCamisetas*100)/100 : Math.round(tp.camPorPedido*100)/100,
@@ -3291,7 +3375,7 @@ Views.gestor = function(){
 };
 
 Views.gestConteudo = function(){
-  var s = Views.gest, g = Calc.gestor(Object.assign({}, s, {ym:UI.ym}));
+  var s = Views.gest, c = Calc.cfg(), g = Calc.gestor(Object.assign({}, s, {ym:UI.ym}));
   var mx = Calc.mix();
   var nivel = g.margemPct >= g.margemAlvo ? 'ok' : (g.margemPct >= g.margemAlvo*0.7 ? 'at' : 'cr');
   var h = '';
@@ -3389,37 +3473,70 @@ Views.gestConteudo = function(){
   '</div>';
 
   /* ---------- promoção que vou usar ---------- */
-  var tp = Calc.ticketDaPromo(s.precos, s.partes);
   var real = Calc.distribuicaoReal();
+  if(s.seguirMixReal && real.mix.temDados){
+    s.partes = {1:0,2:0,3:0,4:0,5:0};
+    Object.keys(real.dist).forEach(function(k){ s.partes[k] = real.dist[k]; });
+  }
+  var tp = Calc.ticketDaPromo(s.precos, s.partes, s.brindes);
   h += '<div class="cartao" style="margin-bottom:12px">'+
     '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+
       '<div style="flex:1;min-width:240px"><div class="cartao-tit">Promoção que vou usar</div>'+
       '<div class="cartao-sub">Defina os preços da escada. O painel aplica a distribuição de pedidos e calcula o ticket médio que isso produz.</div></div>'+
-      (real.mix.temDados?'<button class="btn sec sm" id="gDistReal">Usar distribuição real</button>':'')+
+      (real.mix.temDados
+        ? '<label class="chk" style="margin-right:4px"><input type="checkbox" id="gSeguirMix" '+(s.seguirMixReal?'checked':'')+'> Seguir o mix real</label>'+
+          '<button class="btn sec sm" id="gDistReal">Usar agora</button>'
+        : '')+
     '</div>'+
     '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
-      '<th>Oferta</th><th class="r">Preço de venda</th><th class="r">% dos pedidos</th>'+
-      '<th class="r">Hoje é</th><th class="r">Peso no ticket</th></tr></thead><tbody>'+
+      '<th>Oferta</th><th class="r">Preço</th><th class="r">% dos pedidos</th>'+
+      '<th>Brindes que acompanham</th><th class="r">Custo direto</th><th class="r">Sobra bruta</th></tr></thead><tbody>'+
     [1,2,3,4,5].map(function(q){
       var linha = tp.linhas.find(function(l){ return l.qtd===q; });
-      var hoje = real.dist[q];
+      var sel = s.brindes[q] || [];
+      var brindesCat = (c.insumos||[]).filter(function(i){ return i.ativo!==false; });
+      var cb = Calc.custoBrindes(sel);
+      var custoDireto = linha ? linha.custoDireto : (q*Calc.custoCamiseta() + Calc.kitEmbalagem(q) + cb + Calc.insumosPorPedido());
+      var sobra = U.n(s.precos[q]) - custoDireto;
       return '<tr'+(U.n(s.partes[q])<=0?' style="opacity:.45"':'')+'>'+
-        '<td style="font-weight:500">'+q+' camiseta'+(q>1?'s':'')+'</td>'+
+        '<td style="font-weight:500">'+q+' camiseta'+(q>1?'s':'')+
+          '<div class="nt" style="font-size:11px;color:var(--texto-fraco)">hoje: '+(real.dist[q]!==undefined?U.pct(real.dist[q],1):'—')+' dos pedidos</div></td>'+
         '<td class="r"><input type="number" data-preco="'+q+'" value="'+U.n(s.precos[q])+'" step="1" '+
-          'style="width:96px;padding:5px 8px;text-align:right"></td>'+
+          'style="width:92px;padding:5px 8px;text-align:right"></td>'+
         '<td class="r"><input type="number" data-parte="'+q+'" value="'+U.n(s.partes[q])+'" step="0.1" min="0" '+
-          'style="width:78px;padding:5px 8px;text-align:right"></td>'+
-        '<td class="r" style="color:var(--texto-fraco)">'+(hoje!==undefined?U.pct(hoje,1):'—')+'</td>'+
-        '<td class="r">'+(linha?U.brl(linha.contribTicket):'—')+'</td></tr>';
+          (s.seguirMixReal?'disabled ':'')+'style="width:72px;padding:5px 8px;text-align:right"></td>'+
+        '<td>'+
+          (c.brindesPorOferta
+            ? (brindesCat.length
+                ? '<div style="display:flex;flex-wrap:wrap;gap:4px 10px">'+brindesCat.map(function(i){
+                    return '<label class="chk" style="font-size:12px"><input type="checkbox" data-brinde="'+q+'|'+i.id+'" '+
+                      (sel.indexOf(i.id)>=0?'checked':'')+'> '+U.esc(i.nome)+
+                      ' <span style="color:var(--texto-fraco)">'+U.brl(i.custo)+'</span></label>';
+                  }).join('')+'</div>'+
+                  (cb>0?'<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">brindes: '+U.brl(cb)+'</div>':'')
+                : '<span style="font-size:12px;color:var(--texto-fraco)">cadastre os brindes em CMV &amp; Produto</span>')
+            : '<span style="font-size:12px;color:var(--texto-fraco)">incluídos no kit de embalagem</span>')+
+        '</td>'+
+        '<td class="r">'+U.brl(custoDireto)+'</td>'+
+        '<td class="r" style="font-weight:600;color:'+(sobra<0?'var(--rubro)':'var(--texto)')+'">'+U.brl(sobra)+'</td></tr>';
     }).join('')+
-    '<tr class="total"><td>Resultado da promoção</td><td class="r"></td>'+
-      '<td class="r">'+U.pct(tp.somaPart,1)+'</td><td class="r"></td>'+
-      '<td class="r">ticket '+U.brl(tp.ticket)+'</td></tr>'+
+    '<tr class="total"><td>Média ponderada</td><td class="r">'+U.brl(tp.ticket)+'</td>'+
+      '<td class="r">'+U.pct(tp.somaPart,1)+'</td>'+
+      '<td style="font-size:12px;color:var(--texto-medio)">embalagem média '+U.brl(tp.embalagemMedia)+'</td>'+
+      '<td class="r">'+U.brl(tp.cmvMedio + tp.embalagemMedia)+'</td>'+
+      '<td class="r">'+U.brl(tp.ticket - tp.cmvMedio - tp.embalagemMedia)+'</td></tr>'+
     '</tbody></table></div>'+
+    '<label class="chk" style="margin-top:12px"><input type="checkbox" id="gBrindesPorOferta" '+(c.brindesPorOferta?'checked':'')+'> '+
+      'Escolher os brindes por oferta '+UI.ajuda('Ligado: cada oferta leva os brindes que você marcar, e o custo muda de uma para outra. Desligado: o kit de embalagem é igual para todo pedido.')+'</label>'+
+    (c.brindesPorOferta
+      ? '<div class="aviso" style="margin-top:10px">Com esta opção ligada, o kit de embalagem deve conter <b>só a embalagem de envio</b>. '+
+        'Se o seu kit de '+U.brl(Calc.kitEmbalagem(2))+' já inclui capelinha e sacolinha, corrija em Configurações — senão os brindes entram duas vezes na conta.</div>'
+      : '')+
     '<div class="'+(Math.abs(tp.somaPart-100)>0.5?'aviso':'info')+'" style="margin-top:12px">'+
       (Math.abs(tp.somaPart-100)>0.5
         ? 'As participações somam '+U.pct(tp.somaPart,1)+'. O painel normaliza para 100% no cálculo, mas vale ajustar para conferir melhor.'
-        : 'Com esses preços e essa distribuição: ticket médio de <b>'+U.brl(tp.ticket)+'</b> e <b>'+U.num(tp.camPorPedido,2)+' camisetas por pedido</b>.')+
+        : 'Com esses preços e essa distribuição: ticket médio de <b>'+U.brl(tp.ticket)+'</b> e <b>'+U.num(tp.camPorPedido,2)+' camisetas por pedido</b>.'+
+          (s.seguirMixReal ? ' A distribuição segue o seu histórico e se atualiza sozinha a cada venda nova.' : ''))+
     '</div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
       '<button class="btn" id="gAplicarPromo">Aplicar na planilha</button>'+
@@ -3492,6 +3609,125 @@ Views.gestConteudo = function(){
       '<button class="btn sec" id="gRestaurar">Restaurar padrão</button>'+
     '</div>'+
   '</div>';
+  return h;
+};
+
+/* ============================================================
+   CAIXA ACUMULADO
+============================================================ */
+Views.reserva = function(){
+  var r = Calc.planoReserva(), pl = Store.dados.reservaPlano;
+  var nivel = r.pct>=100 ? 'ok' : (r.pct>=50 ? 'at' : 'cr');
+  var h = '';
+
+  h += '<section class="veredito '+(nivel==='ok'?'':(nivel==='at'?'atencao':'critico'))+'">'+
+    '<div class="veredito-frase">'+(
+      r.meta<=0 ? 'Defina o custo da operação para o painel calcular a meta.'
+      : r.pct>=100 ? 'A reserva está completa.'
+      : r.atual<=0 ? 'A reserva ainda não começou.'
+      : 'A reserva cobre '+U.num(r.mesesCobertos,1)+' mês(es) de operação.')+'</div>'+
+    '<div class="veredito-apoio">'+
+      'A meta é '+U.brl(r.meta,0)+' — '+U.num(r.meses)+' meses de operação garantida, somando estrutura fixa e produção dos pedidos. '+
+      (r.falta>0
+        ? 'Faltam '+U.brl(r.falta,0)+'. '+(r.mesesParaMeta!==null
+            ? 'No ritmo atual de '+U.brl(r.aporte,0)+' por mês, a meta é alcançada em '+
+              (r.mesesParaMeta<1?'menos de um mês':U.num(Math.ceil(r.mesesParaMeta))+' mês(es))').replace('))',')')+
+              (r.dataMeta?', por volta de '+r.dataMeta:'')+'.'
+            : 'Sem sobra mensal, a reserva não avança — o ritmo precisa vir do lucro.')
+        : 'Nada falta. A empresa aguenta '+U.num(r.meses)+' meses sem vender nada.')+
+    '</div>'+
+  '</section>';
+
+  /* barra */
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">'+
+      '<div class="cartao-tit" style="margin:0">'+U.brl(r.atual,0)+' de '+U.brl(r.meta,0)+'</div>'+
+      '<div style="font-family:var(--serif);font-size:22px;font-weight:600"><span class="pt '+nivel+'"></span> '+U.pct(r.pct,0)+'</div>'+
+    '</div>'+
+    '<div class="barra-prog" style="height:14px;margin-top:12px"><span class="'+(nivel==='ok'?'':nivel)+'" style="width:'+U.clamp(r.pct,0,100)+'%"></span></div>'+
+    '<div class="leg" style="margin-top:8px">'+
+      '<span>'+U.num(r.mesesCobertos,1)+' de '+U.num(r.meses)+' meses cobertos</span>'+
+      '<span>'+(r.falta>0?'faltam '+U.brl(r.falta,0):'meta atingida')+'</span></div>'+
+    /* marcos de cada mês */
+    '<div style="display:flex;gap:6px;margin-top:16px">'+
+      (function(){
+        var out = '';
+        for(var i=1;i<=U.n(r.meses,3);i++){
+          var ok = r.mesesCobertos >= i;
+          out += '<div style="flex:1;text-align:center;padding:10px 6px;border-radius:var(--r-sm);border:1px solid '+
+            (ok?'#bcd9cb':'var(--linha)')+';background:'+(ok?'#eef7f2':'#fff')+'">'+
+            '<div style="font-size:11.5px;color:var(--texto-fraco)">'+i+'º mês</div>'+
+            '<div class="num" style="font-size:13px;font-weight:600;color:'+(ok?'var(--verde)':'var(--texto-fraco)')+'">'+
+              U.brlCurto(r.custoMensal*i)+'</div></div>';
+        }
+        return out;
+      })()+
+    '</div>'+
+  '</div>';
+
+  /* entradas */
+  h += '<div class="grade g2" style="align-items:start;margin-bottom:12px">';
+  h += '<div class="cartao" style="padding:0;overflow:hidden">'+
+    '<table class="plan"><thead><tr><th class="rot">Seus números</th><th class="pc"></th><th class="vl">Valor</th></tr></thead><tbody>'+
+    '<tr class="entrada"><td class="rot">Caixa acumulado hoje<div class="nt">quanto já está guardado</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="rAtual" step="100" value="'+U.n(pl.caixaAtual)+'"></td></tr>'+
+    '<tr class="entrada"><td class="rot">Meses de operação garantida<div class="nt">quanto tempo quer aguentar sem vender</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="rMeses" step="1" min="1" value="'+U.n(r.meses)+'"></td></tr>'+
+    '<tr class="entrada"><td class="rot">Pedidos por mês<div class="nt">'+(r.pedidosManual?'valor informado por você':'média dos últimos meses: '+U.num(r.mediaPedidos,0))+'</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="rPedidos" step="1" placeholder="'+U.num(r.mediaPedidos,0)+'" value="'+(r.pedidosManual?U.n(pl.pedidosMes):'')+'"></td></tr>'+
+    '<tr class="entrada"><td class="rot">Quanto guardo por mês<div class="nt">'+(r.aporteManual?'valor informado por você':'lucro médio dos últimos meses: '+U.brl(r.aporteAuto,0))+'</div></td><td class="pc"></td>'+
+      '<td class="vl editavel"><input type="number" id="rAporte" step="100" placeholder="'+U.n(r.aporteAuto,0)+'" value="'+(r.aporteManual?U.n(pl.aporteMensal):'')+'"></td></tr>'+
+    '</tbody></table>'+
+    '<div style="padding:12px 14px"><button class="btn sec sm" id="rLimpar">Voltar aos valores automáticos</button></div>'+
+  '</div>';
+
+  h += '<div class="cartao" style="padding:0;overflow:hidden">'+
+    '<table class="plan"><thead><tr><th class="rot">Como a meta é calculada</th><th class="pc"></th><th class="vl">Por mês</th></tr></thead><tbody>'+
+    '<tr class="saida"><td class="rot">Estrutura fixa<div class="nt">as contas da Agenda, inclusive pró-labore</div></td><td class="pc"></td>'+
+      '<td class="vl">'+U.brl(r.fixo)+'</td></tr>'+
+    '<tr class="saida"><td class="rot">Produção dos pedidos<div class="nt">'+U.num(r.pedidosMes,0)+' pedidos × '+U.brl(r.custoPorPedido)+'</div></td><td class="pc"></td>'+
+      '<td class="vl">'+U.brl(r.producao)+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Custo de um mês de operação</td><td class="pc"></td>'+
+      '<td class="vl">'+U.brl(r.custoMensal)+'</td></tr>'+
+    '<tr class="resultado"><td class="rot">Meta da reserva<div class="nt">'+U.num(r.meses)+' meses</div></td><td class="pc"></td>'+
+      '<td class="vl" style="color:var(--vinho)">'+U.brl(r.meta)+'</td></tr>'+
+    '</tbody></table>'+
+    '<div class="info" style="margin:0 14px 14px">Marketing fica de fora de propósito: se o caixa apertar, o tráfego é a primeira coisa que se desliga. '+
+      'Produção entra porque os pedidos já vendidos precisam ser entregues de qualquer jeito.<br><br>'+
+      'Custo por pedido: '+U.num(r.camPorPedido,2)+' camisetas × '+U.brl(Calc.custoCamiseta())+
+      ' + embalagem '+U.brl(Calc.kitEmbalagem(r.camPorPedido)+Calc.insumosPorPedido())+
+      ' + frete '+U.brl(Calc.cfg().freteMedio)+'.</div>'+
+  '</div>';
+  h += '</div>';
+
+  /* projeção */
+  h += '<div class="cartao"><div class="cartao-tit">Caminho até a meta</div>'+
+    '<div class="cartao-sub">Guardando '+U.brl(r.aporte,0)+' por mês</div>';
+  if(r.falta<=0){
+    h += '<div class="info" style="margin-top:12px">Meta atingida. A partir daqui, o que sobra é lucro disponível de verdade.</div>';
+  }else if(r.aporte<=0){
+    h += '<div class="aviso" style="margin-top:12px">Sem sobra mensal, a reserva não avança. Informe quanto pretende guardar por mês, ou volte ao Financeiro para entender por que o lucro não está sobrando.</div>';
+  }else{
+    var meses = Math.min(24, Math.ceil(r.mesesParaMeta));
+    var pontos = [], labels = [], acc = r.atual;
+    for(var i=0;i<=meses;i++){
+      pontos.push(Math.min(r.meta, acc));
+      labels.push(i===0 ? 'hoje' : U.nomeMesCurto(U.somaMes(U.ymAtual(), i)));
+      acc += r.aporte;
+    }
+    h += Chart.linha({labels:labels, altura:200, series:[
+      {nome:'Caixa acumulado', cor:'#1f9d6c', pontos:pontos, area:true, marcarFim:true},
+      {nome:'Meta', cor:'#94897f', pontos:pontos.map(function(){ return r.meta; }), tracejado:true}
+    ]});
+    h += '<div class="grade g3" style="margin-top:14px">'+
+      UI.kpi({rot:'Falta juntar', val:U.brl(r.falta,0), pequeno:true, nota:U.pct(100-r.pct,0)+' da meta'})+
+      UI.kpi({rot:'Tempo até a meta', val:(r.mesesParaMeta<1?'menos de 1 mês':U.num(Math.ceil(r.mesesParaMeta))+' meses'), destaque:true,
+        nota: r.dataMeta ? ('por volta de '+r.dataMeta) : ''})+
+      UI.kpi({rot:'Guardando por mês', val:U.brl(r.aporte,0), pequeno:true,
+        nota: r.aporteManual ? 'valor que você informou' : 'lucro médio dos últimos meses'})+
+    '</div>';
+  }
+  h += '</div>';
   return h;
 };
 /* ============================================================
@@ -4617,6 +4853,7 @@ var App = {
     else if(UI.tela==='gestor') h = Views.gestor();
     else if(UI.tela==='metas') h = Views.metas();
     else if(UI.tela==='agenda') h = Views.agenda();
+    else if(UI.tela==='reserva') h = Views.reserva();
     else if(UI.tela==='integracoes') h = Views.integracoes();
     else if(UI.tela==='config') h = Views.config();
     else h = Views.breve(UI.tela);
@@ -4836,6 +5073,31 @@ var App = {
     }
 
     /* caixa */
+    if(q('rAtual')){
+      var pl = Store.dados.reservaPlano;
+      var salvaR = function(campo, el, vazioNulo){
+        var t;
+        el.addEventListener('input', function(){
+          var v = this.value;
+          pl[campo] = (vazioNulo && (v===''||v===null)) ? null : U.n(v);
+          clearTimeout(t); t = setTimeout(function(){
+            Store.salvar();
+            var id = el.id, pos = el.selectionStart;
+            App.render();
+            var novo = document.getElementById(id);
+            if(novo){ novo.focus(); try{ novo.setSelectionRange(pos,pos); }catch(e){} }
+          }, 500);
+        });
+      };
+      salvaR('caixaAtual', q('rAtual'));
+      salvaR('meses', q('rMeses'));
+      salvaR('pedidosMes', q('rPedidos'), true);
+      salvaR('aporteMensal', q('rAporte'), true);
+      if(q('rLimpar')) q('rLimpar').addEventListener('click', function(){
+        pl.pedidosMes = null; pl.aporteMensal = null;
+        Store.commit('Voltou aos valores automáticos'); App.render();
+      });
+    }
     if(q('btnAporte')){
       q('btnAporte').addEventListener('click', function(){ Form.reserva('aporte'); });
       q('btnRetirada').addEventListener('click', function(){ Form.reserva('retirada'); });
@@ -4983,6 +5245,32 @@ var App = {
         atualizar();
       });
     });
+    if(q('gSeguirMix')) q('gSeguirMix').addEventListener('change', function(){
+      s.seguirMixReal = this.checked;
+      if(this.checked){
+        var tp = Calc.ticketDaPromo(s.precos, Calc.distribuicaoReal().dist, s.brindes);
+        if(tp.ticket){
+          s.ticket = Math.round(tp.ticket*100)/100;
+          s.camisetasPorPedido = Math.round(tp.camPorPedido*100)/100;
+        }
+      }
+      atualizar();
+    });
+    document.querySelectorAll('[data-brinde]').forEach(function(el){
+      el.addEventListener('change', function(){
+        var pr = this.getAttribute('data-brinde').split('|');
+        var q = pr[0], id = pr[1];
+        s.brindes[q] = s.brindes[q] || [];
+        if(this.checked){ if(s.brindes[q].indexOf(id)<0) s.brindes[q].push(id); }
+        else s.brindes[q] = s.brindes[q].filter(function(x){ return x!==id; });
+        atualizar();
+      });
+    });
+    if(q('gBrindesPorOferta')) q('gBrindesPorOferta').addEventListener('change', function(){
+      Calc.cfg().brindesPorOferta = this.checked;
+      Store.salvar();
+      atualizar();
+    });
     if(q('gDistReal')) q('gDistReal').addEventListener('click', function(){
       var d = Calc.distribuicaoReal().dist;
       s.partes = {1:0,2:0,3:0,4:0,5:0};
@@ -4999,11 +5287,11 @@ var App = {
       atualizar();
     });
     if(q('gAplicarPromo')) q('gAplicarPromo').addEventListener('click', function(){
-      var tp = Calc.ticketDaPromo(s.precos, s.partes);
+      var tp = Calc.ticketDaPromo(s.precos, s.partes, s.brindes);
       if(!tp.ticket){ UI.toast('Informe ao menos uma oferta com participação acima de zero.'); return; }
       s.ticket = Math.round(tp.ticket*100)/100;
       s.camisetasPorPedido = Math.round(tp.camPorPedido*100)/100;
-      s.embalagemUnit = Calc.kitEmbalagem(tp.camPorPedido) + Calc.insumosPorPedido();
+      s.embalagemUnit = Math.round(tp.embalagemMedia*100)/100;
       UI.toast('Ticket de '+U.brl(tp.ticket)+' aplicado na planilha');
       atualizar();
     });
