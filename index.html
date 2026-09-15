@@ -1399,6 +1399,36 @@ var Calc = {
     return {baldes:baldes, pedidos:totPed};
   },
 
+  /* ---------- TICKET A PARTIR DA PROMOÇÃO ----------
+     Aplica a distribuição de pedidos (quantos saem com 1, 2, 3, 4 camisetas)
+     sobre os preços da promoção escolhida. ---------- */
+  ticketDaPromo: function(precos, partes){
+    var linhas = [], somaPart = 0;
+    [1,2,3,4,5].forEach(function(q){
+      var pt = U.n(partes[q]);
+      if(pt<=0) return;
+      somaPart += pt;
+      linhas.push({qtd:q, preco:U.n(precos[q]), part:pt});
+    });
+    if(!somaPart) return {ticket:0, camPorPedido:0, linhas:[], somaPart:0};
+    var ticket = 0, cam = 0;
+    linhas.forEach(function(l){
+      l.peso = l.part / somaPart;
+      ticket += l.peso * l.preco;
+      cam += l.peso * l.qtd;
+      l.partNorm = l.peso * 100;
+    });
+    linhas.forEach(function(l){ l.contribTicket = l.peso * l.preco; });
+    return {ticket:ticket, camPorPedido:cam, linhas:linhas, somaPart:somaPart};
+  },
+
+  /* distribuição real, em percentual por quantidade de camisetas */
+  distribuicaoReal: function(){
+    var mx = Calc.mix(), d = {};
+    mx.faixas.forEach(function(f){ d[f.qtd] = Math.round(f.part*10)/10; });
+    return {dist:d, mix:mx};
+  },
+
   /* ---------- VISÃO DO GESTOR ----------
      Parte do faturamento desejado e abre todos os custos. ---------- */
   gestor: function(o){
@@ -3220,10 +3250,24 @@ Views._cfgNum = function(rot, id, val, passo){
 Views.gest = null;
 Views.gestPadrao = function(){
   var c = Calc.cfg(), mx = Calc.mix();
+  var real = Calc.distribuicaoReal().dist;
+  /* preços puxados das ofertas salvas, quando existirem */
+  var precos = {1:139.90, 2:249.90, 3:319.90, 4:399.90, 5:479.90};
+  (Store.dados.ofertas||[]).forEach(function(o){
+    var q = U.n(o.camisetas);
+    if(q>=1 && q<=5) precos[q] = U.n(o.preco) + (o.freteGratis===false ? U.n(o.freteCobrado) : 0);
+  });
+  var partes = {1:0,2:0,3:0,4:0,5:0};
+  var temReal = Object.keys(real).length>0;
+  if(temReal) Object.keys(real).forEach(function(q){ partes[q] = real[q]; });
+  else { partes[1]=30; partes[2]=60; partes[3]=10; }
+
+  var tp = Calc.ticketDaPromo(precos, partes);
   return {
-    faturamento: 50000,
-    ticket: mx.temDados ? Math.round(mx.ticketMedio*100)/100 : 249.90,
-    camisetasPorPedido: mx.temDados ? Math.round(mx.mediaCamisetas*100)/100 : 2,
+    precos: precos, partes: partes, usarPromo: false,
+    faturamento: 100000,
+    ticket: mx.temDados ? Math.round(mx.ticketMedio*100)/100 : Math.round(tp.ticket*100)/100,
+    camisetasPorPedido: mx.temDados ? Math.round(mx.mediaCamisetas*100)/100 : Math.round(tp.camPorPedido*100)/100,
     custoCamiseta: Calc.custoCamiseta(),
     freteMedio: U.n(c.freteMedio),
     embalagemUnit: Calc.kitEmbalagem(mx.temDados?mx.mediaCamisetas:2) + Calc.insumosPorPedido(),
@@ -3321,6 +3365,49 @@ Views.gestConteudo = function(){
       nota: g.pedidosParaAlvo!==null ? (U.num(g.pedidosParaAlvo)+' no mês · '+U.brl(g.faturamentoParaAlvo,0)) : 'reduza marketing ou suba o ticket'})+
     UI.kpi({rot:'Contribuição por pedido', val:U.brl(g.contribPedido), pequeno:true,
       nota:'é o que sobra para pagar o fixo', ajuda:'Ticket menos todos os custos que variam com a venda.'})+
+  '</div>';
+
+  /* ---------- promoção que vou usar ---------- */
+  var tp = Calc.ticketDaPromo(s.precos, s.partes);
+  var real = Calc.distribuicaoReal();
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">'+
+      '<div style="flex:1;min-width:240px"><div class="cartao-tit">Promoção que vou usar</div>'+
+      '<div class="cartao-sub">Defina os preços da escada. O painel aplica a distribuição de pedidos e calcula o ticket médio que isso produz.</div></div>'+
+      (real.mix.temDados?'<button class="btn sec sm" id="gDistReal">Usar distribuição real</button>':'')+
+    '</div>'+
+    '<div class="tabela-env" style="margin-top:12px"><table><thead><tr>'+
+      '<th>Oferta</th><th class="r">Preço de venda</th><th class="r">% dos pedidos</th>'+
+      '<th class="r">Hoje é</th><th class="r">Peso no ticket</th></tr></thead><tbody>'+
+    [1,2,3,4,5].map(function(q){
+      var linha = tp.linhas.find(function(l){ return l.qtd===q; });
+      var hoje = real.dist[q];
+      return '<tr'+(U.n(s.partes[q])<=0?' style="opacity:.45"':'')+'>'+
+        '<td style="font-weight:500">'+q+' camiseta'+(q>1?'s':'')+'</td>'+
+        '<td class="r"><input type="number" data-preco="'+q+'" value="'+U.n(s.precos[q])+'" step="1" '+
+          'style="width:96px;padding:5px 8px;text-align:right"></td>'+
+        '<td class="r"><input type="number" data-parte="'+q+'" value="'+U.n(s.partes[q])+'" step="0.1" min="0" '+
+          'style="width:78px;padding:5px 8px;text-align:right"></td>'+
+        '<td class="r" style="color:var(--texto-fraco)">'+(hoje!==undefined?U.pct(hoje,1):'—')+'</td>'+
+        '<td class="r">'+(linha?U.brl(linha.contribTicket):'—')+'</td></tr>';
+    }).join('')+
+    '<tr class="total"><td>Resultado da promoção</td><td class="r"></td>'+
+      '<td class="r">'+U.pct(tp.somaPart,1)+'</td><td class="r"></td>'+
+      '<td class="r">ticket '+U.brl(tp.ticket)+'</td></tr>'+
+    '</tbody></table></div>'+
+    '<div class="'+(Math.abs(tp.somaPart-100)>0.5?'aviso':'info')+'" style="margin-top:12px">'+
+      (Math.abs(tp.somaPart-100)>0.5
+        ? 'As participações somam '+U.pct(tp.somaPart,1)+'. O painel normaliza para 100% no cálculo, mas vale ajustar para conferir melhor.'
+        : 'Com esses preços e essa distribuição: ticket médio de <b>'+U.brl(tp.ticket)+'</b> e <b>'+U.num(tp.camPorPedido,2)+' camisetas por pedido</b>.')+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
+      '<button class="btn" id="gAplicarPromo">Aplicar na planilha</button>'+
+      '<button class="btn sec" id="gPromoOfertas">Puxar preços das ofertas salvas</button>'+
+    '</div>'+
+    (s.ticket && Math.abs(s.ticket - tp.ticket) > 0.5
+      ? '<div class="info" style="margin-top:10px">A planilha está usando ticket de '+U.brl(s.ticket)+
+        '. Esta promoção daria '+U.brl(tp.ticket)+' — uma diferença de '+U.brl(Math.abs(tp.ticket-s.ticket))+' por pedido.</div>'
+      : '')+
   '</div>';
 
   /* ---------- mix real ---------- */
@@ -4860,6 +4947,45 @@ var App = {
     liga('gOper','operacional');
     liga('gTicket','ticket');
     liga('gCamPed','camisetasPorPedido');
+
+    /* promoção */
+    var reagirPromo = null;
+    document.querySelectorAll('[data-preco]').forEach(function(el){
+      el.addEventListener('change', function(){
+        s.precos[this.getAttribute('data-preco')] = U.n(this.value);
+        atualizar();
+      });
+    });
+    document.querySelectorAll('[data-parte]').forEach(function(el){
+      el.addEventListener('change', function(){
+        s.partes[this.getAttribute('data-parte')] = U.n(this.value);
+        atualizar();
+      });
+    });
+    if(q('gDistReal')) q('gDistReal').addEventListener('click', function(){
+      var d = Calc.distribuicaoReal().dist;
+      s.partes = {1:0,2:0,3:0,4:0,5:0};
+      Object.keys(d).forEach(function(k){ s.partes[k] = d[k]; });
+      UI.toast('Distribuição real aplicada');
+      atualizar();
+    });
+    if(q('gPromoOfertas')) q('gPromoOfertas').addEventListener('click', function(){
+      (Store.dados.ofertas||[]).forEach(function(o){
+        var qq = U.n(o.camisetas);
+        if(qq>=1 && qq<=5) s.precos[qq] = U.n(o.preco) + (o.freteGratis===false ? U.n(o.freteCobrado) : 0);
+      });
+      UI.toast('Preços das ofertas salvas aplicados');
+      atualizar();
+    });
+    if(q('gAplicarPromo')) q('gAplicarPromo').addEventListener('click', function(){
+      var tp = Calc.ticketDaPromo(s.precos, s.partes);
+      if(!tp.ticket){ UI.toast('Informe ao menos uma oferta com participação acima de zero.'); return; }
+      s.ticket = Math.round(tp.ticket*100)/100;
+      s.camisetasPorPedido = Math.round(tp.camPorPedido*100)/100;
+      s.embalagemUnit = Calc.kitEmbalagem(tp.camPorPedido) + Calc.insumosPorPedido();
+      UI.toast('Ticket de '+U.brl(tp.ticket)+' aplicado na planilha');
+      atualizar();
+    });
 
     if(q('gUsarMix')) q('gUsarMix').addEventListener('click', function(){
       var mx = Calc.mix();
