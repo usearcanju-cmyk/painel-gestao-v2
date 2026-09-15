@@ -566,7 +566,7 @@ function estadoPadrao(){
     fechamento: {}, /* '2026-09': {conciliadoAte, ofertaAprovada, custosConferidos, falhasApuradas, aprendizado, acao, fechado} */
     vigencias: [],  /* [{desde:'2026-09', premissas:{...}, obs:''}] — histórico de custos */
     ajusteFrete: {},/* '2026-09': valor real total pago em etiquetas no mês */
-    reservaPlano: { meses:3, caixaAtual:0, aporteMensal:null, pedidosMes:null, incluirImposto:false },
+    reservaPlano: { meses:3, caixaAtual:0, aporteMensal:null, pedidosMes:null, incluirMarketing:true },
     campanhas: [],  /* desempenho por campanha vindo da Meta */
     integracoes: {
       proxyUrl:'/api', chave:'', autoSync:true,
@@ -1440,13 +1440,22 @@ var Calc = {
                        + U.n(c.freteMedio);
     var producao = pedidos * custoPorPedido;
 
+    /* marketing, quando incluído: mantém o tráfego rodando no mesmo volume */
+    var ticketRef = mx.temDados && mx.ticketMedio>0 ? mx.ticketMedio : 0;
+    var marketing = 0;
+    if(pl.incluirMarketing !== false){
+      marketing = pedidos * ticketRef * U.n(c.marketingBase)/100;
+    }
+
     var r = {
       meses: U.n(pl.meses, 3),
       fixo: fixo.total, fixoDetalhe: fixo,
       pedidosMes: pedidos, mediaPedidos: mediaPedidos, pedidosManual: !(pl.pedidosMes===null||pl.pedidosMes===''),
-      camPorPedido: camPorPedido, custoPorPedido: custoPorPedido, producao: producao
+      camPorPedido: camPorPedido, custoPorPedido: custoPorPedido, producao: producao,
+      incluirMarketing: pl.incluirMarketing !== false,
+      marketing: marketing, ticketRef: ticketRef, marketingPct: U.n(c.marketingBase)
     };
-    r.custoMensal = r.fixo + r.producao;
+    r.custoMensal = r.fixo + r.producao + r.marketing;
     r.meta = r.custoMensal * r.meses;
 
     r.atual = U.n(pl.caixaAtual);
@@ -3687,13 +3696,22 @@ Views.reserva = function(){
       '<td class="vl">'+U.brl(r.fixo)+'</td></tr>'+
     '<tr class="saida"><td class="rot">Produção dos pedidos<div class="nt">'+U.num(r.pedidosMes,0)+' pedidos × '+U.brl(r.custoPorPedido)+'</div></td><td class="pc"></td>'+
       '<td class="vl">'+U.brl(r.producao)+'</td></tr>'+
+    (r.incluirMarketing
+      ? '<tr class="saida"><td class="rot">Marketing<div class="nt">'+U.pct(r.marketingPct)+' sobre '+U.brl(r.pedidosMes*r.ticketRef,0)+' de faturamento</div></td><td class="pc"></td>'+
+        '<td class="vl">'+U.brl(r.marketing)+'</td></tr>'
+      : '')+
     '<tr class="resultado"><td class="rot">Custo de um mês de operação</td><td class="pc"></td>'+
       '<td class="vl">'+U.brl(r.custoMensal)+'</td></tr>'+
     '<tr class="resultado"><td class="rot">Meta da reserva<div class="nt">'+U.num(r.meses)+' meses</div></td><td class="pc"></td>'+
       '<td class="vl" style="color:var(--vinho)">'+U.brl(r.meta)+'</td></tr>'+
     '</tbody></table>'+
-    '<div class="info" style="margin:0 14px 14px">Marketing fica de fora de propósito: se o caixa apertar, o tráfego é a primeira coisa que se desliga. '+
-      'Produção entra porque os pedidos já vendidos precisam ser entregues de qualquer jeito.<br><br>'+
+    '<div style="padding:0 14px 6px"><label class="chk"><input type="checkbox" id="rMkt" '+(r.incluirMarketing?'checked':'')+'> '+
+      'Incluir marketing na reserva '+UI.ajuda('Ligado: a reserva cobre continuar anunciando no mesmo ritmo. Desligado: cobre só manter a casa em pé, assumindo que o tráfego seria desligado numa crise.')+'</label></div>'+
+    '<div class="info" style="margin:0 14px 14px">'+
+      (r.incluirMarketing
+        ? 'Com marketing dentro, a reserva cobre <b>continuar operando</b> no ritmo atual, não apenas sobreviver. É a definição mais exigente — e a que evita ter que desligar campanha por falta de caixa, que é onde a maioria das operações quebra o ciclo de vendas.'
+        : 'Sem marketing, a reserva cobre manter a casa em pé assumindo que o tráfego seria desligado numa crise.')+
+      ' Produção entra dos dois jeitos: os pedidos já vendidos precisam ser entregues.<br><br>'+
       'Custo por pedido: '+U.num(r.camPorPedido,2)+' camisetas × '+U.brl(Calc.custoCamiseta())+
       ' + embalagem '+U.brl(Calc.kitEmbalagem(r.camPorPedido)+Calc.insumosPorPedido())+
       ' + frete '+U.brl(Calc.cfg().freteMedio)+'.</div>'+
@@ -5093,6 +5111,11 @@ var App = {
       salvaR('meses', q('rMeses'));
       salvaR('pedidosMes', q('rPedidos'), true);
       salvaR('aporteMensal', q('rAporte'), true);
+      if(q('rMkt')) q('rMkt').addEventListener('change', function(){
+        pl.incluirMarketing = this.checked;
+        Store.commit(this.checked ? 'Marketing incluído na reserva' : 'Marketing fora da reserva');
+        App.render();
+      });
       if(q('rLimpar')) q('rLimpar').addEventListener('click', function(){
         pl.pedidosMes = null; pl.aporteMensal = null;
         Store.commit('Voltou aos valores automáticos'); App.render();
