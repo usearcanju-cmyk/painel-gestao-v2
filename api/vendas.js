@@ -13,8 +13,11 @@ export default async function handler(req, res) {
 
     const dados = pedidos.map((p) => {
       const freteCobrado = Number(p.shipping_cost_customer) || 0;
-      // valor = só produtos. O frete cobrado vai separado: é receita, mas não é venda de camiseta.
-      const produtos = Number(p.subtotal) || Math.max(0, (Number(p.total) || 0) - freteCobrado);
+      // valor = o que o cliente realmente pagou pelos produtos, JÁ com desconto e promoção,
+      // menos o frete. Nunca usar `subtotal`: na Nuvemshop ele vem antes do desconto,
+      // e uma promoção faria o painel registrar mais receita do que entrou.
+      const total = Number(p.total) || 0;
+      const produtos = Math.max(0, total - freteCobrado);
       const endereco = p.shipping_address || {};
       return {
         id: String(p.id),

@@ -63,7 +63,26 @@ export function pedidoValido(p) {
   return pago && !cancelado;
 }
 
+// Itens que vão na caixa mas não são camiseta. Contá-los como peça inflaria o CMV.
+// Dá para ajustar pela variável NUVEMSHOP_IGNORAR_PRODUTOS, separando por vírgula.
+const PADRAO_IGNORAR = 'capela,capelinha,sacola,sacolinha,saquinho,cartinha,cheirinho,brinde,adesivo';
+
+function termosIgnorados() {
+  return (process.env.NUVEMSHOP_IGNORAR_PRODUTOS || PADRAO_IGNORAR)
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function ehCamiseta(item, termos) {
+  const nome = String(item.name || item.product_name || '').toLowerCase();
+  return !termos.some((t) => nome.includes(t));
+}
+
 export function pecasDoPedido(p) {
   if (!Array.isArray(p.products)) return 0;
-  return p.products.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+  const termos = termosIgnorados();
+  return p.products
+    .filter((i) => ehCamiseta(i, termos))
+    .reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 }
