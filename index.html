@@ -3353,18 +3353,39 @@ Views.gestConteudo = function(){
     '</tbody></table></div>';
   h += '</div>';
 
-  /* ---------- pontos de virada ---------- */
-  h += '<div class="grade g3" style="margin-bottom:12px">'+
-    UI.kpi({rot:'Vendas por dia para não ter prejuízo',
-      val: g.pedidosDiaEquilibrio!==null ? U.num(g.pedidosDiaEquilibrio,1) : '—', destaque:true,
-      nota: g.pedidosEquilibrio!==null ? (U.num(g.pedidosEquilibrio)+' no mês · '+U.brl(g.pedidosEquilibrio*g.ticket,0)) : 'a oferta não cobre o fixo',
-      ajuda:'Abaixo disso o mês fecha no vermelho, independente do quanto você venda bem.'})+
-    UI.kpi({rot:'Vendas por dia para atingir '+U.pct(g.margemAlvo,0),
-      val: g.pedidosParaAlvo!==null ? U.num(g.pedidosParaAlvo/g.dias,1) : 'impossível', destaque:true,
-      classe: g.pedidosParaAlvo===null?'neg':'',
-      nota: g.pedidosParaAlvo!==null ? (U.num(g.pedidosParaAlvo)+' no mês · '+U.brl(g.faturamentoParaAlvo,0)) : 'reduza marketing ou suba o ticket'})+
-    UI.kpi({rot:'Contribuição por pedido', val:U.brl(g.contribPedido), pequeno:true,
-      nota:'é o que sobra para pagar o fixo', ajuda:'Ticket menos todos os custos que variam com a venda.'})+
+  /* ---------- os três números de vendas por dia ---------- */
+  h += '<div class="cartao" style="margin-bottom:12px">'+
+    '<div class="cartao-tit">Quantas vendas por dia</div>'+
+    '<div class="cartao-sub">Três perguntas diferentes, três respostas diferentes. A do meio é a sua meta.</div>'+
+    '<div class="grade g3" style="margin-top:12px">'+
+      UI.kpi({rot:'Para não ter prejuízo',
+        val: g.pedidosDiaEquilibrio!==null ? U.num(g.pedidosDiaEquilibrio,1) : '—',
+        pt: 'at',
+        nota: g.pedidosEquilibrio!==null ? (U.num(g.pedidosEquilibrio)+' no mês · '+U.brl(g.pedidosEquilibrio*g.ticket,0)) : 'a oferta não cobre o fixo',
+        ajuda:'O mínimo para a empresa se pagar. Aqui o lucro é exatamente zero — não é meta, é piso.'})+
+      UI.kpi({rot:'Para bater a meta de '+U.brl(g.faturamento,0),
+        val: U.num(g.pedidosDia,1), destaque:true, pt:'ok',
+        nota: U.num(g.pedidos,0)+' no mês · margem de '+U.pct(g.margemPct),
+        ajuda:'O faturamento que você digitou lá em cima, dividido pelo ticket e pelos dias do mês.'})+
+      UI.kpi({rot:'Para atingir '+U.pct(g.margemAlvo,0)+' de margem',
+        val: g.pedidosParaAlvo!==null ? U.num(g.pedidosParaAlvo/g.dias,1) : 'impossível',
+        classe: g.pedidosParaAlvo===null?'neg':'',
+        pt: g.pedidosParaAlvo!==null ? (g.pedidos>=g.pedidosParaAlvo?'ok':'cr') : 'cr',
+        nota: g.pedidosParaAlvo!==null ? (U.num(g.pedidosParaAlvo)+' no mês · '+U.brl(g.faturamentoParaAlvo,0)) : 'reduza marketing ou suba o ticket',
+        ajuda:'Quanto volume seria preciso para o custo fixo diluir até a margem chegar no alvo, mantendo tudo o mais igual.'})+
+    '</div>'+
+    '<div class="'+(g.pedidosParaAlvo!==null && g.pedidos>=g.pedidosParaAlvo ? 'info' : 'aviso')+'" style="margin-top:14px">'+
+      (g.pedidosParaAlvo===null
+        ? 'Com o marketing em '+U.pct(U.n(s.marketingPct))+' e o ticket em '+U.brl(g.ticket)+', nenhum volume chega a '+U.pct(g.margemAlvo,0)+' de margem. Volume não resolve estrutura: mexa no marketing, no ticket ou no custo.'
+        : g.pedidos>=g.pedidosParaAlvo
+          ? 'A meta que você digitou já supera o volume necessário para '+U.pct(g.margemAlvo,0)+' de margem.'
+          : 'Sua meta entrega '+U.pct(g.margemPct)+' de margem. Para chegar a '+U.pct(g.margemAlvo,0)+' só com volume seriam '+
+            U.num(g.pedidosParaAlvo/g.dias,1)+' vendas por dia — '+U.num(U.div(g.pedidosParaAlvo,g.pedidos),1)+'× o que você planejou. '+
+            'Costuma ser mais barato baixar o marketing ou subir o ticket do que multiplicar o volume.')+
+    '</div>'+
+    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--linha);display:flex;justify-content:space-between;font-size:13px;flex-wrap:wrap;gap:10px">'+
+      '<span>Contribuição por pedido '+UI.ajuda('Ticket menos todos os custos que variam com a venda. É o que cada pedido entrega para pagar o custo fixo.')+'</span>'+
+      '<span class="num" style="font-weight:600">'+U.brl(g.contribPedido)+'</span></div>'+
   '</div>';
 
   /* ---------- promoção que vou usar ---------- */
