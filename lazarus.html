@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projeto Lazarus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E4E9EC; --surface:#F5F7F8; --sunk:#D8DFE3; --ink:#14202A; --muted:#566571;
+  --line:#C3CCD2; --signal:#D98E1C; --signal-ink:#3A2600; --ok:#2B7A68; --risk:#B3261E;
+  --slab:#1D2B36; --slab-ink:#E9EEF1;
+  --font:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E141A; --surface:#16202A; --sunk:#1D2935; --ink:#E3E9ED; --muted:#93A2AD;
+    --line:#2C3A46; --signal:#F0A73A; --signal-ink:#2A1A00; --ok:#5FC1A8; --risk:#F0776C;
+    --slab:#C9D3DA; --slab-ink:#0E141A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E141A; --surface:#16202A; --sunk:#1D2935; --ink:#E3E9ED; --muted:#93A2AD;
+  --line:#2C3A46; --signal:#F0A73A; --signal-ink:#2A1A00; --ok:#5FC1A8; --risk:#F0776C;
+  --slab:#C9D3DA; --slab-ink:#0E141A; color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
+body{min-height:100vh}
+img{max-width:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* Header */
+.top{padding:22px clamp(16px,4vw,40px) 0;max-width:1180px;margin:0 auto}
+.brand{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.word{font-stretch:125%;font-weight:800;font-size:clamp(30px,5vw,44px);letter-spacing:.14em;line-height:1;margin:0}
+.sub{color:var(--muted);margin:6px 0 0;font-size:14px}
+.phases{display:flex;gap:4px;min-width:280px;flex:1;max-width:460px}
+.phase{flex:1;border:0;background:var(--sunk);padding:8px 10px 7px;text-align:left;cursor:pointer;border-radius:2px;position:relative}
+.phase b{display:block;font-size:12px;font-weight:600;font-stretch:110%}
+.phase span{font-size:11px;color:var(--muted)}
+.phase[aria-pressed="true"]{background:var(--slab);color:var(--slab-ink)}
+.phase[aria-pressed="true"] span{color:inherit;opacity:.75}
+.phase[aria-pressed="true"]::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--signal)}
+nav.tabs{display:flex;gap:2px;margin-top:22px;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:650}
+.sync{margin-left:auto;align-self:center;font-size:12px;color:var(--muted);padding:0 4px;white-space:nowrap}
+
+main{max-width:1180px;margin:0 auto;padding:24px clamp(16px,4vw,40px) 80px}
+section[hidden]{display:none}
+h2{font-stretch:115%;font-weight:700;font-size:22px;margin:0 0 4px;letter-spacing:.01em}
+h3{font-stretch:105%;font-weight:650;font-size:16px;margin:0 0 10px}
+p.lead{color:var(--muted);margin:0 0 20px;max-width:68ch}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:18px}
+.panel.flat{background:transparent}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* Hero countdown */
+.hero{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:0;background:var(--slab);color:var(--slab-ink);border-radius:4px;overflow:hidden;margin-bottom:18px}
+.hero>*{min-width:0}
+.hero .count{padding:22px 24px;border-right:1px solid color-mix(in srgb,var(--slab-ink) 18%,transparent)}
+.hero .count .big{font-stretch:125%;font-weight:800;font-size:64px;line-height:.95;letter-spacing:-.01em}
+.hero .count .cap{opacity:.72;font-size:13px;margin-top:6px}
+.hero .count .date{margin-top:14px;font-weight:600;font-stretch:110%;font-size:18px}
+.hero .count .date small{display:block;font-weight:400;opacity:.72;font-size:12px;font-stretch:100%}
+.hero .seq{padding:18px 20px;overflow-x:auto}
+.hero .seq h3{margin-bottom:12px}
+.slabs{display:flex;gap:6px}
+.slabs .slab{min-width:96px}
+.slab{flex:1;min-height:118px;border:1px solid color-mix(in srgb,var(--slab-ink) 28%,transparent);border-radius:2px;padding:9px 9px 8px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:none;color:inherit;text-align:left}
+.slab .n{font-size:12px;font-weight:600;font-stretch:110%;line-height:1.25}
+.slab .d{font-size:11px;opacity:.75}
+.slab .st{height:4px;border-radius:1px;background:color-mix(in srgb,var(--slab-ink) 22%,transparent)}
+.slab.done .st{background:var(--ok)}
+.slab.now{border-color:var(--signal)}
+.slab.now .st{background:var(--signal)}
+.slab.done{opacity:.62}
+.empty-hero{padding:28px 24px}
+.empty-hero .big{font-stretch:120%;font-weight:750;font-size:28px;line-height:1.1;max-width:22ch;margin-bottom:10px}
+
+/* Stats */
+.stat .v{font-stretch:115%;font-weight:700;font-size:26px;line-height:1.15}
+.stat .k{color:var(--muted);font-size:13px}
+.stat .h{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* Tables */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-weight:600;font-size:13px;color:var(--muted)}
+td.r,th.r{text-align:right;white-space:nowrap}
+tr.total td{font-weight:700;border-bottom:2px solid var(--ink)}
+tr.sub td{font-weight:650;background:var(--sunk)}
+
+/* Inputs */
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+label.f.inline{flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+label.f.inline:last-child{border-bottom:0}
+label.f.inline span{color:var(--ink);font-size:14px}
+input[type=number],input[type=text],input[type=date],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:7px 9px;min-width:0}
+input[type=number]{width:100px;text-align:right;font-variant-numeric:tabular-nums}
+input.w-s{width:70px}
+input.w-l{width:100%}
+textarea{width:100%;min-height:90px;resize:vertical}
+td input[type=number]{width:64px;padding:5px 6px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:3px;cursor:pointer;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.sig{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn.danger{background:transparent;border-color:var(--risk);color:var(--risk)}
+.linkbtn{border:0;background:none;padding:0;color:var(--ink);text-decoration:underline;cursor:pointer;font-size:13px}
+.chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}
+.chip.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.chip.warn{background:color-mix(in srgb,var(--signal) 22%,transparent);color:color-mix(in srgb,var(--signal) 70%,var(--ink))}
+.chip.bad{background:color-mix(in srgb,var(--risk) 16%,transparent);color:var(--risk)}
+.chip.neutral{background:var(--sunk);color:var(--muted)}
+.note{border-left:3px solid var(--signal);padding:8px 12px;background:color-mix(in srgb,var(--signal) 9%,transparent);font-size:14px;margin:0 0 16px}
+.note.bad{border-color:var(--risk);background:color-mix(in srgb,var(--risk) 8%,transparent)}
+.note.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.check:last-child{border-bottom:0}
+.check .mk{flex:0 0 18px;height:18px;border-radius:2px;border:1.5px solid var(--muted);margin-top:2px;display:grid;place-items:center;font-size:12px;font-weight:800}
+.check.pass .mk{background:var(--ok);border-color:var(--ok);color:#fff}
+.check.fail .mk{border-color:var(--risk)}
+
+/* Lotes list */
+.lotes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.lote-pill{border:1px solid var(--line);background:var(--surface);padding:8px 12px;border-radius:3px;cursor:pointer;text-align:left}
+.lote-pill b{display:block;font-weight:650;font-size:14px}
+.lote-pill span{font-size:12px;color:var(--muted)}
+.lote-pill[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 -3px 0 var(--ink)}
+
+/* Gantt */
+.gantt{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.gantt table{min-width:640px;table-layout:fixed}
+.gantt th,.gantt td{padding:0;border-bottom:1px solid var(--line);height:30px}
+.gantt th.lab,.gantt td.lab{width:170px;padding:0 10px;font-size:13px;position:sticky;left:0;background:var(--surface);z-index:1;border-right:1px solid var(--line)}
+.gantt th.day{font-size:10px;text-align:center;color:var(--muted);font-weight:500;line-height:1.15;padding:4px 0}
+.gantt th.day.off,.gantt td.off{background:var(--sunk)}
+.gantt td.bar{position:relative}
+.gantt td.bar i{position:absolute;inset:8px 0;background:var(--slab)}
+.gantt td.bar i.first{border-radius:2px 0 0 2px;margin-left:2px}
+.gantt td.bar i.last{border-radius:0 2px 2px 0;margin-right:2px}
+.gantt td.bar.sig i{background:var(--signal)}
+.gantt td.bar.ok i{background:var(--ok)}
+.gantt td.bar.ghost i{background:transparent;border-top:1.5px dashed var(--muted);border-bottom:1.5px dashed var(--muted)}
+.gantt td.bar.ghost i.first{border-left:1.5px dashed var(--muted)}
+.gantt td.bar.ghost i.last{border-right:1.5px dashed var(--muted)}
+.gantt td.mark{position:relative}
+.gantt td.mark i{position:absolute;inset:6px 30%;background:var(--signal);transform:rotate(45deg);border-radius:1px}
+
+.promise{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--sunk);padding:10px 12px;border-radius:3px;margin-top:12px}
+.promise code{font-family:inherit;font-weight:650}
+details summary{cursor:pointer;font-weight:600;padding:6px 0}
+.file{display:inline-flex;align-items:center;gap:8px}
+.file input{max-width:230px;font-size:13px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:3px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (max-width:720px){
+  .hero{grid-template-columns:1fr}
+  .hero .count{border-right:0;border-bottom:1px solid color-mix(in srgb,var(--slab-ink) 18%,transparent)}
+  .hero .count .big{font-size:52px}
+  .phases{min-width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.mission{display:flex;align-items:center;gap:14px;min-width:280px;flex:1;max-width:480px;background:var(--slab);color:var(--slab-ink);border-radius:4px;padding:10px 14px}
+.mission .lab{font-size:12px;opacity:.75}
+.mission .val{font-stretch:115%;font-weight:750;font-size:18px;line-height:1.15}
+.mission .bar{flex:1;height:8px;background:color-mix(in srgb,var(--slab-ink) 20%,transparent);border-radius:2px;overflow:hidden;min-width:80px}
+.mission .bar i{display:block;height:100%;background:var(--signal)}
+.today{display:grid;grid-template-columns:minmax(240px,320px) 1fr;background:var(--slab);color:var(--slab-ink);border-radius:4px;overflow:hidden;margin-bottom:16px}
+.today>*{min-width:0;padding:20px 22px}
+.today .d{font-stretch:125%;font-weight:800;font-size:40px;line-height:1}
+.today .d small{display:block;font-size:14px;font-weight:500;font-stretch:100%;opacity:.75;margin-top:6px}
+.today .open{border-left:1px solid color-mix(in srgb,var(--slab-ink) 18%,transparent)}
+.today .open .bar{height:10px;background:color-mix(in srgb,var(--slab-ink) 20%,transparent);border-radius:2px;margin:10px 0;overflow:hidden}
+.today .open .bar i{display:block;height:100%}
+.site{background:color-mix(in srgb,var(--slab-ink) 10%,transparent);padding:8px 10px;border-radius:3px;font-weight:600;margin-top:10px}
+.task{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.task input{margin-top:3px;width:18px;height:18px;flex:0 0 auto}
+.task .t{flex:1}
+.task .v{white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.task.done .t,.task.done .v{opacity:.5;text-decoration:line-through}
+.task .sub{font-size:13px;color:var(--muted)}
+.group-title{font-size:13px;font-weight:650;color:var(--muted);margin:16px 0 2px;font-stretch:110%}
+.group-title:first-child{margin-top:0}
+.steps{display:grid;gap:0}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:720px){
+  .today{grid-template-columns:1fr}
+  .today .open{border-left:0;border-top:1px solid color-mix(in srgb,var(--slab-ink) 18%,transparent)}
+  .mission{min-width:100%}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div>
+      <h1 class="word">LAZARUS</h1>
+      <p class="sub">Missão de retomada da Arcanju: vender, produzir em 3 dias e juntar o primeiro estoque.</p>
+    </div>
+    <div class="mission" id="mission"></div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="hoje" aria-selected="true">Hoje</button>
+    <button role="tab" data-tab="agenda" aria-selected="false">Agenda</button>
+    <button role="tab" data-tab="lotes" aria-selected="false">Lotes</button>
+    <button role="tab" data-tab="dinheiro" aria-selected="false">Dinheiro</button>
+    <button role="tab" data-tab="cenario" aria-selected="false">Cenário</button>
+    <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
+    <span class="sync" id="sync">Salvo neste navegador</span>
+  </nav>
+</header>
+<main>
+  <section id="tab-hoje"></section>
+  <section id="tab-agenda" hidden></section>
+  <section id="tab-lotes" hidden></section>
+  <section id="tab-dinheiro" hidden></section>
+  <section id="tab-cenario" hidden></section>
+  <section id="tab-ajustes" hidden></section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+/*LOGIC-START*/
+const TAMS_ALL = ['PP','P','M','G','GG','XG'];
+const DEFAULT_CONFIG = {
+  versao: 1,
+  inicio: '',
+  oferta: { preco:249.90, pecas:2, frete:18 },
+  taxas: { marketing:29, appmax:4.9, antifraude:0.99, nuvem:0.7, imposto:6.7, pix:57 },
+  recebe: { pix:1, cartao:2 },
+  custos: { malhaClara:37.90, malhaEscura:42.90, kgPeca:0.2, corte:1, costura:3, dtfMetro:30, dtfPorMetro:8,
+            kit:8, saqT:0.40, saqP:0.50, etiquetaPacote:178, etiquetasPacote:1800, cheirinho:100, cheirinhoRende:500 },
+  conta: { camiseta:17, brindes:11 },
+  cores: [ { id:'OFF', nome:'Off-white', clara:true }, { id:'PRETO', nome:'Preto', clara:false } ],
+  tamanhos: ['P','M','G','GG'],
+  mods: ['Tradicional','Baby look'],
+  grade: {
+    'OFF|Tradicional|P':244,'OFF|Tradicional|M':265,'OFF|Tradicional|G':149,'OFF|Tradicional|GG':119,
+    'OFF|Baby look|P':184,'OFF|Baby look|M':160,'OFF|Baby look|G':110,'OFF|Baby look|GG':63,
+    'PRETO|Tradicional|P':51,'PRETO|Tradicional|M':52,'PRETO|Tradicional|G':50,'PRETO|Tradicional|GG':31,
+    'PRETO|Baby look|P':26,'PRETO|Baby look|M':26,'PRETO|Baby look|G':17,'PRETO|Baby look|GG':11
+  },
+  lote: { fechaDias:[1,3,5], teto:36, malhaEmCasa:true, folga:2 },
+  prazos: { corte:1, costura:1, dtf:1, kits:1, descanso:1 },
+  missao: { meta:20000, meses:3, pedidosMes:0, adsDia:0, colchao:3000 },
+  contas: [
+    { nome:'Custos operacionais (dividir em contas)', dia:10, valor:2691.90, tipo:'fixo' },
+    { nome:'Pró-labore', dia:30, valor:5000, tipo:'prolabore' }
+  ],
+  feriados: '2026-10-12 Nossa Senhora Aparecida\n2026-11-02 Finados\n2026-11-20 Consciência Negra\n2026-12-25 Natal\n2027-01-01 Confraternização\n2027-02-09 Carnaval\n2027-03-26 Sexta-feira Santa\n2027-04-21 Tiradentes\n2027-05-27 Corpus Christi\n2027-09-07 Independência\n2027-10-12 Nossa Senhora Aparecida\n2027-11-02 Finados\n2027-11-15 Proclamação da República\n2027-12-25 Natal'
+};
+const DEFAULT_ESTOQUE = { dtf:[], etiquetas:0, cheirinho:0 };
+const DEFAULT_CAIXA = { dias:{}, feitos:{}, saldos:{}, cofre:[] };
+
+const clone = o => JSON.parse(JSON.stringify(o));
+function deepMerge(base, over){
+  if (Array.isArray(base)) return Array.isArray(over) ? over : base;
+  if (base && typeof base === 'object'){
+    const out = {...base};
+    if (over && typeof over === 'object') for (const k of Object.keys(over)) out[k] = (k in base) ? deepMerge(base[k], over[k]) : over[k];
+    return out;
+  }
+  return over === undefined ? base : over;
+}
+const n = v => { const x = Number(v); return isFinite(x) ? x : 0; };
+const vazio = v => v===undefined || v===null || v==='';
+const brl = v => n(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const int = v => Math.round(n(v)).toLocaleString('pt-BR');
+const dec = (v,k=1) => n(v).toLocaleString('pt-BR',{maximumFractionDigits:k});
+const pct = v => n(v).toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%';
+
+/* Datas */
+function parseD(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function fmtISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const MESES_L=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const DIAS=['dom','seg','ter','qua','qui','sex','sáb'];
+const DIAS_L=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+function fmtD(d){ if(!d) return '—'; return d.getDate()+' '+MESES[d.getMonth()]; }
+function fmtDL(d){ if(!d) return '—'; return DIAS[d.getDay()]+', '+d.getDate()+' '+MESES[d.getMonth()]; }
+function fmtBR(d){ return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+function addCal(d,k){ const x=new Date(d); x.setDate(x.getDate()+k); return x; }
+function holidaySet(cfg){ const s=new Set(); (cfg.feriados||'').split('\n').forEach(l=>{const m=l.trim().match(/^(\d{4}-\d{2}-\d{2})/); if(m) s.add(m[1]);}); return s; }
+function isBD(d,H){ const w=d.getDay(); return w!==0 && w!==6 && !H.has(fmtISO(d)); }
+function toBD(d,H){ let x=new Date(d); while(!isBD(x,H)) x=addCal(x,1); return x; }
+function addBD(d,k,H){ let x=toBD(d,H); let c=0; while(c<k){ x=addCal(x,1); if(isBD(x,H)) c++; } return x; }
+function maxD(...ds){ return ds.filter(Boolean).reduce((a,b)=> a>b?a:b); }
+function bdBetween(a,b,H){ if(!a||!b) return 0; let c=0; let x=new Date(a); while(x<b){ x=addCal(x,1); if(isBD(x,H)) c++; } return c; }
+const ymOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const sameDay = (a,b) => a && b && a.getTime()===b.getTime();
+
+/* Distribuição por maior resto */
+function distribute(total, weights){
+  const keys = Object.keys(weights); const sum = keys.reduce((a,k)=>a+n(weights[k]),0);
+  const out = {}; if (!total || !sum) { keys.forEach(k=>out[k]=0); return out; }
+  let used=0; const rem=[];
+  keys.forEach(k=>{ const exact = total*n(weights[k])/sum; out[k]=Math.floor(exact); used+=out[k]; rem.push([k,exact-out[k]]); });
+  rem.sort((a,b)=>b[1]-a[1]);
+  for (let i=0;i<total-used;i++) out[rem[i%rem.length][0]]++;
+  return out;
+}
+const skuKey = (cor,mod,tam) => cor+'|'+mod+'|'+tam;
+
+/* ===== Custos e cenário ===== */
+function partCor(cfg){
+  const tot = Object.values(cfg.grade).reduce((a,b)=>a+n(b),0)||1;
+  const out = {};
+  cfg.cores.forEach(c=>{ out[c.id] = Object.keys(cfg.grade).filter(k=>k.startsWith(c.id+'|')).reduce((a,k)=>a+n(cfg.grade[k]),0)/tot; });
+  return out;
+}
+const precoKg = (cfg, corId) => { const c = cfg.cores.find(x=>x.id===corId); return c && c.clara===false ? n(cfg.custos.malhaEscura) : n(cfg.custos.malhaClara); };
+function custoReal(cfg){
+  const c = cfg.custos, pc = partCor(cfg);
+  const malha = cfg.cores.reduce((a,co)=>a + (pc[co.id]||0)*precoKg(cfg,co.id)*n(c.kgPeca), 0);
+  const dtf = n(c.dtfMetro)/Math.max(n(c.dtfPorMetro),1);
+  const camiseta = malha + n(c.corte) + n(c.costura) + dtf;
+  const etiqueta = n(c.etiquetasPacote) ? n(c.etiquetaPacote)/n(c.etiquetasPacote) : 0;
+  const cheiro = n(c.cheirinhoRende) ? n(c.cheirinho)/n(c.cheirinhoRende) : 0;
+  const brindes = n(c.kit) + n(c.saqP) + n(c.saqT)*n(cfg.oferta.pecas) + etiqueta + cheiro;
+  return {malha, dtf, camiseta, brindes, etiqueta, cheiro};
+}
+const pctVenda = cfg => (n(cfg.taxas.marketing)+n(cfg.taxas.appmax)+n(cfg.taxas.nuvem)+n(cfg.taxas.imposto))/100;
+function contribuicao(cfg, camiseta, brindes){
+  const o = cfg.oferta;
+  return n(o.preco) - n(o.pecas)*n(camiseta) - n(brindes) - n(o.frete) - n(o.preco)*pctVenda(cfg) - n(cfg.taxas.antifraude);
+}
+const contribConta = cfg => contribuicao(cfg, cfg.conta.camiseta, cfg.conta.brindes);
+function totalContas(cfg){
+  let fixo=0, prolabore=0;
+  (cfg.contas||[]).forEach(c=>{ if (c.tipo==='prolabore') prolabore+=n(c.valor); else fixo+=n(c.valor); });
+  return {fixo, prolabore, total:fixo+prolabore};
+}
+const lucroAlvoMes = cfg => n(cfg.missao.meta)/Math.max(n(cfg.missao.meses),1);
+function pedidosNecessarios(cfg){
+  const c = contribConta(cfg);
+  return c>0 ? Math.ceil((totalContas(cfg).total + lucroAlvoMes(cfg))/c) : Infinity;
+}
+const pedidosMeta = cfg => n(cfg.missao.pedidosMes)>0 ? n(cfg.missao.pedidosMes) : pedidosNecessarios(cfg);
+const adsDiaAuto = cfg => Math.round(pedidosMeta(cfg)*n(cfg.oferta.preco)*n(cfg.taxas.marketing)/100/30*100)/100;
+const adsDia = cfg => n(cfg.missao.adsDia)>0 ? n(cfg.missao.adsDia) : adsDiaAuto(cfg);
+const cofrinhoPorPedido = cfg => n(cfg.oferta.pecas)*n(cfg.conta.camiseta) + n(cfg.conta.brindes) + n(cfg.oferta.frete) + n(cfg.oferta.preco)*n(cfg.taxas.imposto)/100;
+
+function dreMes(cfg, pedidos, ads){
+  const o=cfg.oferta, t=cfg.taxas, p=n(pedidos);
+  const fat = p*n(o.preco);
+  const mkt = ads!=null ? n(ads) : fat*n(t.marketing)/100;
+  const linhas = [
+    ['Camisetas', `${int(p*o.pecas)} × ${brl(cfg.conta.camiseta)}`, p*n(o.pecas)*n(cfg.conta.camiseta)],
+    ['Brindes e embalagens', `${int(p)} × ${brl(cfg.conta.brindes)}`, p*n(cfg.conta.brindes)],
+    ['Frete', `${int(p)} × ${brl(o.frete)}`, p*n(o.frete)],
+    ['Anúncios', ads!=null ? 'recargas do mês' : pct(t.marketing), mkt],
+    ['Appmax', pct(t.appmax), fat*n(t.appmax)/100],
+    ['Antifraude', `${int(p)} × ${brl(t.antifraude)}`, p*n(t.antifraude)],
+    ['Nuvemshop', pct(t.nuvem), fat*n(t.nuvem)/100],
+    ['Imposto', pct(t.imposto), fat*n(t.imposto)/100]
+  ];
+  const variavel = linhas.reduce((a,l)=>a+l[2],0);
+  const tc = totalContas(cfg);
+  const lucro = fat - variavel - tc.total;
+  return {fat, linhas, variavel, contrib: fat-variavel, fixo:tc.fixo, prolabore:tc.prolabore, lucro, margem: fat? lucro/fat*100 : 0};
+}
+
+/* ===== Lotes a cada 2 dias ===== */
+function diasFecha(cfg){ const d=(cfg.lote.fechaDias||[]).map(Number).filter(x=>x>=0&&x<=6); return d.length? d : [0,1,2,3,4,5,6]; }
+const ehFechamento = (cfg, d) => diasFecha(cfg).includes(d.getDay());
+function proximoFechamento(cfg, d){ let x=new Date(d); for(let i=0;i<8;i++){ if (ehFechamento(cfg,x)) return x; x=addCal(x,1); } return x; }
+function fechamentoAnterior(cfg, d){ let x=addCal(d,-1); for(let i=0;i<8;i++){ if (ehFechamento(cfg,x)) return x; x=addCal(x,-1); } return x; }
+function janela(cfg, fecha){ return {ini: addCal(fechamentoAnterior(cfg, fecha),1), fim: fecha}; }
+
+function cronograma(cfg, fecha, opt={}){
+  const H = holidaySet(cfg); const p = cfg.prazos;
+  const emCasa = opt.malhaEmCasa ?? cfg.lote.malhaEmCasa;
+  const D0 = toBD(addCal(fecha,1),H);
+  const leva = emCasa ? D0 : addBD(D0, Math.max(n(p.descanso),1), H);
+  const cortVolta = addBD(leva, Math.max(n(p.corte),0), H);
+  const costVolta = addBD(cortVolta, Math.max(n(p.costura),0), H);
+  const dtf = addBD(D0, n(p.dtf), H);
+  const kits = addBD(D0, n(p.kits), H);
+  const estampar = toBD(maxD(costVolta, dtf, kits), H);
+  const postar = addBD(estampar, 1, H);
+  const prometido = addBD(postar, n(cfg.lote.folga), H);
+  return {H, D0, leva, cortVolta, costVolta, dtf, kits, estampar, postar, prometido, emCasa};
+}
+// maior prazo em dias úteis entre o primeiro dia da janela e o envio prometido (sem feriados)
+function prazoSite(cfg){
+  const semFeriado = {...cfg, feriados:''};
+  let max = 0; let d = new Date(2027,5,6); // uma semana qualquer sem feriados
+  for (let i=0;i<7;i++){
+    const x = addCal(d,i);
+    if (!ehFechamento(cfg,x)) continue;
+    const j = janela(cfg,x); const c = cronograma(semFeriado,x);
+    for (let y=new Date(j.ini); y<=j.fim; y=addCal(y,1)){ max = Math.max(max, bdBetween(y, c.prometido, new Set())); }
+  }
+  return max;
+}
+
+function calcLote(cfg, est, L){
+  const c = cfg.custos, o = cfg.oferta;
+  const itens = (L.itens||[]).filter(i=>n(i.qty)>0);
+  const pecas = itens.reduce((a,i)=>a+n(i.qty),0);
+  const pedidos = n(L.pedidos) || Math.ceil(pecas/Math.max(n(o.pecas),1));
+  const grade = {};
+  itens.forEach(i=>{ const k=skuKey(i.cor,i.mod,i.tam); grade[k]=(grade[k]||0)+n(i.qty); });
+  const malha = cfg.cores.map(co=>{
+    const q = itens.filter(i=>i.cor===co.id).reduce((a,i)=>a+n(i.qty),0);
+    const kg = Math.round(q*n(c.kgPeca)*10)/10;
+    return {cor:co, pecas:q, kg, valor: kg*precoKg(cfg,co.id)};
+  });
+  const foraLancamento = itens.filter(i=>!cfg.cores.some(co=>co.id===i.cor)).reduce((a,i)=>a+n(i.qty),0);
+  // DTF: desconta o que está guardado; metros inteiros; espaço livre vira estoque das líderes
+  const porEC = {};
+  itens.forEach(i=>{ const k=i.estampa+'|'+i.cor; porEC[k]=(porEC[k]||0)+n(i.qty); });
+  const dtf = Object.entries(porEC).map(([k,q])=>{
+    const [estampa,cor]=k.split('|');
+    const tem=(est.dtf||[]).filter(x=>x.estampa===estampa && x.cor===cor).reduce((a,x)=>a+n(x.qty),0);
+    return {estampa, cor, precisa:q, tem, usa:Math.min(q,tem), comprar:Math.max(0,q-tem), extra:0};
+  }).sort((a,b)=>b.precisa-a.precisa);
+  const dtfComprar = dtf.reduce((a,d)=>a+d.comprar,0);
+  const PM = Math.max(n(c.dtfPorMetro),1);
+  const metros = dtfComprar ? Math.ceil(dtfComprar/PM) : 0;
+  const espacos = metros*PM - dtfComprar;
+  if (espacos>0){
+    const lid = dtf.slice(0,3); const w={}; lid.forEach((d,i)=>w[i]=d.precisa);
+    const dist = distribute(espacos,w); lid.forEach((d,i)=>d.extra=dist[i]||0);
+  }
+  const valorDTF = metros*n(c.dtfMetro);
+  const kits = pedidos, valorKits = kits*n(c.kit);
+  const valorSaq = pecas*n(c.saqT) + pedidos*n(c.saqP);
+  const etPacotes = n(est.etiquetas) >= pedidos ? 0 : Math.ceil((pedidos-n(est.etiquetas))/Math.max(n(c.etiquetasPacote),1));
+  const valorEt = etPacotes*n(c.etiquetaPacote);
+  const chFrascos = n(est.cheirinho) >= pedidos ? 0 : Math.ceil((pedidos-n(est.cheirinho))/Math.max(n(c.cheirinhoRende),1));
+  const valorCh = chFrascos*n(c.cheirinho);
+  const compras = [
+    ...malha.filter(m=>m.kg>0).map(m=>({id:'malha-'+m.cor.id, nome:`Malha ${m.cor.nome.toLowerCase()}: ${dec(m.kg)} kg`, valor:m.valor})),
+    metros ? {id:'dtf', nome:`DTF: ${metros} metro${metros>1?'s':''} (${dtfComprar} estampas${espacos?` + ${espacos} para guardar`:''})`, valor:valorDTF} : null,
+    {id:'kits', nome:`Capelinha e sacolinha: ${kits}`, valor:valorKits},
+    {id:'saq', nome:`Saquinhos: ${pecas} transparentes e ${pedidos} pretos`, valor:valorSaq},
+    etPacotes ? {id:'etq', nome:`Etiquetas de envio: ${etPacotes} pacote`, valor:valorEt} : null,
+    chFrascos ? {id:'ch', nome:`Cheirinho: ${chFrascos} frasco`, valor:valorCh} : null
+  ].filter(Boolean);
+  const valorCompras = compras.reduce((a,x)=>a+x.valor,0);
+  const valorCortador = pecas*n(c.corte);
+  const valorCostura = pecas*n(c.costura);
+  const valorFrete = pedidos*n(o.frete);
+  const cr = L.fecha ? cronograma(cfg, parseD(L.fecha), {malhaEmCasa: L.malhaEmCasa ?? cfg.lote.malhaEmCasa}) : null;
+  const alertas = [];
+  if (n(cfg.lote.teto)>0 && pecas>n(cfg.lote.teto)) alertas.push(`Este lote tem ${pecas} camisetas e o limite combinado é ${cfg.lote.teto}. Confirme com o cortador e as costureiras se entregam em D+1, ou passe ${pecas-n(cfg.lote.teto)} camisetas para o próximo lote e avise esses clientes.`);
+  if (foraLancamento) alertas.push(`${foraLancamento} camisetas estão em cores fora do lançamento e não entraram na conta da malha.`);
+  return {itens, pecas, pedidos, grade, malha, dtf, dtfComprar, metros, espacos, valorDTF, kits, valorKits, valorSaq,
+    etPacotes, valorEt, chFrascos, valorCh, compras, valorCompras, valorCortador, valorCostura, valorFrete,
+    total: valorCompras+valorCortador+valorCostura+valorFrete, cr, alertas};
+}
+
+function registrarNoEstoque(cfg, est, r){
+  const e = clone(est); e.dtf = e.dtf||[];
+  r.dtf.forEach(d=>{
+    let usar=d.usa;
+    e.dtf.forEach(x=>{ if(usar>0 && x.estampa===d.estampa && x.cor===d.cor){ const t=Math.min(n(x.qty),usar); x.qty=n(x.qty)-t; usar-=t; } });
+    if (d.extra){ const x=e.dtf.find(x=>x.estampa===d.estampa && x.cor===d.cor); if(x) x.qty=n(x.qty)+d.extra; else e.dtf.push({estampa:d.estampa,cor:d.cor,qty:d.extra}); }
+  });
+  e.dtf = e.dtf.filter(x=>n(x.qty)>0);
+  e.etiquetas = Math.max(0, n(e.etiquetas) + r.etPacotes*n(cfg.custos.etiquetasPacote) - r.pedidos);
+  e.cheirinho = Math.max(0, n(e.cheirinho) + r.chFrascos*n(cfg.custos.cheirinhoRende) - r.pedidos);
+  return e;
+}
+
+/* ===== Dinheiro ===== */
+function diaInfo(cfg, caixa, iso, inicio){
+  const d = parseD(iso); const o=cfg.oferta;
+  const log = (caixa.dias||{})[iso];
+  const temReal = log && !vazio(log.pedidos);
+  const adsReal = log && !vazio(log.ads);
+  if (!inicio || d < inicio) return {pedidos:0, fat:0, pix:0, ads: adsReal? n(log.ads):0, real:!!temReal, adsReal:!!adsReal, antes:true};
+  let pedidos, fat, pix;
+  if (temReal){
+    pedidos = n(log.pedidos);
+    fat = !vazio(log.fat) ? n(log.fat) : pedidos*n(o.preco);
+    pix = !vazio(log.pix) ? n(log.pix) : fat*n(cfg.taxas.pix)/100;
+  } else {
+    const k = Math.round((d - inicio)/864e5); const m = pedidosMeta(cfg)/30;
+    pedidos = Math.round((k+1)*m) - Math.round(k*m);
+    fat = pedidos*n(o.preco); pix = fat*n(cfg.taxas.pix)/100;
+  }
+  return {pedidos, fat, pix, ads: adsReal? n(log.ads) : adsDia(cfg), real:!!temReal, adsReal:!!adsReal};
+}
+const liquido = (cfg, valor, ped) => valor*(1-(n(cfg.taxas.appmax)+n(cfg.taxas.nuvem))/100) - n(cfg.taxas.antifraude)*ped;
+
+function pedidosJanela(cfg, caixa, fecha, inicio){
+  const j = janela(cfg, fecha); let ped=0, reais=0, dias=0;
+  for (let d=new Date(j.ini); d<=j.fim; d=addCal(d,1)){ const di=diaInfo(cfg,caixa,fmtISO(d),inicio); ped+=di.pedidos; dias++; if(di.real) reais++; }
+  return {pedidos:ped, reais, dias, ...j};
+}
+
+// o primeiro lote da missão ainda não tem malha descansada em casa
+function primeiroPrevisto(cfg, lotes, inicio, d){
+  if (Object.values(lotes).some(l=>l.fecha)) return false;
+  return sameDay(proximoFechamento(cfg, inicio), d);
+}
+// Pagamentos dos lotes (reais e previstos) entre ini e fim
+function eventosLotes(cfg, est, caixa, lotes, ini, fim, inicio){
+  const ev = [];
+  const add = (d,nome,valor,tipo,ref)=>{ if (valor>0.004 && d>=ini && d<=fim) ev.push({d:new Date(d), nome, valor, conta:'cof', tipo, ref}); };
+  const reais = Object.values(lotes).filter(l=>l.fecha);
+  const fechados = new Set(reais.map(l=>l.fecha));
+  reais.forEach(l=>{
+    const r = calcLote(cfg, l.estAntes||est, l); if (!r.cr) return;
+    const nm = l.nome || `Lote de ${fmtBR(parseD(l.fecha))}`;
+    r.compras.forEach(x=>add(r.cr.D0, `${nm}: ${x.nome}`, x.valor, 'compra', l.id));
+    add(r.cr.cortVolta, `${nm}: pagar cortador (${r.pecas} peças)`, r.valorCortador, 'oficina', l.id);
+    add(r.cr.costVolta, `${nm}: pagar costureiras (${r.pecas} peças)`, r.valorCostura, 'oficina', l.id);
+    add(r.cr.postar, `${nm}: etiquetas de frete (${r.pedidos} pedidos)`, r.valorFrete, 'frete', l.id);
+  });
+  if (inicio){
+    const o=cfg.oferta, cu=cfg.custos;
+    for (let d=addCal(ini,-14); d<=fim; d=addCal(d,1)){
+      if (!ehFechamento(cfg,d) || d<inicio || fechados.has(fmtISO(d))) continue;
+      const pj = pedidosJanela(cfg,caixa,d,inicio); if (!pj.pedidos) continue;
+      const pc = pj.pedidos*n(o.pecas);
+      const cr = cronograma(cfg,d,{malhaEmCasa: primeiroPrevisto(cfg,lotes,inicio,d) ? false : undefined});
+      const nm = `Lote de ${fmtBR(d)} (previsão)`;
+      const crr = custoReal(cfg);
+      const insumos = pj.pedidos*(n(o.pecas)*(n(cfg.conta.camiseta)-n(cu.corte)-n(cu.costura)) + n(cfg.conta.brindes) - crr.etiqueta - crr.cheiro);
+      add(cr.D0, `${nm}: malha, DTF, capelinhas, sacolinhas e saquinhos`, insumos, 'compra', 'p'+fmtISO(d));
+      add(cr.cortVolta, `${nm}: pagar cortador (${pc} peças)`, pc*n(cu.corte), 'oficina', 'p'+fmtISO(d));
+      add(cr.costVolta, `${nm}: pagar costureiras (${pc} peças)`, pc*n(cu.costura), 'oficina', 'p'+fmtISO(d));
+      add(cr.postar, `${nm}: etiquetas de frete (${pj.pedidos} pedidos)`, pj.pedidos*n(o.frete), 'frete', 'p'+fmtISO(d));
+    }
+  }
+  return ev;
+}
+
+
+/* Compras que duram muitos lotes (etiquetas e cheirinho), previstas a partir de hoje */
+function comprasPrevistas(cfg, est, caixa, lotes, inicio, hoje, ate){
+  const out=[]; if (!inicio) return out;
+  const cu=cfg.custos; const pack=Math.max(n(cu.etiquetasPacote),1), rende=Math.max(n(cu.cheirinhoRende),1);
+  let et=n(est.etiquetas), ch=n(est.cheirinho);
+  const reais = new Set();
+  Object.values(lotes).forEach(l=>{ if(!l.fecha) return; reais.add(l.fecha);
+    if (!l.registrado){ const r=calcLote(cfg,est,l); et=Math.max(0, et + r.etPacotes*pack - r.pedidos); ch=Math.max(0, ch + r.chFrascos*rende - r.pedidos); } });
+  for (let d=addCal(hoje,-7); d<=ate; d=addCal(d,1)){
+    if (!ehFechamento(cfg,d) || d<inicio || reais.has(fmtISO(d))) continue;
+    const cr=cronograma(cfg,d,{malhaEmCasa: primeiroPrevisto(cfg,lotes,inicio,d) ? false : undefined}); if (cr.D0<hoje) continue;
+    const ped=pedidosJanela(cfg,caixa,d,inicio).pedidos; if(!ped) continue;
+    const nm=`Lote de ${fmtBR(d)} (previsão)`;
+    if (et<ped){ const k=Math.ceil((ped-et)/pack); et+=k*pack; out.push({d:cr.D0, nome:`${nm}: etiquetas de envio (${k} pacote${k>1?'s':''})`, valor:k*n(cu.etiquetaPacote), conta:'cof', tipo:'compra', ref:'p'+fmtISO(d)}); }
+    if (ch<ped){ const k=Math.ceil((ped-ch)/rende); ch+=k*rende; out.push({d:cr.D0, nome:`${nm}: cheirinho (${k} frasco${k>1?'s':''})`, valor:k*n(cu.cheirinho), conta:'cof', tipo:'compra', ref:'p'+fmtISO(d)}); }
+    et-=ped; ch-=ped;
+  }
+  return out;
+}
+
+function somaMes(cfg, caixa, ym, inicio){
+  const [y,m] = ym.split('-').map(Number); const dias = new Date(y,m,0).getDate();
+  let fat=0, pedidos=0, ads=0, reais=0;
+  for (let i=1;i<=dias;i++){ const di = diaInfo(cfg,caixa,`${ym}-${String(i).padStart(2,'0')}`,inicio); fat+=di.fat; pedidos+=di.pedidos; ads+=(di.antes&&!di.adsReal)?0:di.ads; if(di.real) reais++; }
+  return {fat, pedidos, ads, reais, dias};
+}
+
+function agendaMes(cfg, est, caixa, lotes, ym, inicio, saldoIni, opt={}){
+  const [y,m] = ym.split('-').map(Number);
+  const ini = new Date(y,m-1,1), fim = new Date(y,m,0);
+  const t = cfg.taxas; const cofP = cofrinhoPorPedido(cfg);
+  const ev = [];
+  for (let d=new Date(ini); d<=fim; d=addCal(d,1)){
+    const iso = fmtISO(d);
+    const hoje = diaInfo(cfg,caixa,iso,inicio);
+    const ontem = diaInfo(cfg,caixa,fmtISO(addCal(d,-1)),inicio);
+    const dp = Math.max(0,n(cfg.recebe.pix)), dc = Math.max(0,n(cfg.recebe.cartao));
+    const vP = diaInfo(cfg,caixa,fmtISO(addCal(d,-dp)),inicio);
+    const vC = diaInfo(cfg,caixa,fmtISO(addCal(d,-dc)),inicio);
+    const pPix = vP.fat ? vP.pedidos*vP.pix/vP.fat : 0;
+    const pCart = vC.fat ? vC.pedidos*(vC.fat-vC.pix)/vC.fat : 0;
+    const entra = liquido(cfg,vP.pix,pPix) + liquido(cfg,vC.fat-vC.pix,pCart);
+    const quando = x => x===0?'de hoje':x===1?'de ontem':`de ${x} dias atrás`;
+    if (entra>0.004) ev.push({d:new Date(d), nome:`Resgatar o saldo da Appmax para a Operação (Pix ${quando(dp)} e cartão ${quando(dc)})`, valor:entra, conta:'op', tipo:'entrada', prev:!(vP.real||vC.real)});
+    if (ontem.pedidos>0) ev.push({d:new Date(d), nome:`Passar para o Cofrinho: ${ontem.pedidos} pedido${ontem.pedidos>1?'s':''} de ontem × ${brl(cofP)}`, valor:ontem.pedidos*cofP, conta:'op>cof', tipo:'cofrinho', prev:!ontem.real});
+    if ((!hoje.antes || hoje.adsReal) && hoje.ads>0) ev.push({d:new Date(d), nome:'Recarregar anúncios na Meta por Pix', valor:hoje.ads, conta:'op', tipo:'ads', prev:!hoje.adsReal});
+  }
+  let fixoMes=0, proMes=0;
+  (cfg.contas||[]).forEach(c=>{
+    if (!n(c.valor)) return;
+    const dd = new Date(y,m-1,Math.min(Math.max(1,n(c.dia)||1), fim.getDate()));
+    if (!inicio || dd < inicio) return;
+    let valor=n(c.valor), nome=c.nome||'Conta';
+    if (c.tipo==='prolabore' && ymOf(inicio)===ym){
+      const ativos = fim.getDate()-inicio.getDate()+1;
+      valor = Math.round(valor*ativos/fim.getDate()*100)/100; nome += ` (proporcional a ${ativos} dias)`;
+    }
+    if (c.tipo==='prolabore') proMes+=valor; else fixoMes+=valor;
+    ev.push({d:dd, nome, valor, conta:'op', tipo:c.tipo==='prolabore'?'prolabore':'fixo'});
+  });
+  const prev = ymOf(new Date(y,m-2,1));
+  const fp = somaMes(cfg,caixa,prev,inicio).fat;
+  if (fp>0) ev.push({d:new Date(y,m-1,20), nome:`Imposto das vendas de ${MESES_L[(m+10)%12]} (${pct(t.imposto)} de ${brl(fp)})`, valor:fp*n(t.imposto)/100, conta:'cof', tipo:'imposto'});
+  (caixa.cofre||[]).forEach(dp=>{ const d=parseD(dp.data); if (d && d>=ini && d<=fim && n(dp.valor)) ev.push({d, nome:`Depósito no Cofre Lazarus${dp.origem==='cof'?' (sobra do Cofrinho)':''}`, valor:n(dp.valor), conta: dp.origem==='cof'?'cof>cofre':'op>cofre', tipo:'cofre'}); });
+  ev.push(...eventosLotes(cfg,est,caixa,lotes,ini,fim,inicio));
+  (opt.extras||[]).forEach(e=>{ if (e.d>=ini && e.d<=fim) ev.push({...e, d:new Date(e.d)}); });
+  const ordem = {entrada:0, cofrinho:1, ads:2, compra:3, oficina:4, frete:5, imposto:6, fixo:7, prolabore:8, cofre:9};
+  const temDeposito = (caixa.cofre||[]).some(dp=>dp.data && dp.data.slice(0,7)===ym && n(dp.valor));
+  ev.sort((a,b)=>a.d-b.d || (ordem[a.tipo]??9)-(ordem[b.tipo]??9));
+  let op=n(saldoIni.op), cof=n(saldoIni.cof), cofre=n(saldoIni.cofre);
+  let minOp={v:op,d:ini}, minCof={v:cof,d:ini};
+  ev.forEach(e=>{
+    e.key = fmtISO(e.d)+'|'+e.nome;
+    if (e.conta==='op') op += e.tipo==='entrada'? e.valor : -e.valor;
+    else if (e.conta==='cof') cof -= e.valor;
+    else if (e.conta==='op>cof'){ op-=e.valor; cof+=e.valor; }
+    else if (e.conta==='op>cofre'){ op-=e.valor; cofre+=e.valor; }
+    else if (e.conta==='cof>cofre'){ cof-=e.valor; cofre+=e.valor; }
+    e.op=op; e.cof=cof; e.cofre=cofre;
+    if (op<minOp.v) minOp={v:op,d:e.d};
+    if (cof<minCof.v) minCof={v:cof,d:e.d};
+  });
+  const sm = somaMes(cfg,caixa,ym,inicio);
+  const colchao = n(cfg.missao.colchao);
+  const guardarCof = sm.fat*n(cfg.taxas.imposto)/100 + 2*cofrinhoPorPedido(cfg)*pedidosMeta(cfg)/15;
+  const sugestao = {op: Math.max(0, op-colchao), cof: Math.max(0, cof-guardarCof), colchao, guardarCof};
+  if (!temDeposito && inicio && fim>=inicio){
+    const push=(conta,valor,nome)=>{ if(valor<0.5) return; const e={d:new Date(fim), nome, valor, conta, tipo:'cofre', prev:true, key:fmtISO(fim)+'|'+nome};
+      if (conta==='op>cofre'){ op-=valor; } else { cof-=valor; } cofre+=valor; e.op=op; e.cof=cof; e.cofre=cofre; ev.push(e); };
+    push('op>cofre', sugestao.op, `Depositar no Cofre Lazarus o que passar de ${brl(colchao)} na Operação`);
+    push('cof>cofre', sugestao.cof, `Depositar no Cofre Lazarus a sobra do Cofrinho`);
+  }
+  const d = dreMes(cfg, sm.pedidos, sm.ads);
+  d.linhas.push(['Contas fixas','',fixoMes],['Pró-labore','',proMes]);
+  const custos = d.variavel + fixoMes + proMes;
+  return {ev, ini, fim, saldoFim:{op,cof,cofre}, minOp, minCof, sm, linhas:d.linhas, lucro: sm.fat-custos, cofP, sugestao, temDeposito};
+}
+
+/* ===== CSV da Nuvemshop ===== */
+function parseCSV(text, sep){
+  const rows=[]; let row=[], field='', q=false;
+  for (let i=0;i<text.length;i++){
+    const ch=text[i];
+    if (q){ if (ch==='"'){ if (text[i+1]==='"'){ field+='"'; i++; } else q=false; } else field+=ch; }
+    else {
+      if (ch==='"') q=true;
+      else if (ch===sep){ row.push(field); field=''; }
+      else if (ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else if (ch!=='\r') field+=ch;
+    }
+  }
+  if (field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function parseProduto(nome){
+  const up = nome.toUpperCase();
+  if (!/CAMISETA|BLUSA|BABY/.test(up)) return null;
+  const m = nome.match(/\(([^()]*)\)\s*$/);
+  const partes = (m ? m[1] : '').split(',').map(s=>s.trim()).filter(Boolean);
+  const tam = partes.find(p=>TAMS_ALL.includes(p.toUpperCase()));
+  if (!tam) return null;
+  const low = partes.map(p=>p.toLowerCase());
+  const baby = /BABY|FEMININ/.test(up) || low.some(p=>['acólita','acolita','feminina','baby look'].includes(p));
+  const cv = low.join(' ');
+  let cor='?';
+  if (/bege|off/.test(cv)) cor='OFF'; else if (/pret/.test(cv)) cor='PRETO'; else if (/branc/.test(cv)) cor='BRANCA'; else if (/azul/.test(cv)) cor='AZUL';
+  else if (/OFF-WHITE|OFF WHITE/.test(up)) cor='OFF'; else if (/PRETA|PRETO/.test(up)) cor='PRETO'; else if (/AZUL/.test(up)) cor='AZUL'; else if (/BRANCA/.test(up)) cor='BRANCA';
+  const base = m ? nome.slice(0,m.index).trim() : nome;
+  let estampa = base.includes(' - ') ? base.slice(base.indexOf(' - ')+3) : base;
+  estampa = estampa.replace(/["“”]/g,'').replace(/\s+FT\..*$/i,'').trim().toUpperCase();
+  return {cor, mod: baby?'Baby look':'Tradicional', tam: tam.toUpperCase(), estampa};
+}
+function lerNuvemshop(text){
+  const first = text.slice(0, text.indexOf('\n'));
+  const sep = first.split(';').length > first.split(',').length ? ';' : ',';
+  const rows = parseCSV(text, sep);
+  const head = rows[0].map(h=>h.trim().toLowerCase());
+  const col = nm => head.indexOf(nm.toLowerCase());
+  const I = {num:col('Número do Pedido'), data:col('Data'), status:col('Status do Pedido'), pag:col('Status do Pagamento'),
+    total:col('Total'), meio:col('Meio de pagamento'), prod:col('Nome do Produto'), qtd:col('Quantidade Comprada')};
+  if (I.num<0 || I.data<0 || I.total<0) throw new Error('Esse arquivo não parece a exportação de vendas da Nuvemshop.');
+  const pedidos = []; let cur = null;
+  for (let r=1;r<rows.length;r++){
+    const row = rows[r]; if (row.length < head.length/2) continue;
+    if (row[I.data]){
+      const m = row[I.data].match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const status=(row[I.status]||'').toLowerCase(), pag=(row[I.pag]||'').toLowerCase();
+      const valido = m && !/cancel/.test(status) && !/cancel|estorn|recus|pendente/.test(pag);
+      cur = valido ? {num:row[I.num], data:`${m[3]}-${m[2]}-${m[1]}`, total:n((row[I.total]||'').replace(',','.')), pix:/pix/i.test(row[I.meio]||''), itens:[]} : null;
+      if (cur) pedidos.push(cur);
+    }
+    if (!cur || I.prod<0) continue;
+    const p = parseProduto(row[I.prod]||''); if (!p) continue;
+    cur.itens.push({...p, qty:n(row[I.qtd])});
+  }
+  return pedidos;
+}
+function itensDaJanela(pedidos, ini, fim){
+  const a=fmtISO(ini), b=fmtISO(fim);
+  const sel = pedidos.filter(p=>p.data>=a && p.data<=b);
+  const acc = {};
+  sel.forEach(p=>p.itens.forEach(i=>{ const k=[i.estampa,i.cor,i.mod,i.tam].join('|'); acc[k]=(acc[k]||0)+i.qty; }));
+  const itens = Object.entries(acc).map(([k,q])=>{ const [estampa,cor,mod,tam]=k.split('|'); return {estampa,cor,mod,tam,qty:q}; });
+  return {pedidos:sel.length, receita:Math.round(sel.reduce((s,p)=>s+p.total,0)*100)/100, itens};
+}
+function diasDosPedidos(pedidos){
+  const dias={}; if (!pedidos.length) return dias;
+  const datas = pedidos.map(p=>p.data).sort();
+  for (let d=parseD(datas[0]); d<=parseD(datas[datas.length-1]); d=addCal(d,1)) dias[fmtISO(d)]={pedidos:0,fat:0,pix:0};
+  pedidos.forEach(p=>{ const d=dias[p.data]; d.pedidos++; d.fat+=p.total; if(p.pix) d.pix+=p.total; });
+  Object.values(dias).forEach(d=>{ d.fat=Math.round(d.fat*100)/100; d.pix=Math.round(d.pix*100)/100; });
+  return dias;
+}
+/*LOGIC-END*/
+
+/* ================= Estado ================= */
+let CFG = clone(DEFAULT_CONFIG);
+let EST = clone(DEFAULT_ESTOQUE);
+let CAIXA = clone(DEFAULT_CAIXA);
+let LOTES = {};
+let db = null;
+let dl = null;
+const LS = 'lazarus-v2';
+const $ = (s,el=document)=>el.querySelector(s);
+const $$ = (s,el=document)=>[...el.querySelectorAll(s)];
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const HOJE = (()=>{ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); })();
+let tab='hoje', loteSel=null, mesSel=ymOf(HOJE), esconderRotina=false, csvCache=null;
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+function setSync(m){ $('#sync').textContent=m; }
+function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify({CFG,EST,CAIXA,LOTES})); }catch(e){} }
+function loadLocal(){ try{ const o=JSON.parse(localStorage.getItem(LS)||'null'); if(!o) return;
+  if(o.CFG) CFG=deepMerge(clone(DEFAULT_CONFIG),o.CFG);
+  if(o.EST) EST=deepMerge(clone(DEFAULT_ESTOQUE),o.EST);
+  if(o.CAIXA) CAIXA=deepMerge(clone(DEFAULT_CAIXA),o.CAIXA);
+  if(o.LOTES) LOTES=o.LOTES; }catch(e){} }
+
+const timers={}, writing={};
+function persist(kind,id){ saveLocal(); if(!db) return; const k=kind+(id||''); clearTimeout(timers[k]); timers[k]=setTimeout(()=>writeNow(kind,id),700); }
+async function writeNow(kind,id){
+  const k=kind+(id||'');
+  if (writing[k]){ timers[k]=setTimeout(()=>writeNow(kind,id),400); return; }
+  writing[k]=true; setSync('Salvando…');
+  try{
+    if (kind==='cfg') await db.doc('lazarus2/config').set(clone(CFG));
+    else if (kind==='est') await db.doc('lazarus2/estoque').set(clone(EST));
+    else if (kind==='caixa') await db.doc('lazarus2/caixa').set(clone(CAIXA));
+    else if (kind==='lote'){ if (LOTES[id]) await db.collection('lotes2').doc(id).set(clone(LOTES[id])); }
+    else if (kind==='del') await db.collection('lotes2').doc(id).delete();
+    setSync('Salvo e compartilhado');
+  }catch(e){
+    if (e && e.code==='unavailable') setTimeout(()=>writeNow(kind,id),1500+Math.random()*1000);
+    else setSync('Não salvou: '+(e&&e.code||'erro'));
+  }finally{ writing[k]=false; }
+}
+function isTyping(){ const a=document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && $('main').contains(a) && a.type!=='checkbox'; }
+let pendingRender=false;
+function safeRender(){ if (isTyping()){ pendingRender=true; return; } renderAll(); }
+document.addEventListener('focusout',()=>setTimeout(()=>{ if(pendingRender && !isTyping()){ pendingRender=false; renderAll(); } },50));
+
+async function initDB(){
+  if (!window.claude || !window.claude.use) return;
+  try{ dl = await window.claude.use('downloads'); }catch(e){ dl=null; }
+  try{ db = await window.claude.use('db'); }catch(e){ db=null; }
+  if (dl && tab==='agenda') renderAgendaOut();
+  if (!db) return;
+  setSync('Conectando…');
+  const onErr = ()=>setSync('Sem sincronização agora');
+  const sub = (path, get, set, def, kind) => db.doc(path).onSnapshot(s=>{
+    if (s.metadata.hasPendingWrites) return;
+    if (s.exists){ const inc=deepMerge(clone(def), clone(s.data())); if (JSON.stringify(inc)!==JSON.stringify(get())){ set(inc); saveLocal(); safeRender(); } }
+    else writeNow(kind);
+    setSync('Salvo e compartilhado');
+  }, onErr);
+  sub('lazarus2/config', ()=>CFG, v=>CFG=v, DEFAULT_CONFIG, 'cfg');
+  sub('lazarus2/estoque', ()=>EST, v=>EST=v, DEFAULT_ESTOQUE, 'est');
+  sub('lazarus2/caixa', ()=>CAIXA, v=>CAIXA=v, DEFAULT_CAIXA, 'caixa');
+  let first=true;
+  db.collection('lotes2').onSnapshot(q=>{
+    if (q.metadata.hasPendingWrites) return;
+    const inc={}; q.docs.forEach(d=>inc[d.id]=clone(d.data()));
+    if (first && q.empty && Object.keys(LOTES).length){ Object.keys(LOTES).forEach(id=>writeNow('lote',id)); first=false; return; }
+    first=false;
+    if (JSON.stringify(inc)!==JSON.stringify(LOTES)){ LOTES=inc; if(loteSel && !LOTES[loteSel]) loteSel=null; saveLocal(); safeRender(); }
+  }, onErr);
+}
+
+/* ================= Arquivos ================= */
+async function salvarArquivo(nome, conteudo, tipo){
+  if (dl){ await dl.save({filename:nome, data:conteudo}); return; }
+  const blob=new Blob([conteudo],{type:tipo||'application/octet-stream'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nome;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+async function exportarBackup(){
+  const dados={app:'projeto-lazarus', versao:2, em:new Date().toISOString(), CFG, EST, CAIXA, LOTES};
+  try{ await salvarArquivo(`lazarus-backup-${fmtISO(HOJE)}.json`, JSON.stringify(dados,null,2), 'application/json'); toast('Cópia de segurança pronta'); }
+  catch(e){ toast('Não consegui gerar o arquivo'); }
+}
+async function importarBackup(f){
+  try{
+    const o=JSON.parse(await f.text());
+    if(!o || o.app!=='projeto-lazarus' || !o.CFG) throw new Error('Este arquivo não é uma cópia do Projeto Lazarus.');
+    if(!confirm('Substituir todos os dados deste Lazarus pelos da cópia? Isso não pode ser desfeito.')) return;
+    const antigos=Object.keys(LOTES);
+    CFG=deepMerge(clone(DEFAULT_CONFIG),o.CFG); EST=deepMerge(clone(DEFAULT_ESTOQUE),o.EST||{});
+    CAIXA=deepMerge(clone(DEFAULT_CAIXA),o.CAIXA||{}); LOTES=o.LOTES||{};
+    saveLocal();
+    if (db){ antigos.filter(id=>!LOTES[id]).forEach(id=>writeNow('del',id)); writeNow('cfg'); writeNow('est'); writeNow('caixa'); Object.keys(LOTES).forEach(id=>writeNow('lote',id)); }
+    renderAll(); toast('Dados restaurados');
+  }catch(e){ toast(e.message||'Arquivo inválido'); }
+}
+
+/* ================= Campos ================= */
+function setPath(obj,path,val){ const ks=path.split('.'); let o=obj; for(let i=0;i<ks.length-1;i++){ const k=ks[i]; if(o[k]==null) o[k]={}; o=o[k]; } o[ks[ks.length-1]]=val; }
+function getPath(obj,path){ return path.split('.').reduce((o,k)=>o==null?o:o[k], obj); }
+const srcOf = scope => scope==='cfg'?CFG:scope==='est'?EST:scope==='caixa'?CAIXA:LOTES[loteSel];
+function numInput(scope,path,o={}){
+  const v=getPath(srcOf(scope),path);
+  return `<input type="number" inputmode="decimal" step="${o.step||'any'}" min="${o.min??0}" ${o.cls?`class="${o.cls}"`:''} ${o.ph!=null?`placeholder="${esc(o.ph)}"`:''} data-scope="${scope}" data-path="${esc(path)}" value="${v??''}" aria-label="${esc(o.label||path)}">`;
+}
+function field(label,scope,path,o={}){
+  return `<label class="f inline"><span>${label}${o.hint?`<br><small class="muted">${o.hint}</small>`:''}</span>${numInput(scope,path,{...o,label})}</label>`;
+}
+function checkField(label,scope,path,hint){
+  const v=getPath(srcOf(scope),path);
+  return `<label class="f inline"><span>${label}${hint?`<br><small class="muted">${hint}</small>`:''}</span><input type="checkbox" data-scope="${scope}" data-path="${esc(path)}" ${v?'checked':''}></label>`;
+}
+function persistScope(scope){ if(scope==='cfg') persist('cfg'); else if(scope==='est') persist('est'); else if(scope==='caixa') persist('caixa'); else if(scope==='lote'&&loteSel) persist('lote',loteSel); }
+document.addEventListener('input', e=>{
+  const el=e.target, scope=el.dataset.scope; if(!scope || el.type==='checkbox') return;
+  const val = el.type==='number' ? (el.value===''?'':Number(el.value)) : el.value;
+  const src=srcOf(scope); if(!src) return;
+  setPath(src, el.dataset.path, val); persistScope(scope); renderOutputs();
+});
+document.addEventListener('change', e=>{
+  const el=e.target, scope=el.dataset.scope; if(!scope) return;
+  const src=srcOf(scope); if(!src) return;
+  if (el.type==='checkbox'){ setPath(src, el.dataset.path, el.checked); persistScope(scope); }
+  if (el.type==='checkbox' || el.tagName==='SELECT' || el.type==='date') setTimeout(renderAll,0);
+});
+
+/* ================= Apoio ================= */
+function inicioData(){ return CFG.inicio ? parseD(CFG.inicio) : null; }
+let CACHE=null;
+function invalidar(){ CACHE=null; }
+function saldoInicial(ym){
+  const sv=(CAIXA.saldos||{})[ym];
+  if (sv && (!vazio(sv.op)||!vazio(sv.cof))) return {op:n(sv.op), cof:n(sv.cof), cofre: saldoCofreAntes(ym)};
+  const ini=inicioData();
+  if (!ini || ym<=ymOf(ini)) return {op:0,cof:0,cofre:saldoCofreAntes(ym)};
+  const [y,m]=ym.split('-').map(Number);
+  return {...agendaDe(ymOf(new Date(y,m-2,1))).saldoFim};
+}
+function saldoCofreAntes(ym){ return (CAIXA.cofre||[]).filter(d=>d.data && d.data < ym+'-01').reduce((a,d)=>a+n(d.valor),0); }
+const totalCofre = () => (CAIXA.cofre||[]).reduce((a,d)=>a+n(d.valor),0);
+function agendaDe(ym){
+  const ini=inicioData(); if(!ini) return null;
+  if (!CACHE) CACHE={meses:{}, extras: comprasPrevistas(CFG,EST,CAIXA,LOTES,ini,HOJE,addCal(HOJE,430))};
+  if (CACHE.meses[ym]) return CACHE.meses[ym];
+  const si=saldoInicial(ym);
+  const a=agendaMes(CFG,EST,CAIXA,LOTES,ym,ini,si,{extras:CACHE.extras}); a.si=si;
+  CACHE.meses[ym]=a; return a;
+}
+const loteDaData = iso => Object.values(LOTES).find(l=>l.fecha===iso);
+const nomeLote = l => l.nome || `Lote de ${fmtBR(parseD(l.fecha))}`;
+function contaChip(c){
+  return ({op:'<span class="chip neutral">Operação</span>', cof:'<span class="chip warn">Cofrinho</span>',
+    'op>cof':'<span class="chip neutral">Operação → Cofrinho</span>', 'op>cofre':'<span class="chip ok">Operação → Cofre</span>', 'cof>cofre':'<span class="chip ok">Cofrinho → Cofre</span>'})[c]||'';
+}
+
+const pl = (q, um, varios) => `${q} ${q===1?um:varios}`;
+const cap1 = t => t ? t[0].toUpperCase()+t.slice(1) : t;
+/* ================= Render geral ================= */
+$$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{ tab=b.dataset.tab; $$('nav.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b)); $$('main section').forEach(s=>s.hidden=s.id!=='tab-'+tab); renderAll(); window.scrollTo(0,0); }));
+function goTab(t){ $(`nav.tabs button[data-tab="${t}"]`).click(); }
+function renderMission(){
+  const meta=n(CFG.missao.meta), tem=totalCofre(); const p=meta?Math.min(100,tem/meta*100):0;
+  $('#mission').innerHTML = `<div style="min-width:0"><div class="lab">Cofre Lazarus</div><div class="val num">${brl(tem)} <span style="font-size:13px;font-weight:500;opacity:.75">de ${brl(meta)}</span></div></div><div class="bar" aria-label="Progresso da missão"><i style="width:${p}%"></i></div><div class="val num" style="font-size:15px">${dec(p,0)}%</div>`;
+}
+function renderAll(){
+  invalidar();
+  renderMission();
+  if (tab==='hoje') renderHoje();
+  if (tab==='agenda') renderAgenda();
+  if (tab==='lotes') renderLotes();
+  if (tab==='dinheiro') renderDinheiro();
+  if (tab==='cenario') renderCenario();
+  if (tab==='ajustes') renderAjustes();
+}
+function renderOutputs(){
+  invalidar();
+  renderMission();
+  if (tab==='lotes') renderLoteOut();
+  else if (tab==='dinheiro') renderDinheiroOut();
+  else if (tab==='agenda') renderAgendaOut();
+  else if (tab==='cenario') renderCenarioOut();
+  else if (tab==='ajustes') renderAjustesOut();
+}
+
+/* ================= HOJE ================= */
+function tarefasDoDia(dia){
+  const iso=fmtISO(dia); const ini=inicioData();
+  const out={manha:[], lotes:[], contas:[], noite:[]};
+  const a = ini ? agendaDe(ymOf(dia)) : null;
+  const evs = a ? a.ev.filter(e=>sameDay(e.d,dia)) : [];
+  evs.filter(e=>['entrada','cofrinho','ads'].includes(e.tipo)).forEach(e=>out.manha.push({key:e.key, texto:e.nome, valor:e.valor, conta:e.conta, entrada:e.tipo==='entrada', prev:e.prev}));
+  evs.filter(e=>['fixo','prolabore','imposto','cofre'].includes(e.tipo)).forEach(e=>out.contas.push({key:e.key, texto:e.nome, valor:e.valor, conta:e.conta}));
+  // lotes reais
+  Object.values(LOTES).filter(l=>l.fecha).sort((x,y)=>x.fecha.localeCompare(y.fecha)).forEach(l=>{
+    const r=calcLote(CFG, l.estAntes||EST, l); const c=r.cr; if(!c) return;
+    const nm=nomeLote(l); const lst=[];
+    const t=(id,texto,sub)=>lst.push({key:`${iso}|${l.id}|${id}`, texto, sub});
+    const money=evs.filter(e=>e.ref===l.id).map(e=>({key:e.key, texto:cap1(e.nome.replace(nm+': ','')), valor:e.valor, conta:e.conta}));
+    if (sameDay(c.D0,dia)){
+      t('caixa',`Separar a caixa do lote com a lista de ${r.pedidos} pedidos e ${r.pecas} camisetas`);
+      t('pedidos', 'Pedir o DTF da cidade e as capelinhas e sacolinhas (chegam amanhã)');
+      if (c.emCasa) t('cortador',`Levar ao cortador a malha que está descansando em casa`, `${r.malha.filter(m=>m.kg).map(m=>`${dec(m.kg)} kg ${m.cor.nome.toLowerCase()}`).join(' e ')}. Compre hoje a mesma quantidade para deixar descansando para o próximo lote.`);
+      else t('malha','Comprar a malha e deixar descansar até amanhã');
+    }
+    if (!c.emCasa && sameDay(c.leva,dia)) t('cortador','Levar a malha ao cortador');
+    if (sameDay(c.cortVolta,dia)) t('costureiras',`Buscar ${pl(r.pecas,'peça cortada','peças cortadas')} e levar às costureiras`);
+    if (sameDay(c.costVolta,dia)) t('buscar',`Buscar ${pl(r.pecas,'camiseta','camisetas')} nas costureiras`);
+    if (sameDay(c.estampar,dia)) t('estampar',`Estampar e embalar ${pl(r.pedidos,'pedido','pedidos')}`, 'Camiseta no saquinho transparente, capelinha, sacolinha e cheirinho no saquinho preto.');
+    if (sameDay(c.postar,dia)) t('postar',`Postar ${pl(r.pedidos,'pedido','pedidos')}`, `Prazo prometido a esses clientes: ${fmtDL(c.prometido)}.`);
+    const all=[...lst,...money];
+    if (all.length) out.lotes.push({nome:nm, id:l.id, itens:all, atrasado: dia>c.prometido && !l.etapas?.postar});
+  });
+  // lote que fechou e ainda não foi registrado
+  if (ini){
+    for (let d=addCal(dia,-3); d<dia; d=addCal(d,1)){
+      if (d>=ini && ehFechamento(CFG,d) && !loteDaData(fmtISO(d))) out.lotes.unshift({nome:`Lote de ${fmtBR(d)}`, pendente:fmtISO(d), itens:[{key:`${iso}|pend|${fmtISO(d)}`, texto:`Este lote fechou em ${fmtDL(d)} e ainda não foi registrado. Registre agora para saber o que comprar.`}]});
+    }
+  }
+  if (ini && dia>=ini){
+    if (ehFechamento(CFG,dia)) out.noite.push({key:`${iso}|fechar`, texto:'Fechar o lote de hoje', sub:'Exporte as vendas na Nuvemshop e registre o lote na aba Lotes.'});
+    out.noite.push({key:`${iso}|anotar`, texto:'Anotar as vendas e o anúncio do dia', sub:'Na aba Dinheiro, ou importando o CSV da Nuvemshop.'});
+  }
+  return out;
+}
+function taskHTML(t){
+  const done = !!(CAIXA.feitos||{})[t.key];
+  return `<div class="task ${done&&!t.info?'done':''}">${t.info?'<span style="width:18px"></span>':`<input type="checkbox" data-feito="${esc(t.key)}" ${done?'checked':''} aria-label="Feito">`}
+    <div class="t">${esc(t.texto)}${t.prev?' <span class="small muted">previsão</span>':''}${t.sub?`<div class="sub">${esc(t.sub)}</div>`:''}${t.conta?`<div style="margin-top:3px">${contaChip(t.conta)}</div>`:''}</div>
+    ${t.valor!=null?`<div class="v" style="color:${t.entrada?'var(--ok)':'inherit'}">${t.entrada?'+':''}${brl(t.valor)}</div>`:''}</div>`;
+}
+function renderHoje(){
+  const el=$('#tab-hoje'); const ini=inicioData();
+  if (!ini){
+    el.innerHTML=`<div class="today"><div style="grid-column:1/-1"><div class="d" style="font-size:30px">Quando a missão começa?</div>
+      <p style="opacity:.8;max-width:60ch">Escolha o primeiro dia de vendas. A partir dele o app monta os lotes, a agenda de pagamentos e o que fazer em cada dia.</p>
+      <label class="f" style="max-width:220px;color:inherit">Primeiro dia de vendas<input type="date" data-scope="cfg" data-path="inicio" value=""></label></div></div>`;
+    return;
+  }
+  const fechaHoje = proximoFechamento(CFG,HOJE); const jn = janela(CFG,fechaHoje);
+  const pj = pedidosJanela(CFG,CAIXA,fechaHoje,ini);
+  let reais=0, ped=0; for(let d=new Date(jn.ini); d<=HOJE; d=addCal(d,1)){ const lg=(CAIXA.dias||{})[fmtISO(d)]; if(lg&&!vazio(lg.pedidos)){ ped+=n(lg.pedidos); reais++; } }
+  const cam = ped*n(CFG.oferta.pecas), teto=n(CFG.lote.teto);
+  const uso = teto? cam/teto : 0;
+  const cor = uso<0.8?'var(--ok)':uso<=1?'var(--signal)':'var(--risk)';
+  const msg = uso<0.8?'Dentro do limite. Anúncio no ritmo normal.':uso<=1?'Perto do limite. Não aumente o anúncio hoje.':'Passou do limite. Baixe o anúncio e avise as costureiras.';
+  const cr = cronograma(CFG, fechaHoje);
+  const tk = tarefasDoDia(HOJE);
+  const bloco = (titulo, lista) => lista.length ? `<div class="group-title">${titulo}</div>${lista.map(taskHTML).join('')}` : '';
+  const lotesHTML = tk.lotes.map(g=>`<div class="group-title">${esc(g.nome)}${g.atrasado?' <span class="chip bad">passou do prazo</span>':''}</div>${g.pendente?`<div class="task"><span style="width:18px"></span><div class="t">${esc(g.itens[0].texto)}</div><button class="btn small sig" data-registrar="${g.pendente}">Registrar</button></div>`:g.itens.map(taskHTML).join('')}`).join('');
+  const prox = [];
+  for (let i=1;i<=4;i++){ const d=addCal(HOJE,i); const t=tarefasDoDia(d); const q=t.lotes.reduce((a,g)=>a+g.itens.filter(x=>x.valor==null).length,0)+t.contas.length;
+    const tot=[...t.lotes.flatMap(g=>g.itens), ...t.contas].filter(x=>x.valor!=null).reduce((a,x)=>a+x.valor,0);
+    prox.push(`<tr><td style="white-space:nowrap">${fmtDL(d)}</td><td>${t.lotes.map(g=>g.pendente?`registrar ${esc(g.nome)}`:esc(g.nome)).join(', ')||'<span class="muted">Sem produção</span>'}${ehFechamento(CFG,d)?' <span class="chip neutral">fecha lote</span>':''}</td><td class="r">${tot?brl(tot):''}</td></tr>`); }
+  const pm = pedidosMeta(CFG);
+  el.innerHTML = `
+  <div class="today">
+    <div><div class="d">${DIAS_L[HOJE.getDay()]}<small>${HOJE.getDate()} de ${MESES_L[HOJE.getMonth()]}</small></div>
+      <p style="margin:14px 0 0;opacity:.85">Meta da missão: <b>${dec(pm/30)} pedidos por dia</b>, ${dec(pm*n(CFG.oferta.pecas)/30)} camisetas.</p></div>
+    <div class="open">
+      <div style="font-weight:650;font-stretch:110%">Lote aberto: vendas de ${fmtDL(jn.ini)} a ${fmtDL(jn.fim)}</div>
+      <div style="opacity:.8;font-size:14px">${sameDay(fechaHoje,HOJE)?'Fecha hoje à noite.':`Fecha ${fmtDL(fechaHoje)} à noite.`} Esses pedidos saem até ${fmtDL(cr.prometido)}.</div>
+      <div class="bar"><i style="width:${Math.min(100,uso*100)}%;background:${cor}"></i></div>
+      <div style="font-size:14px">${reais?`${int(cam)} de ${int(teto)} camisetas até agora. ${msg}`:`Anote as vendas do dia para acompanhar o limite de ${int(teto)} camisetas por lote. A previsão é de ${int(pj.pedidos*n(CFG.oferta.pecas))}.`}</div>
+      <div class="site">No site: Produção sob encomenda. Envio em até ${prazoSite(CFG)} dias úteis.</div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <h3>O que fazer hoje</h3>
+      ${bloco('De manhã', tk.manha)}
+      ${lotesHTML}
+      ${bloco('Contas', tk.contas)}
+      ${bloco('À noite', tk.noite)}
+      ${!tk.manha.length && !tk.lotes.length && !tk.contas.length && !tk.noite.length ? '<p class="muted">Nada para hoje.</p>':''}
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:16px">
+        <h3>Próximos dias</h3>
+        <div class="tw"><table><tbody>${prox.join('')}</tbody></table></div>
+        <p class="small muted" style="margin-bottom:0">O valor é o que sai das contas nesse dia, sem contar anúncio e cofrinho.</p>
+      </div>
+      <div class="panel">
+        <h3>Toda manhã, em 4 passos</h3>
+        <div class="check"><div class="mk" style="border-color:var(--ink)">1</div><div>Resgate todo o saldo da Appmax para a conta Operação.</div></div>
+        <div class="check"><div class="mk" style="border-color:var(--ink)">2</div><div>Passe para o Cofrinho ${brl(cofrinhoPorPedido(CFG))} por pedido de ontem, mesmo que parte do cartão ainda não tenha caído.</div></div>
+        <div class="check"><div class="mk" style="border-color:var(--ink)">3</div><div>Recarregue ${brl(adsDia(CFG))} na Meta por Pix.</div></div>
+        <div class="check"><div class="mk" style="border-color:var(--ink)">4</div><div>Faça as tarefas dos lotes na ordem da lista.</div></div>
+      </div>
+    </div>
+  </div>`;
+  $$('[data-feito]').forEach(c=>c.onchange=()=>{ CAIXA.feitos=CAIXA.feitos||{}; if(c.checked) CAIXA.feitos[c.dataset.feito]=true; else delete CAIXA.feitos[c.dataset.feito]; persist('caixa'); renderHoje(); });
+  $$('[data-registrar]').forEach(b=>b.onclick=()=>{ criarLote(b.dataset.registrar); });
+}
+
+/* ================= LOTES ================= */
+function criarLote(iso){
+  if (loteDaData(iso)){ loteSel=loteDaData(iso).id; goTab('lotes'); return; }
+  const id='l'+iso.replace(/-/g,'')+Math.random().toString(36).slice(2,5);
+  const primeiro = !Object.keys(LOTES).length;
+  LOTES[id]={id, fecha:iso, nome:'', pedidos:'', receita:'', itens:[], etapas:{}, malhaEmCasa: primeiro ? false : !!CFG.lote.malhaEmCasa, criado:Date.now()};
+  loteSel=id; persist('lote',id); goTab('lotes');
+}
+function ultimoFechamentoSemLote(){
+  let d=new Date(HOJE); const ini=inicioData();
+  for (let i=0;i<14;i++){ if (ehFechamento(CFG,d) && (!ini||d>=ini) && !loteDaData(fmtISO(d))) return fmtISO(d); d=addCal(d,-1); }
+  return fmtISO(proximoFechamento(CFG,HOJE));
+}
+function opts(list, sel){ return list.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}" ${v===sel?'selected':''}>${esc(l)}</option>`; }).join(''); }
+function renderLotes(){
+  const el=$('#tab-lotes');
+  const ls=Object.values(LOTES).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if (!loteSel||!LOTES[loteSel]) loteSel=ls[0]?.id||null;
+  const sug = ultimoFechamentoSemLote();
+  const pills = ls.slice(0,12).map(l=>{ const c=cronograma(CFG,parseD(l.fecha),{malhaEmCasa:l.malhaEmCasa}); const st=l.etapas?.postar?'postado':`sai até ${fmtD(c.prometido)}`;
+    return `<button class="lote-pill" aria-pressed="${l.id===loteSel}" data-lote="${l.id}"><b>${esc(nomeLote(l))}</b><span>${st}</span></button>`; }).join('');
+  el.innerHTML = `
+  <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Lotes</h2><span class="spacer"></span>
+    <label class="f" style="flex-direction:row;align-items:center;gap:8px">Lote que fechou em <input type="date" id="novaData" value="${sug}"></label>
+    <button class="btn sig small" id="novo">Registrar lote</button></div>
+  <p class="lead">Cada lote junta as vendas de ${diasFecha(CFG).length===3?'2 ou 3 dias':'alguns dias'} e fecha ${diasFecha(CFG).map(d=>DIAS_L[d]).join(', ')} à noite. No dia seguinte começa a produção.</p>
+  ${ls.length?`<div class="lotes">${pills}</div>`:''}
+  <div id="loteBox"></div>`;
+  $('#novo').onclick=()=>{ const v=$('#novaData').value; if(!v) return; const d=parseD(v); if(!ehFechamento(CFG,d) && !confirm(`${fmtDL(d)} não é dia de fechar lote. Registrar mesmo assim?`)) return; criarLote(v); };
+  $$('[data-lote]').forEach(b=>b.onclick=()=>{ loteSel=b.dataset.lote; renderAll(); });
+  renderLoteBox();
+}
+function renderLoteBox(){
+  const box=$('#loteBox'); if(!box) return;
+  if (!loteSel){ box.innerHTML=`<div class="note">Nenhum lote registrado ainda. Quando um lote fechar, registre aqui com as vendas da Nuvemshop.</div>`; return; }
+  const L=LOTES[loteSel]; const j=janela(CFG,parseD(L.fecha));
+  const estampas=[...new Set([...(L.itens||[]).map(i=>i.estampa),...(EST.dtf||[]).map(x=>x.estampa)])].filter(Boolean);
+  box.innerHTML = `
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="panel">
+      <h3>${esc(nomeLote(L))}</h3>
+      <p class="small muted" style="margin-top:-6px">Vendas de ${fmtDL(j.ini)} a ${fmtDL(j.fim)}.</p>
+      <label class="f" style="margin-bottom:8px">Nome (opcional)<input type="text" data-scope="lote" data-path="nome" value="${esc(L.nome)}" placeholder="${esc(`Lote de ${fmtBR(parseD(L.fecha))}`)}"></label>
+      ${field('Pedidos','lote','pedidos',{step:1,hint:'Vazio: calcula pelas camisetas'})}
+      ${checkField('Malha já descansada em casa','lote','malhaEmCasa','Desmarque no primeiro lote: a malha comprada hoje só vai ao cortador amanhã')}
+      <div class="row" style="margin-top:12px;align-items:center">
+        <label class="f">Vendas da Nuvemshop (CSV)<input type="file" id="csv" accept=".csv,text/csv" style="max-width:240px;font-size:13px"></label>
+      </div>
+      <div id="csvMsg" class="small" style="margin-top:6px"></div>
+    </div>
+    <div class="panel">
+      <details ${(L.itens||[]).length?'':'open'}><summary>Camisetas do lote (${int((L.itens||[]).reduce((a,i)=>a+n(i.qty),0))})</summary>
+        <div class="tw"><table><thead><tr><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th><th class="r">Qtd</th><th></th></tr></thead><tbody>
+        ${(L.itens||[]).map((it,i)=>`<tr>
+          <td><input type="text" list="estampas" data-scope="lote" data-path="itens.${i}.estampa" value="${esc(it.estampa)}" style="width:100%;min-width:140px"></td>
+          <td><select data-scope="lote" data-path="itens.${i}.cor">${opts(CFG.cores.map(c=>[c.id,c.nome]),it.cor)}</select></td>
+          <td><select data-scope="lote" data-path="itens.${i}.mod">${opts(CFG.mods,it.mod)}</select></td>
+          <td><select data-scope="lote" data-path="itens.${i}.tam">${opts(TAMS_ALL,it.tam)}</select></td>
+          <td class="r">${numInput('lote',`itens.${i}.qty`,{step:1,label:'Quantidade',cls:'w-s'})}</td>
+          <td><button class="linkbtn" data-rm="${i}">Remover</button></td></tr>`).join('')}
+        </tbody></table></div>
+        <datalist id="estampas">${estampas.map(e=>`<option value="${esc(e)}">`).join('')}</datalist>
+        <div class="row" style="margin-top:10px"><button class="btn ghost small" id="addItem">Adicionar camiseta</button></div>
+      </details>
+    </div>
+  </div>
+  <div id="loteOut"></div>
+  <div class="row" style="margin-top:20px"><span class="spacer"></span><button class="btn danger small" id="delLote">Excluir este lote</button></div>`;
+  const reopen=()=>{ const d=$('#loteBox details'); if(d) d.open=true; };
+  $('#addItem').onclick=()=>{ L.itens=L.itens||[]; L.itens.push({estampa:'',cor:'OFF',mod:'Tradicional',tam:'M',qty:1}); persist('lote',L.id); renderLoteBox(); reopen(); };
+  $$('[data-rm]').forEach(b=>b.onclick=()=>{ L.itens.splice(Number(b.dataset.rm),1); persist('lote',L.id); renderLoteBox(); reopen(); });
+  $('#delLote').onclick=()=>{ if(!confirm(`Excluir ${nomeLote(L)}?`)) return; const id=L.id; delete LOTES[id]; loteSel=null; persist('del',id); renderAll(); toast('Lote excluído'); };
+  $('#csv').onchange=async ev=>{
+    const f=ev.target.files[0]; if(!f) return;
+    try{
+      const peds=lerNuvemshop(await lerArquivo(f)); csvCache=peds;
+      const r=itensDaJanela(peds,j.ini,j.fim);
+      if(!r.pedidos){ $('#csvMsg').innerHTML=`<span class="chip bad">Nenhum pedido pago entre ${fmtD(j.ini)} e ${fmtD(j.fim)}</span>`; return; }
+      L.itens=r.itens; L.pedidos=r.pedidos; L.receita=r.receita;
+      mesclarDias(peds);
+      persist('lote',L.id); renderLoteBox();
+      $('#csvMsg').innerHTML=`<span class="chip ok">${r.pedidos} pedidos</span> ${int(r.itens.reduce((a,i)=>a+i.qty,0))} camisetas, ${brl(r.receita)}. As vendas de cada dia também foram anotadas.`;
+    }catch(e){ $('#csvMsg').innerHTML=`<span class="chip bad">Não importou</span> ${esc(e.message)}`; }
+  };
+  renderLoteOut();
+}
+async function lerArquivo(f){ const buf=await f.arrayBuffer(); try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ return new TextDecoder('windows-1252').decode(buf); } }
+function mesclarDias(peds){
+  const dias=diasDosPedidos(peds);
+  Object.entries(dias).forEach(([k,v])=>{ const cur=CAIXA.dias[k]||{}; CAIXA.dias[k]={...cur, pedidos:v.pedidos, fat:v.fat, pix:v.pix}; });
+  persist('caixa');
+}
+function renderLoteOut(){
+  const box=$('#loteOut'); if(!box||!loteSel) return;
+  const L=LOTES[loteSel]; const r=calcLote(CFG, L.estAntes||EST, L); const c=r.cr;
+  if (!r.pecas){ box.innerHTML=`<div class="note">Importe o CSV da Nuvemshop ou adicione as camisetas para ver compras, corte e prazos.</div>`; return; }
+  const et=L.etapas||{};
+  const passos=[
+    ['compras', c.emCasa?`Separar a caixa, pedir DTF e kits, levar a malha de casa ao cortador e comprar a malha de reposição`:`Separar a caixa, comprar a malha (descansa até amanhã), pedir DTF e kits`, c.D0],
+    ...(c.emCasa?[]:[['cortador','Levar a malha ao cortador', c.leva]]),
+    ['costureiras','Buscar no cortador, pagar e levar às costureiras', c.cortVolta],
+    ['buscar','Buscar nas costureiras e pagar', c.costVolta],
+    ['estampar','Estampar e embalar', c.estampar],
+    ['postar','Postar e pagar as etiquetas de frete', c.postar]
+  ];
+  const txtCliente=`Seu pedido está em produção e será enviado até ${fmtBR(c.prometido)}.`;
+  const corte = CFG.cores.map(co=>{
+    const tot=Object.keys(r.grade).filter(k=>k.startsWith(co.id+'|')).reduce((a,k)=>a+r.grade[k],0); if(!tot) return '';
+    return `<tr class="sub"><td colspan="${CFG.tamanhos.length+2}">${esc(co.nome)}: ${tot} camisetas</td></tr>`+CFG.mods.map(m=>`<tr><td>${m}</td>${CFG.tamanhos.map(t=>`<td class="r">${r.grade[skuKey(co.id,m,t)]||'·'}</td>`).join('')}<td class="r"><b>${CFG.tamanhos.reduce((a,t)=>a+(r.grade[skuKey(co.id,m,t)]||0),0)}</b></td></tr>`).join('');
+  }).join('');
+  box.innerHTML = `${r.alertas.map(a=>`<div class="note bad">${esc(a)}</div>`).join('')}
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="panel">
+      <h3>Passo a passo</h3>
+      ${passos.map(p=>`<div class="task ${et[p[0]]?'done':''}"><input type="checkbox" data-etapa="${p[0]}" ${et[p[0]]?'checked':''} aria-label="Feito"><div class="t">${p[1]}</div><div class="v">${fmtDL(p[2])}</div></div>`).join('')}
+      <div class="site" style="background:var(--sunk)">Envio prometido: ${fmtDL(c.prometido)}</div>
+      <p class="small muted" style="margin:8px 0 0">Mensagem para os clientes do lote: ${esc(txtCliente)}</p>
+    </div>
+    <div class="panel">
+      <h3>Pagamentos do lote</h3>
+      <div class="tw"><table><tbody>
+        ${r.compras.map(x=>`<tr><td>${esc(x.nome)}</td><td class="r muted small">${fmtD(c.D0)}</td><td class="r">${brl(x.valor)}</td></tr>`).join('')}
+        <tr><td>Cortador: ${r.pecas} peças</td><td class="r muted small">${fmtD(c.cortVolta)}</td><td class="r">${brl(r.valorCortador)}</td></tr>
+        <tr><td>Costureiras: ${r.pecas} peças</td><td class="r muted small">${fmtD(c.costVolta)}</td><td class="r">${brl(r.valorCostura)}</td></tr>
+        <tr><td>Etiquetas de frete: ${r.pedidos} pedidos</td><td class="r muted small">${fmtD(c.postar)}</td><td class="r">${brl(r.valorFrete)}</td></tr>
+        <tr class="total"><td>Total, pago pelo Cofrinho</td><td></td><td class="r">${brl(r.total)}</td></tr>
+      </tbody></table></div>
+      <p class="small muted">O Cofrinho recebeu ${brl(r.pedidos*cofrinhoPorPedido(CFG))} destes ${pl(r.pedidos,'pedido','pedidos')}. ${r.total>r.pedidos*cofrinhoPorPedido(CFG)?'Este lote gasta mais porque compra coisas que duram muitos lotes, como etiquetas e cheirinho. Os próximos lotes devolvem a diferença.':'A diferença fica guardada para o imposto do mês e para a folga.'}</p>
+      <div class="row">${L.registrado?'<span class="chip ok">Estoque de DTF, etiquetas e cheirinho atualizado</span>':'<button class="btn small" id="registrar">Registrar compras no estoque</button>'}</div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="panel"><h3>Ordem de corte</h3>
+      <div class="tw"><table><thead><tr><th></th>${CFG.tamanhos.map(t=>`<th class="r">${t}</th>`).join('')}<th class="r">Total</th></tr></thead><tbody>${corte}</tbody></table></div></div>
+    <div class="panel"><h3>Pedido de DTF</h3>
+      <div class="tw"><table><thead><tr><th>Estampa</th><th>Cor</th><th class="r">Precisa</th><th class="r">Tem</th><th class="r">Pedir</th></tr></thead><tbody>
+      ${r.dtf.map(d=>`<tr><td>${esc(d.estampa)}</td><td>${esc((CFG.cores.find(x=>x.id===d.cor)||{nome:d.cor}).nome)}</td><td class="r">${d.precisa}</td><td class="r">${d.tem||'·'}</td><td class="r"><b>${d.comprar+d.extra}</b>${d.extra?` <span class="small muted">(${d.extra} para guardar)</span>`:''}</td></tr>`).join('')}
+      </tbody></table></div>
+      <p class="small muted" style="margin-bottom:0">${r.metros} metro${r.metros===1?'':'s'} a ${brl(CFG.custos.dtfMetro)}. Cada metro tem ${CFG.custos.dtfPorMetro} estampas; o espaço que sobra vai para as estampas que mais saíram no lote.</p></div>
+  </div>`;
+  $$('[data-etapa]').forEach(cb=>cb.onchange=()=>{ L.etapas=L.etapas||{}; L.etapas[cb.dataset.etapa]=cb.checked; persist('lote',L.id); renderLoteOut(); });
+  const rg=$('#registrar'); if(rg) rg.onclick=()=>{ if(!confirm('Atualizar o estoque de DTF, etiquetas e cheirinho com este lote? Faça isso uma vez, no dia das compras.')) return;
+    L.estAntes=clone(EST); EST=registrarNoEstoque(CFG,EST,calcLote(CFG,EST,L)); L.registrado=true; persist('est'); persist('lote',L.id); renderLoteOut(); toast('Estoque atualizado'); };
+}
+
+/* ================= DINHEIRO ================= */
+function renderDinheiro(){
+  const el=$('#tab-dinheiro'); const ini=inicioData();
+  const [y,m]=mesSel.split('-').map(Number); const dias=new Date(y,m,0).getDate();
+  const linhas=[];
+  for (let i=1;i<=dias;i++){
+    const iso=`${mesSel}-${String(i).padStart(2,'0')}`; const d=parseD(iso);
+    const di= ini ? diaInfo(CFG,CAIXA,iso,ini) : {antes:true};
+    const ph = k => di.antes ? '' : String(Math.round(di[k]));
+    linhas.push(`<tr${sameDay(d,HOJE)?' style="background:var(--sunk)"':''}><td style="white-space:nowrap">${fmtDL(d)}</td>
+      <td class="r">${numInput('caixa',`dias.${iso}.pedidos`,{step:1,ph:ph('pedidos'),label:'Pedidos',cls:'w-s'})}</td>
+      <td class="r">${numInput('caixa',`dias.${iso}.fat`,{ph:ph('fat'),label:'Faturamento',cls:'w-s'})}</td>
+      <td class="r">${numInput('caixa',`dias.${iso}.pix`,{ph:ph('pix'),label:'Pix',cls:'w-s'})}</td>
+      <td class="r">${numInput('caixa',`dias.${iso}.ads`,{ph:ph('ads'),label:'Anúncio',cls:'w-s'})}</td></tr>`);
+  }
+  el.innerHTML = `
+  <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Dinheiro</h2><span class="spacer"></span>
+    <div class="row" style="flex-wrap:nowrap;gap:8px"><button class="btn ghost small" id="mA">Anterior</button><b style="white-space:nowrap">${MESES_L[m-1]} de ${y}</b><button class="btn ghost small" id="mP">Próximo</button></div></div>
+  <p class="lead">Três contas. <b>Operação</b> recebe as vendas e paga anúncio, contas e pró-labore. <b>Cofrinho</b> guarda ${brl(cofrinhoPorPedido(CFG))} de cada pedido e paga malha, DTF, brindes, cortador, costureiras, frete e imposto. <b>Cofre Lazarus</b> guarda o lucro até os ${brl(CFG.missao.meta)}.</p>
+  ${ini?'':`<div class="note bad">Escolha o primeiro dia de vendas na aba Hoje.</div>`}
+  <div id="dinOut"></div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="panel">
+      <h3>Vendas e anúncios de cada dia</h3>
+      <p class="small muted" style="margin-top:-6px">O número apagado é a previsão. Digite o real ou importe o CSV da Nuvemshop. Anúncio é o que você recarregou na Meta.</p>
+      <div class="row" style="margin-bottom:8px"><input type="file" id="csvDias" accept=".csv,text/csv" style="max-width:240px;font-size:13px"><span id="csvDiasMsg" class="small"></span></div>
+      <div class="tw" style="max-height:520px;overflow:auto"><table><thead><tr><th>Dia</th><th class="r">Pedidos</th><th class="r">Faturou</th><th class="r">Pix</th><th class="r">Anúncio</th></tr></thead><tbody>${linhas.join('')}</tbody></table></div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:16px">
+        <h3>Depósitos no Cofre Lazarus</h3>
+        <div class="tw"><table><tbody>
+          ${(CAIXA.cofre||[]).map((d,i)=>`<tr><td><input type="date" data-scope="caixa" data-path="cofre.${i}.data" value="${esc(d.data)}"></td>
+            <td><select data-scope="caixa" data-path="cofre.${i}.origem">${opts([['op','da Operação'],['cof','do Cofrinho']],d.origem||'op')}</select></td>
+            <td class="r">${numInput('caixa',`cofre.${i}.valor`,{label:'Valor'})}</td><td><button class="linkbtn" data-rmcofre="${i}">Remover</button></td></tr>`).join('') || '<tr><td class="muted small">Nenhum depósito ainda.</td></tr>'}
+        </tbody></table></div>
+        <div class="row" style="margin-top:10px"><button class="btn ghost small" id="addCofre">Registrar depósito</button></div>
+      </div>
+      <div class="panel" style="margin-bottom:16px">
+        <h3>Contas fixas e pró-labore</h3>
+        <div class="tw"><table><thead><tr><th>Conta</th><th class="r">Dia</th><th class="r">Valor</th><th></th></tr></thead><tbody>
+        ${(CFG.contas||[]).map((c,i)=>`<tr><td><input type="text" data-scope="cfg" data-path="contas.${i}.nome" value="${esc(c.nome)}" style="width:100%;min-width:140px"></td>
+          <td class="r">${numInput('cfg',`contas.${i}.dia`,{step:1,min:1,label:'Dia',cls:'w-s'})}</td>
+          <td class="r">${numInput('cfg',`contas.${i}.valor`,{label:'Valor'})}</td><td><button class="linkbtn" data-rmconta="${i}">Remover</button></td></tr>`).join('')}
+        <tr class="total"><td>Total por mês</td><td></td><td class="r">${brl(totalContas(CFG).total)}</td><td></td></tr></tbody></table></div>
+        <div class="row" style="margin-top:10px"><button class="btn ghost small" id="addConta">Adicionar conta</button></div>
+        <p class="small muted" style="margin-bottom:0">Troque a primeira linha pelas contas de verdade, cada uma no dia do vencimento. O pró-labore no dia 30 evita a conta negativa no começo do mês.</p>
+      </div>
+      <div class="panel">
+        <h3>Começo do mês</h3>
+        <p class="small muted" style="margin-top:-6px">Vazio: usa o saldo com que o mês anterior terminou.</p>
+        ${field('Operação no dia 1 (R$)','caixa',`saldos.${mesSel}.op`)}
+        ${field('Cofrinho no dia 1 (R$)','caixa',`saldos.${mesSel}.cof`)}
+      </div>
+    </div>
+  </div>`;
+  const nav=k=>{ mesSel=ymOf(new Date(y,m-1+k,1)); renderDinheiro(); };
+  $('#mA').onclick=()=>nav(-1); $('#mP').onclick=()=>nav(1);
+  $('#addConta').onclick=()=>{ CFG.contas.push({nome:'Nova conta',dia:10,valor:0,tipo:'fixo'}); persist('cfg'); renderDinheiro(); };
+  $$('[data-rmconta]').forEach(b=>b.onclick=()=>{ CFG.contas.splice(Number(b.dataset.rmconta),1); persist('cfg'); renderDinheiro(); });
+  $('#addCofre').onclick=()=>{ CAIXA.cofre=CAIXA.cofre||[]; CAIXA.cofre.push({data:fmtISO(HOJE),valor:0,origem:'op'}); persist('caixa'); renderAll(); };
+  $$('[data-rmcofre]').forEach(b=>b.onclick=()=>{ CAIXA.cofre.splice(Number(b.dataset.rmcofre),1); persist('caixa'); renderAll(); });
+  $('#csvDias').onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return;
+    try{ const peds=lerNuvemshop(await lerArquivo(f)); mesclarDias(peds); renderDinheiro(); $('#csvDiasMsg').innerHTML=`<span class="chip ok">${peds.length} pedidos anotados</span>`; }
+    catch(e){ $('#csvDiasMsg').innerHTML=`<span class="chip bad">Não importou</span> ${esc(e.message)}`; } };
+  renderDinheiroOut();
+}
+function renderDinheiroOut(){
+  const box=$('#dinOut'); if(!box) return;
+  const a=agendaDe(mesSel); if(!a){ box.innerHTML=''; return; }
+  const si=a.si, sg=a.sugestao;
+  const alerts=[];
+  if (a.minOp.v<-0.004) alerts.push(`<div class="note bad">A Operação fica em ${brl(a.minOp.v)} no dia ${fmtD(a.minOp.d)}. Deixe esse valor na conta antes, ou recarregue menos anúncio até lá.</div>`);
+  if (a.minCof.v<-0.004) alerts.push(`<div class="note bad">O Cofrinho fica em ${brl(a.minCof.v)} no dia ${fmtD(a.minCof.d)}. Passe esse valor da Operação para o Cofrinho nesse dia.</div>`);
+  box.innerHTML = `${alerts.join('')}
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="panel stat"><div class="k">Faturamento do mês</div><div class="v num">${brl(a.sm.fat)}</div><div class="h">${int(a.sm.pedidos)} pedidos, ${a.sm.reais} de ${a.sm.dias} dias anotados</div></div>
+    <div class="panel stat"><div class="k">Lucro do mês</div><div class="v num" style="color:${a.lucro<0?'var(--risk)':'inherit'}">${brl(a.lucro)}</div><div class="h">Com os custos com folga, depois do pró-labore</div></div>
+    <div class="panel stat"><div class="k">Operação no fim do mês</div><div class="v num" style="color:${a.saldoFim.op<0?'var(--risk)':'inherit'}">${brl(a.saldoFim.op)}</div><div class="h">Começou com ${brl(si.op)}. Já descontado o depósito no Cofre</div></div>
+    <div class="panel stat"><div class="k">Cofrinho no fim do mês</div><div class="v num">${brl(a.saldoFim.cof)}</div><div class="h">Começou com ${brl(si.cof)}</div></div>
+    <div class="panel stat"><div class="k">Cofre Lazarus no fim do mês</div><div class="v num">${brl(a.saldoFim.cofre)}</div><div class="h">Contando os depósitos previstos</div></div>
+  </div>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="panel">
+      <h3>Fechamento do mês</h3>
+      <div class="tw"><table><tbody>
+        <tr class="sub"><td>Faturamento</td><td class="muted">${int(a.sm.pedidos)} pedidos</td><td class="r">${brl(a.sm.fat)}</td></tr>
+        ${a.linhas.map(l=>`<tr><td>${l[0]}</td><td class="muted small">${l[1]}</td><td class="r">−${brl(l[2])}</td></tr>`).join('')}
+        <tr class="total"><td>Lucro</td><td></td><td class="r">${brl(a.lucro)}</td></tr></tbody></table></div>
+    </div>
+    <div class="panel">
+      <h3>No último dia do mês, para o Cofre Lazarus</h3>
+      <div class="task"><span style="width:18px"></span><div class="t">Da Operação: tudo acima de ${brl(sg.colchao)}<div class="sub">O colchão paga as contas do começo do mês seguinte.</div></div><div class="v">${brl(sg.op)}</div></div>
+      <div class="task"><span style="width:18px"></span><div class="t">Do Cofrinho: o que passar de ${brl(sg.guardarCof)}<div class="sub">Ele guarda o imposto do mês e o custo de 2 lotes. O resto é a folga dos custos.</div></div><div class="v">${brl(sg.cof)}</div></div>
+      <div class="task"><span style="width:18px"></span><div class="t"><b>Total</b></div><div class="v">${brl(sg.op+sg.cof)}</div></div>
+      <p class="small muted" style="margin-bottom:0">${a.temDeposito?'O depósito deste mês já foi registrado.':'Quando depositar, registre abaixo para a barra da missão andar. Até lá, a agenda já conta com esse depósito no último dia.'}</p>
+    </div>
+  </div>
+  <div class="row"><button class="btn ghost small" id="verAgenda">Ver todos os pagamentos na Agenda</button></div>`;
+  $('#verAgenda').onclick=()=>goTab('agenda');
+}
+
+/* ================= AGENDA ================= */
+let agPeriodo='30', agConta='todas', agRotina=false;
+const TIPO_NOME = {entrada:'Resgate', cofrinho:'Cofrinho', ads:'Anúncio', compra:'Compra', oficina:'Oficina', frete:'Frete', imposto:'Imposto', fixo:'Conta fixa', prolabore:'Pró-labore', cofre:'Cofre Lazarus'};
+const ROTINA = new Set(['entrada','cofrinho','ads']);
+function periodoAgenda(){
+  const ini=inicioData();
+  let a=new Date(HOJE), b;
+  if (agPeriodo==='missao'){ a = ini && ini>HOJE ? new Date(ini) : new Date(HOJE); b = addCal(new Date(ini.getFullYear(), ini.getMonth()+n(CFG.missao.meses), ini.getDate()),-1); if (b<a) b=addCal(a,29); }
+  else b = addCal(a, Number(agPeriodo)-1);
+  return {a,b};
+}
+function eventosPeriodo(a,b){
+  const out=[]; let d=new Date(a.getFullYear(),a.getMonth(),1);
+  while (d<=b){ const ag=agendaDe(ymOf(d)); if(ag) ag.ev.forEach(e=>{ if(e.d>=a && e.d<=b) out.push(e); }); d=new Date(d.getFullYear(),d.getMonth()+1,1); }
+  return out;
+}
+function renderAgenda(){
+  const el=$('#tab-agenda');
+  if (!inicioData()){ el.innerHTML=`<h2>Agenda</h2><div class="note">Escolha o primeiro dia de vendas na aba Hoje para montar a agenda.</div>`; return; }
+  el.innerHTML = `
+  <div class="row" style="margin-bottom:6px"><h2 style="margin:0">Agenda de pagamentos</h2><span class="spacer"></span>
+    <label class="f" style="flex-direction:row;align-items:center;gap:6px">Período <select id="agPer">${opts([['7','Próximos 7 dias'],['30','Próximos 30 dias'],['90','Próximos 90 dias'],['missao','Até o fim da missão']],agPeriodo)}</select></label>
+    <label class="f" style="flex-direction:row;align-items:center;gap:6px">Conta <select id="agConta">${opts([['todas','Todas'],['op','Operação'],['cof','Cofrinho']],agConta)}</select></label>
+  </div>
+  <p class="lead">Tudo que entra e sai, dia a dia, com o saldo de cada conta no fim do dia. O que vem das vendas e dos lotes ainda não registrados é previsão pela meta e muda quando você anota o real.</p>
+  <div id="agOut"></div>`;
+  $('#agPer').onchange=e=>{ agPeriodo=e.target.value; renderAgendaOut(); };
+  $('#agConta').onchange=e=>{ agConta=e.target.value; renderAgendaOut(); };
+  renderAgendaOut();
+}
+function renderAgendaOut(){
+  const box=$('#agOut'); if(!box) return;
+  const {a,b}=periodoAgenda();
+  const todos=eventosPeriodo(a,b);
+  const feitos=CAIXA.feitos||{};
+  const daConta = e => agConta==='todas' || e.conta===agConta || e.conta.startsWith(agConta+'>') || e.conta.endsWith('>'+agConta);
+  // atrasados: pagamentos dos últimos 30 dias que não foram marcados
+  const atras = eventosPeriodo(addCal(HOJE,-30), addCal(HOJE,-1)).filter(e=>!ROTINA.has(e.tipo) && !feitos[e.key] && !(e.ref||'').startsWith('p'));
+  let saiOp=0, saiCof=0, entra=0, cofre=0, maior=null;
+  todos.forEach(e=>{
+    if (e.tipo==='entrada') entra+=e.valor;
+    else if (e.conta==='op') saiOp+=e.valor;
+    else if (e.conta==='cof') saiCof+=e.valor;
+    else if (e.conta.endsWith('>cofre')) cofre+=e.valor;
+    if (!ROTINA.has(e.tipo) && e.tipo!=='cofre' && (!maior || e.valor>maior.valor)) maior=e;
+  });
+  let minOp=null, minCof=null;
+  todos.forEach(e=>{ if(e.op!=null && (!minOp||e.op<minOp.v)) minOp={v:e.op,d:e.d}; if(e.cof!=null && (!minCof||e.cof<minCof.v)) minCof={v:e.cof,d:e.d}; });
+  const ult = todos[todos.length-1];
+  const vis = todos.filter(e=>daConta(e) && (agRotina || !ROTINA.has(e.tipo)));
+  const porDia={}; todos.forEach(e=>{ const k=fmtISO(e.d); (porDia[k]=porDia[k]||[]).push(e); });
+  const linha=e=>{ const done=!!feitos[e.key]; const venc = e.d<HOJE && !done && !ROTINA.has(e.tipo);
+    const cor = e.tipo==='entrada'?'var(--ok)':e.conta.includes('>')?'inherit':'var(--risk)';
+    return `<tr${done?' style="opacity:.5"':''}><td style="width:26px"><input type="checkbox" data-feito="${esc(e.key)}" ${done?'checked':''} aria-label="Feito"></td>
+      <td>${esc(e.nome)}${e.prev?' <span class="small muted">previsão</span>':''}${venc?' <span class="chip bad">atrasado</span>':''}</td>
+      <td class="small muted">${TIPO_NOME[e.tipo]||''}</td><td>${contaChip(e.conta)}</td>
+      <td class="r" style="color:${cor}">${e.tipo==='entrada'?'+':e.conta.includes('>')?'':'−'}${brl(e.valor)}</td></tr>`; };
+  let semanaAtual=null; let html='';
+  const dias=Object.keys(porDia).sort();
+  dias.forEach(k=>{
+    const d=parseD(k); const lst=porDia[k]; const ultDia=lst[lst.length-1];
+    const seg=new Date(d); while(seg.getDay()!==1) seg.setDate(seg.getDate()-1);
+    if (!semanaAtual || seg.getTime()!==semanaAtual.getTime()){
+      semanaAtual=seg; const fimS=addCal(seg,6);
+      const doS=todos.filter(e=>e.d>=seg && e.d<=fimS);
+      const sOp=doS.filter(e=>e.conta==='op'&&e.tipo!=='entrada').reduce((x,e)=>x+e.valor,0);
+      const sCof=doS.filter(e=>e.conta==='cof').reduce((x,e)=>x+e.valor,0);
+      html+=`<tr><td colspan="5" style="padding-top:18px;border-bottom:2px solid var(--ink)"><b style="font-stretch:110%">Semana de ${fmtD(seg)} a ${fmtD(fimS)}</b> <span class="small muted">Sai ${brl(sOp)} da Operação e ${brl(sCof)} do Cofrinho</span></td></tr>`;
+    }
+    const itens=lst.filter(e=>daConta(e) && (agRotina || !ROTINA.has(e.tipo)));
+    const rot=lst.filter(e=>ROTINA.has(e.tipo));
+    const resumoRot = !agRotina && rot.length ? `<tr><td></td><td class="small muted" colspan="3">Rotina da manhã: ${rot.map(e=>`${TIPO_NOME[e.tipo].toLowerCase()} ${brl(e.valor)}`).join(', ')}</td><td></td></tr>` : '';
+    if (!itens.length && !resumoRot) return;
+    html+=`<tr class="sub"><td colspan="3">${fmtDL(d)}${sameDay(d,HOJE)?' (hoje)':''}</td><td class="small" style="font-weight:500">Fim do dia</td><td class="r small" style="font-weight:500">Operação <b style="color:${ultDia.op<0?'var(--risk)':'inherit'}">${brl(ultDia.op)}</b><br>Cofrinho <b style="color:${ultDia.cof<0?'var(--risk)':'inherit'}">${brl(ultDia.cof)}</b></td></tr>`
+      + resumoRot + itens.map(linha).join('');
+  });
+  const avisos=[];
+  if (minOp && minOp.v<-0.004) avisos.push(`<div class="note bad">A Operação fica em ${brl(minOp.v)} em ${fmtDL(minOp.d)}. Coloque pelo menos ${brl(-minOp.v)} na conta antes desse dia, ou recarregue menos anúncio até lá.</div>`);
+  if (minCof && minCof.v<-0.004) avisos.push(`<div class="note bad">O Cofrinho fica em ${brl(minCof.v)} em ${fmtDL(minCof.d)}. Nesse dia, passe ${brl(-minCof.v)} da Operação para o Cofrinho.</div>`);
+  box.innerHTML = `${avisos.join('')}
+  ${atras.length?`<div class="panel" style="margin-bottom:16px;border-color:var(--risk)"><h3>Ficou para trás (${atras.length})</h3><p class="small muted" style="margin-top:-6px">Pagamentos dos últimos 30 dias que não foram marcados. Pague e marque, ou marque se já pagou.</p><div class="tw"><table><tbody>${atras.map(e=>`<tr><td style="white-space:nowrap" class="small">${fmtD(e.d)}</td>${linha(e).replace(/^<tr[^>]*>/,'')}`).join('')}</tbody></table></div></div>`:''}
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="panel stat"><div class="k">Sai da Operação</div><div class="v num">${brl(saiOp)}</div><div class="h">Anúncio, contas fixas e pró-labore</div></div>
+    <div class="panel stat"><div class="k">Sai do Cofrinho</div><div class="v num">${brl(saiCof)}</div><div class="h">Lotes, frete e imposto</div></div>
+    <div class="panel stat"><div class="k">Entra dos resgates</div><div class="v num">${brl(entra)}</div><div class="h">Vendas já sem as taxas</div></div>
+    <div class="panel stat"><div class="k">Vai para o Cofre Lazarus</div><div class="v num">${brl(cofre)}</div><div class="h">${ult?`Cofre em ${brl(ult.cofre)} no fim do período`:''}</div></div>
+    <div class="panel stat"><div class="k">Menor saldo da Operação</div><div class="v num" style="color:${minOp&&minOp.v<0?'var(--risk)':'inherit'}">${minOp?brl(minOp.v):'—'}</div><div class="h">${minOp?fmtDL(minOp.d):''}</div></div>
+    <div class="panel stat"><div class="k">Maior pagamento</div><div class="v num">${maior?brl(maior.valor):'—'}</div><div class="h">${maior?`${fmtDL(maior.d)}: ${esc(maior.nome)}`:''}</div></div>
+  </div>
+  <div class="panel">
+    <div class="row"><h3 style="margin:0">${fmtDL(a)} a ${fmtDL(b)}</h3><span class="spacer"></span>
+      <label class="row small"><input type="checkbox" id="agRot" ${agRotina?'checked':''}> Mostrar a rotina da manhã em linhas separadas</label>
+      <button class="btn ghost small" id="ics">Baixar para o calendário do celular</button></div>
+    <div class="tw" style="margin-top:10px"><table><tbody>${html||'<tr><td class="muted">Nada neste período.</td></tr>'}</tbody></table></div>
+  </div>`;
+  $$('#agOut [data-feito]').forEach(c=>c.onchange=()=>{ CAIXA.feitos=CAIXA.feitos||{}; if(c.checked) CAIXA.feitos[c.dataset.feito]=true; else delete CAIXA.feitos[c.dataset.feito]; persist('caixa'); renderAgendaOut(); });
+  $('#agRot').onchange=e=>{ agRotina=e.target.checked; renderAgendaOut(); };
+  const ic=$('#ics'); if(ic) ic.onclick=()=>baixarICS(todos.filter(e=>!ROTINA.has(e.tipo)), a, b);
+}
+function icsEsc(t){ return String(t).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+const icsD = d => fmtISO(d).replace(/-/g,'');
+async function baixarICS(evs, a, b){
+  const nomeConta = c => ({op:'Operação',cof:'Cofrinho','op>cofre':'Operação para o Cofre','cof>cofre':'Cofrinho para o Cofre','op>cof':'Operação para o Cofrinho'})[c]||c;
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Arcanju//Lazarus//PT','CALSCALE:GREGORIAN','X-WR-CALNAME:Lazarus: pagamentos'];
+  const stamp = icsD(HOJE)+'T000000Z';
+  evs.forEach((e,i)=>{
+    L.push('BEGIN:VEVENT', `UID:lazarus-${icsD(e.d)}-${i}-${Math.round(e.valor*100)}@arcanju`, `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${icsD(e.d)}`, `DTEND;VALUE=DATE:${icsD(addCal(e.d,1))}`,
+      `SUMMARY:${icsEsc(`${brl(e.valor)}: ${e.nome}`)}`, `DESCRIPTION:${icsEsc(`Conta: ${nomeConta(e.conta)}${e.prev?'. Valor previsto pela meta.':''}`)}`,
+      'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:${icsEsc(e.nome)}`,'TRIGGER;RELATED=START:PT8H','END:VALARM','END:VEVENT');
+  });
+  L.push('BEGIN:VEVENT', `UID:lazarus-rotina-${icsD(a)}@arcanju`, `DTSTAMP:${stamp}`, `DTSTART:${icsD(a)}T080000`, `DTEND:${icsD(a)}T081500`,
+    `RRULE:FREQ=DAILY;UNTIL=${icsD(b)}T235959`, `SUMMARY:${icsEsc('Lazarus: resgatar Appmax, passar o Cofrinho e recarregar a Meta')}`,
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Rotina da manhã','TRIGGER:PT0M','END:VALARM','END:VEVENT');
+  L.push('END:VCALENDAR');
+  try{ await salvarArquivo(`lazarus-pagamentos-${icsD(a)}.ics`, L.join('\r\n'), 'text/calendar'); toast('Calendário pronto'); }
+  catch(e){ toast('Download não concluído'); }
+}
+
+/* ================= CENÁRIO ================= */
+function renderCenario(){
+  $('#tab-cenario').innerHTML = `<h2>Cenário da missão</h2><p class="lead">Como os números fecham para juntar ${brl(CFG.missao.meta)} em ${CFG.missao.meses} meses. Mude custos e prazos em Ajustes.</p>
+  <div class="grid g2" style="margin-bottom:16px"><div class="panel">${field('Pedidos por mês','cfg','missao.pedidosMes',{step:1,hint:`0 = automático: ${pedidosNecessarios(CFG)} pedidos, o necessário para a missão`})}${field('Anúncio por dia (R$)','cfg','missao.adsDia',{hint:'0 = automático pelo % de marketing'})}</div><div></div></div>
+  <div id="cenOut"></div>`;
+  renderCenarioOut();
+}
+function renderCenarioOut(){
+  const box=$('#cenOut'); if(!box) return;
+  const cr=custoReal(CFG), cc=contribConta(CFG), crc=contribuicao(CFG,cr.camiseta,cr.brindes);
+  const tc=totalContas(CFG), alvo=lucroAlvoMes(CFG), pm=pedidosMeta(CFG), pn=pedidosNecessarios(CFG);
+  const d=dreMes(CFG,pm); const pc=n(CFG.oferta.pecas);
+  const empate = cc>0? Math.ceil(tc.total/cc) : Infinity;
+  const meses = d.lucro>0 ? n(CFG.missao.meta)/d.lucro : Infinity;
+  const mesesReal = (d.lucro + pm*(crc-cc))>0 ? n(CFG.missao.meta)/(d.lucro + pm*(crc-cc)) : Infinity;
+  const lotesSem = diasFecha(CFG).length; const pedLote = pm/15;
+  const ex = {fecha:fmtISO(new Date(2027,5,9))}; // uma quarta qualquer
+  const partes=partCor(CFG); const camLote=Math.round(pedLote*pc);
+  const itensEx=CFG.cores.map(co=>({estampa:'EXEMPLO', cor:co.id, mod:'Tradicional', tam:'M', qty:Math.round(camLote*(partes[co.id]||0))}));
+  const rEx=calcLote(CFG,{dtf:[],etiquetas:99999,cheirinho:99999},{...ex, itens:itensEx, pedidos:Math.round(pedLote)});
+  const crEx = cronograma(CFG, parseD(ex.fecha)); const diasUteis = bdBetween(parseD(ex.fecha), crEx.postar, crEx.H);
+  const diasSeed = Math.max(1, n(CFG.recebe.pix), n(CFG.recebe.cartao));
+  const seed = adsDia(CFG)*diasSeed + n(CFG.custos.etiquetaPacote) + n(CFG.custos.cheirinho) + CFG.cores.reduce((a,co)=>a+Math.round(camLote*(partes[co.id]||0))*n(CFG.custos.kgPeca)*precoKg(CFG,co.id),0);
+  box.innerHTML = `
+  <div class="grid g3" style="margin-bottom:16px">
+    <div class="panel stat"><div class="k">Pedidos por mês</div><div class="v num">${int(pm)}</div><div class="h">${dec(pm/30)} por dia, ${dec(pm*pc/30)} camisetas por dia</div></div>
+    <div class="panel stat"><div class="k">Lucro por mês</div><div class="v num">${brl(d.lucro)}</div><div class="h">${isFinite(meses)?`R$ ${int(CFG.missao.meta)} em ${dec(meses)} meses`:'Não chega na meta'}</div></div>
+    <div class="panel stat"><div class="k">Empate</div><div class="v num">${isFinite(empate)?int(empate):'—'} <span class="small muted">pedidos</span></div><div class="h">Abaixo disso o mês dá prejuízo</div></div>
+  </div>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="panel">
+      <h3>A conta da meta</h3>
+      <div class="check"><div class="mk" style="border-color:var(--ink)">1</div><div>${brl(CFG.missao.meta)} em ${CFG.missao.meses} meses = <b>${brl(alvo)} de lucro por mês</b>.</div></div>
+      <div class="check"><div class="mk" style="border-color:var(--ink)">2</div><div>Somando contas fixas e pró-labore (${brl(tc.total)}), cada mês precisa gerar <b>${brl(alvo+tc.total)}</b>.</div></div>
+      <div class="check"><div class="mk" style="border-color:var(--ink)">3</div><div>Cada pedido deixa <b>${brl(cc)}</b> depois de camisetas, brindes, frete, anúncio, taxas e imposto.</div></div>
+      <div class="check"><div class="mk" style="border-color:var(--ink)">4</div><div>${brl(alvo+tc.total)} ÷ ${brl(cc)} = <b>${pn} pedidos por mês</b>.</div></div>
+    </div>
+    <div class="panel">
+      <h3>Ritmo</h3>
+      <div class="tw"><table><thead><tr><th></th><th class="r">Pedidos</th><th class="r">Camisetas</th></tr></thead><tbody>
+        <tr><td>Por dia</td><td class="r">${dec(pm/30)}</td><td class="r">${dec(pm*pc/30)}</td></tr>
+        <tr><td>Lote de 2 dias</td><td class="r">${dec(pedLote)}</td><td class="r">${dec(pedLote*pc)}</td></tr>
+        <tr><td>Lote de 3 dias (pega o fim de semana)</td><td class="r">${dec(pm/10)}</td><td class="r">${dec(pm*pc/10)}</td></tr>
+        <tr><td>Por semana</td><td class="r">${dec(pm/30*7,0)}</td><td class="r">${dec(pm*pc/30*7,0)}</td></tr>
+        <tr><td>Por mês</td><td class="r">${int(pm)}</td><td class="r">${int(pm*pc)}</td></tr>
+        <tr><td>Na missão</td><td class="r">${int(pm*n(CFG.missao.meses))}</td><td class="r">${int(pm*pc*n(CFG.missao.meses))}</td></tr>
+      </tbody></table></div>
+      ${pm*pc/10>n(CFG.lote.teto)?`<p class="small" style="margin-bottom:0;color:var(--risk)">O lote do fim de semana passa do limite de ${CFG.lote.teto} camisetas. Confirme com a oficina.</p>`:''}
+    </div>
+  </div>
+  <div class="grid g2" style="margin-bottom:16px">
+    <div class="panel">
+      <h3>Quanto custa cada coisa</h3>
+      <div class="tw"><table><thead><tr><th></th><th class="r">Real</th><th class="r">Na conta</th></tr></thead><tbody>
+        <tr><td>Malha (${dec(n(CFG.custos.kgPeca)*1000,0)} g, mistura de cores)</td><td class="r">${brl(cr.malha)}</td><td></td></tr>
+        <tr><td>Cortador</td><td class="r">${brl(CFG.custos.corte)}</td><td></td></tr>
+        <tr><td>Costureiras</td><td class="r">${brl(CFG.custos.costura)}</td><td></td></tr>
+        <tr><td>DTF (${brl(CFG.custos.dtfMetro)} ÷ ${CFG.custos.dtfPorMetro})</td><td class="r">${brl(cr.dtf)}</td><td></td></tr>
+        <tr class="sub"><td>Camiseta pronta</td><td class="r">${brl(cr.camiseta)}</td><td class="r">${brl(CFG.conta.camiseta)}</td></tr>
+        <tr class="sub"><td>Brindes e embalagens por pedido</td><td class="r">${brl(cr.brindes)}</td><td class="r">${brl(CFG.conta.brindes)}</td></tr>
+      </tbody></table></div>
+      <p class="small muted" style="margin-bottom:0">A conta usa valores com folga. Se os custos reais se mantiverem, sobram ${brl(pm*(crc-cc))} a mais por mês no Cofrinho, e a missão termina em ${isFinite(mesesReal)?dec(mesesReal):'—'} meses.</p>
+    </div>
+    <div class="panel">
+      <h3>Mês da missão</h3>
+      <div class="tw"><table><tbody>
+        <tr class="sub"><td>Faturamento</td><td class="muted small">${int(pm)} × ${brl(CFG.oferta.preco)}</td><td class="r">${brl(d.fat)}</td></tr>
+        ${d.linhas.map(l=>`<tr><td>${l[0]}</td><td class="muted small">${l[1]}</td><td class="r">−${brl(l[2])}</td></tr>`).join('')}
+        <tr><td>Contas fixas</td><td></td><td class="r">−${brl(tc.fixo)}</td></tr>
+        <tr><td>Pró-labore</td><td></td><td class="r">−${brl(tc.prolabore)}</td></tr>
+        <tr class="total"><td>Lucro</td><td class="small">${pct(d.margem)}</td><td class="r">${brl(d.lucro)}</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <h3>Um lote típico (${camLote} camisetas, ${Math.round(pedLote)} pedidos)</h3>
+      <div class="tw"><table><tbody>
+        ${rEx.compras.map(x=>`<tr><td>${esc(x.nome.replace(' + 0 para guardar',''))}</td><td class="r">${brl(x.valor)}</td></tr>`).join('')}
+        <tr><td>Cortador</td><td class="r">${brl(rEx.valorCortador)}</td></tr>
+        <tr><td>Costureiras</td><td class="r">${brl(rEx.valorCostura)}</td></tr>
+        <tr><td>Etiquetas de frete</td><td class="r">${brl(rEx.valorFrete)}</td></tr>
+        <tr class="total"><td>Total</td><td class="r">${brl(rEx.total)}</td></tr>
+      </tbody></table></div>
+    </div>
+    <div class="panel">
+      <h3>Prazo e começo</h3>
+      <p style="margin-top:0">Com a malha descansada em casa, cortador e costureiras em D+1 e DTF e kits em D+1, os pedidos de um lote são postados <b>${diasUteis} dias úteis</b> depois que ele fecha. No site: <b>envio em até ${prazoSite(CFG)} dias úteis</b>, já com ${CFG.lote.folga} dias de folga.</p>
+      <p style="margin-bottom:0">Para começar, separe uns <b>${brl(seed)}</b>: o anúncio dos ${diasSeed===1?'primeiro dia':`${diasSeed} primeiros dias`} (antes de o dinheiro das vendas chegar), o pacote de etiquetas, o cheirinho e a primeira malha para descansar. O primeiro lote demora 1 dia a mais, porque a malha ainda precisa descansar.</p>
+    </div>
+  </div>`;
+}
+
+/* ================= AJUSTES ================= */
+function renderAjustes(){
+  const dias=[1,2,3,4,5,6,0];
+  const gradeT = CFG.cores.map(co=>`<tr class="sub"><td colspan="${CFG.tamanhos.length+1}">${esc(co.nome)}</td></tr>`+CFG.mods.map(m=>`<tr><td>${m}</td>${CFG.tamanhos.map(t=>`<td class="r">${numInput('cfg',`grade.${skuKey(co.id,m,t)}`,{step:1,label:'Peso',cls:'w-s'})}</td>`).join('')}</tr>`).join('')).join('');
+  $('#tab-ajustes').innerHTML = `<h2>Ajustes</h2><p class="lead">Preços, prazos e regras. Tudo aqui recalcula o resto do app.</p>
+  <div class="grid g2">
+    <div class="panel"><h3>Missão</h3>
+      ${field('Meta do Cofre Lazarus (R$)','cfg','missao.meta')}
+      ${field('Em quantos meses','cfg','missao.meses',{step:1,min:1})}
+      ${field('Colchão da Operação (R$)','cfg','missao.colchao',{hint:'Fica na conta no fim do mês para as contas do começo do mês seguinte'})}
+      <label class="f inline"><span>Primeiro dia de vendas</span><input type="date" data-scope="cfg" data-path="inicio" value="${esc(CFG.inicio)}"></label>
+    </div>
+    <div class="panel"><h3>Lotes</h3>
+      <div class="f" style="margin-bottom:8px">Dias em que o lote fecha, à noite
+        <div class="row" style="margin-top:6px">${dias.map(d=>`<label class="row small" style="gap:4px"><input type="checkbox" data-dia="${d}" ${diasFecha(CFG).includes(d)&&CFG.lote.fechaDias.length?'checked':''}> ${DIAS[d]}</label>`).join('')}</div></div>
+      ${field('Limite de camisetas por lote','cfg','lote.teto',{step:1,hint:'O que o cortador e as costureiras entregam em D+1'})}
+      ${checkField('Manter malha descansada em casa','cfg','lote.malhaEmCasa','Ganha 1 dia em cada lote')}
+      ${field('Dias úteis de folga no prazo do site','cfg','lote.folga',{step:1})}
+      <div id="ajPrazo" class="small muted" style="margin-top:6px"></div>
+    </div>
+    <div class="panel"><h3>Prazos em dias úteis</h3>
+      ${field('Cortador devolve em','cfg','prazos.corte',{step:1})}
+      ${field('Costureiras devolvem em','cfg','prazos.costura',{step:1})}
+      ${field('DTF chega em','cfg','prazos.dtf',{step:1})}
+      ${field('Capelinha e sacolinha chegam em','cfg','prazos.kits',{step:1})}
+      ${field('Descanso da malha','cfg','prazos.descanso',{step:1})}
+    </div>
+    <div class="panel"><h3>Custos de produção</h3>
+      ${field('Malha clara, por kg (R$)','cfg','custos.malhaClara')}
+      ${field('Malha escura, por kg (R$)','cfg','custos.malhaEscura')}
+      ${field('Malha por camiseta (kg)','cfg','custos.kgPeca',{hint:'1 rolo de 20 kg rende 100 camisetas'})}
+      ${field('Cortador por peça (R$)','cfg','custos.corte')}
+      ${field('Costureiras por peça (R$)','cfg','custos.costura')}
+      ${field('DTF por metro (R$)','cfg','custos.dtfMetro')}
+      ${field('Estampas por metro','cfg','custos.dtfPorMetro',{step:1})}
+    </div>
+    <div class="panel"><h3>Brindes e envio</h3>
+      ${field('Capelinha + sacolinha (R$)','cfg','custos.kit')}
+      ${field('Saquinho transparente (R$, 1 por camiseta)','cfg','custos.saqT')}
+      ${field('Saquinho preto (R$, 1 por pedido)','cfg','custos.saqP')}
+      ${field('Pacote de etiquetas de envio (R$)','cfg','custos.etiquetaPacote')}
+      ${field('Etiquetas por pacote','cfg','custos.etiquetasPacote',{step:1})}
+      ${field('Cheirinho (R$)','cfg','custos.cheirinho')}
+      ${field('Pedidos por cheirinho','cfg','custos.cheirinhoRende',{step:1})}
+      <h3 style="margin-top:14px">Estoque</h3>
+      ${field('Etiquetas de envio guardadas','est','etiquetas',{step:1})}
+      ${field('Cheirinho: pedidos que ainda rende','est','cheirinho',{step:1})}
+    </div>
+    <div class="panel"><h3>Valores com folga usados nas contas</h3>
+      ${field('Camiseta pronta (R$)','cfg','conta.camiseta')}
+      ${field('Brindes e embalagens por pedido (R$)','cfg','conta.brindes')}
+      <div id="ajReal" class="small muted" style="margin-top:6px"></div>
+      <h3 style="margin-top:14px">Oferta e taxas</h3>
+      ${field('Preço da oferta (R$)','cfg','oferta.preco')}
+      ${field('Camisetas por pedido','cfg','oferta.pecas',{step:1})}
+      ${field('Frete por pedido (R$)','cfg','oferta.frete')}
+      ${field('Marketing (% do faturamento)','cfg','taxas.marketing')}
+      ${field('Appmax (%)','cfg','taxas.appmax')}
+      ${field('Antifraude por pedido (R$)','cfg','taxas.antifraude')}
+      ${field('Nuvemshop (%)','cfg','taxas.nuvem')}
+      ${field('Imposto (%)','cfg','taxas.imposto')}
+      ${field('Vendas em Pix (%)','cfg','taxas.pix')}
+      ${field('Pix chega na Operação em (dias)','cfg','recebe.pix',{step:1,hint:'Resgatando de manhã: 1'})}
+      ${field('Cartão chega na Operação em (dias)','cfg','recebe.cartao',{step:1,hint:'Cartão D+1 resgatado de manhã: 2'})}
+    </div>
+    <div class="panel"><h3>Grade de tamanhos</h3><p class="small muted" style="margin-top:-6px">Peso de cada variação. Usado para dividir as cores nas previsões.</p>
+      <div class="tw"><table><thead><tr><th></th>${CFG.tamanhos.map(t=>`<th class="r">${t}</th>`).join('')}</tr></thead><tbody>${gradeT}</tbody></table></div></div>
+    <div class="panel"><h3>Cópia de segurança</h3><p class="small muted" style="margin-top:-6px">Guarda tudo do Lazarus em um arquivo: ajustes, lotes, vendas, contas e depósitos. Serve também para levar os dados para outro lugar onde o Lazarus estiver.</p>
+      <div class="btnrow"><button class="btn small" id="bkExp">Baixar cópia</button><button class="btn ghost small" id="bkImp">Restaurar de um arquivo</button><input type="file" id="bkArq" accept=".json,application/json" hidden></div></div>
+    <div class="panel"><h3>Feriados</h3><p class="small muted" style="margin-top:-6px">Uma data por linha (ano-mês-dia). Inclua os da sua cidade.</p>
+      <textarea data-scope="cfg" data-path="feriados" rows="10">${esc(CFG.feriados)}</textarea></div>
+  </div>
+  <div class="row" style="margin-top:18px"><span class="spacer"></span><button class="btn ghost small" id="reset">Voltar aos valores iniciais</button></div>`;
+  $('#bkExp').onclick=exportarBackup; $('#bkImp').onclick=()=>$('#bkArq').click(); $('#bkArq').onchange=e=>{ const f=e.target.files[0]; if(f) importarBackup(f); e.target.value=''; };
+  $$('[data-dia]').forEach(c=>c.onchange=()=>{ const set=new Set(diasFecha(CFG).length===7&&!CFG.lote.fechaDias.length?[]:CFG.lote.fechaDias); const d=Number(c.dataset.dia); if(c.checked) set.add(d); else set.delete(d); CFG.lote.fechaDias=[...set].sort(); persist('cfg'); renderAjustesOut(); });
+  $('#reset').onclick=()=>{ if(!confirm('Voltar os ajustes aos valores iniciais? Lotes, vendas e contas fixas não mudam.')) return; const keep={inicio:CFG.inicio, contas:CFG.contas}; CFG={...clone(DEFAULT_CONFIG),...keep}; persist('cfg'); renderAll(); toast('Ajustes restaurados'); };
+  renderAjustesOut();
+}
+function renderAjustesOut(){
+  const p=$('#ajPrazo'); if(p) p.textContent=`Com esses ajustes, o site mostra: envio em até ${prazoSite(CFG)} dias úteis.`;
+  const r=$('#ajReal'); if(r){ const c=custoReal(CFG); r.textContent=`Custo real hoje: camiseta ${brl(c.camiseta)}, brindes ${brl(c.brindes)} por pedido.`; }
+}
+
+loadLocal();
+renderAll();
+initDB();
+
+</script>
+</body>
+</html>

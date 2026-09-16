@@ -17,6 +17,8 @@ Princípio: **você informa pouco, o sistema calcula, projeta, diagnostica e aju
 | `api/vendas.js` | Pedidos pagos da Nuvemshop. |
 | `api/ads.js` | Gasto, compras e receita por campanha na Meta. |
 | `api/frete.js` | Custo real de envio por pedido, vindo da Nuvemshop. |
+| `api/expedicao.js` | Pedidos pagos com os itens, para a Logística separar e postar. |
+| `lazarus.html` | Projeto Lazarus. Roda separado, dentro do painel. |
 | `api/_lib.js` | Funções compartilhadas pelas três rotas. |
 | `vercel.json` | Configuração da hospedagem. |
 | `.env.example` | Lista das variáveis de ambiente (os valores ficam só na Vercel). |
@@ -38,8 +40,10 @@ middleware.js
 vercel.json
 .env.example
 .gitignore
+lazarus.html
 api/
   _lib.js
+  expedicao.js
   vendas.js
   ads.js
   frete.js
@@ -132,8 +136,52 @@ Premissas de partida já carregadas: camiseta R$ 15, kit R$ 9,15 (até 3 peças)
 (4 peças), frete R$ 18, Appmax 4,88% + R$ 0,99 por pedido, Nuvemshop 0,7%, imposto 6,7%,
 marketing 29%, custo fixo mensal R$ 7.690,90.
 
+## Detalhes do conector da loja
+
+**Receita.** O painel usa `total − frete cobrado`, nunca o `subtotal` da Nuvemshop. O subtotal
+vem antes do desconto: num pedido promocional de R$ 179 formado por três peças de R$ 71, o
+subtotal é R$ 213. Usá-lo faria o painel registrar receita que nunca entrou.
+
+**Contagem de peças.** Capelinha, sacolinha, saquinho, cartinha, cheirinho, brinde e adesivo
+não são contados como camiseta — senão cada brinde viraria mais uma peça multiplicada pelo
+custo da camiseta no CMV. Para mudar essa lista, crie a variável
+`NUVEMSHOP_IGNORAR_PRODUTOS` na Vercel com os termos separados por vírgula.
+
+**Custos.** Nenhum valor de custo vem da loja. Preço de camiseta, embalagem, frete e taxas
+saem exclusivamente de Configurações → Custos e taxas, dentro do painel.
+
 ## Lançamentos manuais
 
 Continuam disponíveis e sempre estarão: o botão **Novo lançamento** aceita qualquer receita ou
 despesa. A automação cobre as entradas e o tráfego; as saídas do dia a dia você lança, e as
 fixas ficam cadastradas na Agenda de pagamentos, aparecendo sozinhas todo mês.
+
+---
+
+## Logística
+
+Fica no menu, em **Operação → Logística**. É para quando a Arcanju já tiver estoque.
+
+| Aba | O que faz |
+|---|---|
+| Expedição | Pedidos da Nuvemshop (pelo conector ou pelo CSV de Vendas), com prazo de envio. Separar dá baixa em camiseta lisa, DTF e brindes. |
+| Estoque | Camisetas lisas nas 16 variações, DTF guardado, insumos e malha, com quantos dias cada um dura. |
+| Reposição | O que cortar, costurar e comprar para manter o estoque no alvo, respeitando a capacidade da oficina. "Criar as compras" gera tudo com datas. |
+| Compras | Pagar e receber. Receber soma ao estoque; o corte recebido tira a malha usada. |
+| Indicadores | Envio no prazo, tempo até o envio, falta de estoque, dinheiro parado e custo real contra o custo do Financeiro. |
+| Ajustes | Prazos, preços, capacidade, grade e feriados. |
+
+**Como conversa com o Financeiro**
+
+- Lê as vendas dos últimos 30 dias (ou a meta do mês) para saber o ritmo.
+- Os pagamentos das compras aparecem na **Agenda**. Pagar lá ou na Logística dá no mesmo.
+- Com custo das camisetas e dos brindes em modo automático, a compra paga **não** vira lançamento, porque o Financeiro já conta esse custo a cada venda. Em modo manual, ela vira lançamento.
+- Em Indicadores, o botão de custo cria uma vigência nova em Custos, valendo do mês atual em diante.
+
+Depois de subir esta versão, **Buscar na Nuvemshop** usa a rota nova `api/expedicao.js`. Nada precisa mudar nas variáveis de ambiente.
+
+## Projeto Lazarus
+
+Fica em **Missões → Projeto Lazarus**. Ele roda em um quadro separado (`lazarus.html`) e **não lê nem escreve nada** do Financeiro ou da Logística. Os dados dele ficam no navegador, em uma chave própria.
+
+Para trazer os dados do Lazarus que você já usa no Claude: lá, em **Ajustes → Cópia de segurança → Baixar cópia**. Aqui, no mesmo lugar, **Restaurar de um arquivo**.

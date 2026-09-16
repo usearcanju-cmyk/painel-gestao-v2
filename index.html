@@ -356,6 +356,22 @@ input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;bac
   border-left:2px solid var(--linha-forte);padding-left:14px;margin:0 0 20px}
 
 @media print{.rail,.barra-dir,.menu-btn{display:none}.conteudo{padding:0}}
+/* ---------------- Logística e Projeto Lazarus ---------------- */
+.lg-num{width:74px;padding:5px 7px;text-align:right}
+.lg-cel{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:4px;border-radius:8px}
+.lg-cel.cr{background:var(--rubro-fundo)}
+.lg-cel.at{background:var(--ambar-fundo)}
+.lg-cel.ok{background:var(--verde-fundo)}
+.lg-dias{font-size:10.5px;color:var(--texto-fraco);white-space:nowrap;line-height:1.3}
+.lg-aviso{font-size:11.5px;margin-top:4px;font-weight:600}
+.lg-aviso.cr{color:var(--rubro)}
+.lg-aviso.at{color:#8a5e13}
+button.etq{cursor:pointer;border:none}
+.conteudo.cheio{padding:0;max-width:none}
+.lz-topo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 28px;border-bottom:1px solid var(--linha);font-size:12.5px;color:var(--texto-medio);background:var(--carta)}
+.lz-topo span{flex:1;min-width:200px}
+.lz-quadro{display:block;width:100%;height:calc(100vh - 106px);border:0;background:#E4E9EC}
+
 </style>
 </head>
 <body>
@@ -2007,16 +2023,22 @@ var UI = {
    NAVEGAÇÃO
 ------------------------------------------------------------ */
 var NAV = [
-  {g:'Dia a dia', itens:[
+  {g:'Financeiro · dia a dia', itens:[
     {id:'hoje', nome:'Hoje', ico:'M3 12l9-9 9 9M5 10v10h14V10'},
     {id:'agenda', nome:'Agenda', ico:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
     {id:'lancamentos', nome:'Lançamentos', ico:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h6'}
   ]},
-  {g:'Decisão', itens:[
+  {g:'Financeiro · decisão', itens:[
     {id:'planejamento', nome:'Planejamento', ico:'M22 12h-4l-3 9L9 3l-3 9H2'},
     {id:'resultados', nome:'Resultados', ico:'M3 3v18h18M7 15l4-4 3 3 5-6'},
     {id:'caixa', nome:'Caixa', ico:'M3 10h18M7 15h4M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'},
     {id:'custos', nome:'Custos', ico:'M20 7 12 3 4 7v10l8 4 8-4zM12 11v10M4 7l8 4 8-4'}
+  ]},
+  {g:'Operação', itens:[
+    {id:'logistica', nome:'Logística', ico:'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'}
+  ]},
+  {g:'Missões', itens:[
+    {id:'lazarus', nome:'Projeto Lazarus', ico:'M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7z'}
   ]},
   {g:'Sistema', itens:[
     {id:'integracoes', nome:'Integrações', ico:'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'},
@@ -2037,6 +2059,14 @@ var ABAS = {
     {id:'canal', nome:'Canais e estados'},
     {id:'falha', nome:'Custo da falha'},
     {id:'frete', nome:'Frete'}
+  ],
+  logistica: [
+    {id:'expedicao', nome:'Expedição'},
+    {id:'estoque', nome:'Estoque'},
+    {id:'reposicao', nome:'Reposição'},
+    {id:'compras', nome:'Compras'},
+    {id:'indicadores', nome:'Indicadores'},
+    {id:'ajustes', nome:'Ajustes'}
   ],
   caixa: [
     {id:'saldo', nome:'Caixa e contas'},
@@ -3158,7 +3188,7 @@ Views.geral = function(){
      ['Vendas','Marketing, conteúdo, revenda e representantes','breve'],
      ['Produto','Catálogo, coleções e ficha de custo','breve'],
      ['Produção','Capacidade, fila e prazo de estampa','breve'],
-     ['Logística','Envio, prazo e rastreio','breve'],
+     ['Logística','Expedição, estoque, reposição e compras','ok'],
      ['Atendimento','Suporte, comunidade e reclamações','breve'],
      ['Gestão','Indicadores gerais e rotina de decisão','breve'],
      ['Jurídico','Contratos e obrigações','breve']
@@ -4186,7 +4216,7 @@ Views.agenda = function(){
       h += '<tr><td style="white-space:nowrap">'+U.dataBr(o.data)+' <span style="color:var(--texto-fraco);font-size:11.5px">'+U.diaSemana(o.data)+'</span></td>'+
         '<td style="font-weight:500">'+U.esc(o.nome)+'</td>'+
         '<td style="color:var(--texto-medio)">'+U.esc(GRUPOS[o.grupo]?GRUPOS[o.grupo].nome:o.grupo)+'</td>'+
-        '<td class="c"><span class="etq pag">'+(o.origem==='conta'?(o.recorrente?'conta fixa':'conta'):'lançamento')+'</span></td>'+
+        '<td class="c"><span class="etq pag">'+(o.origem==='conta'?(o.recorrente?'conta fixa':'conta'):(o.origem==='logistica'?'logística':'lançamento'))+'</span></td>'+
         '<td class="r" style="font-weight:600">'+U.brl(o.valor)+'</td>'+
         '<td class="c"><span class="etq '+(o.status==='pago'?'rec':(o.status==='atrasado'?'fal':'pen'))+'">'+
           (o.status==='pago'?'Pago':(o.status==='atrasado'?'Vencido':'Em aberto'))+'</span></td>'+
@@ -5564,8 +5594,12 @@ var App = {
     document.querySelectorAll('.nav-item').forEach(function(b){
       b.classList.toggle('ativo', b.getAttribute('data-tela')===UI.tela);
     });
-    var semPeriodo = ['custos','integracoes','config'];
-    document.getElementById('periodoCtrl').style.display = semPeriodo.indexOf(UI.tela)>=0 ? 'none' : '';
+    var semPeriodo = ['custos','integracoes','config','lazarus'];
+    var abaLog = UI.tela==='logistica' ? (UI.aba||'expedicao') : '';
+    var semMes = semPeriodo.indexOf(UI.tela)>=0 || (UI.tela==='logistica' && abaLog!=='indicadores');
+    document.getElementById('periodoCtrl').style.display = semMes ? 'none' : '';
+    document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus') ? 'none' : '';
+    alvo.classList.toggle('cheio', UI.tela==='lazarus');
 
     var h = '';
     if(ABAS[UI.tela]){
@@ -5585,6 +5619,8 @@ var App = {
     else if(UI.tela==='custos') h += Views.precos();
     else if(UI.tela==='integracoes') h += Views.integracoes();
     else if(UI.tela==='config') h += Views.config();
+    else if(UI.tela==='logistica') h += Views.logistica();
+    else if(UI.tela==='lazarus') h += Views.lazarus();
     else h += Views.hoje();
 
     alvo.innerHTML = h;
@@ -6299,6 +6335,1161 @@ var App = {
     });
   }
 };
+
+/* ============================================================
+   LOGÍSTICA — expedição, estoque, reposição e compras
+   Conversa com o Financeiro sem mexer no cálculo do resultado:
+   · lê vendas (ritmo de camisetas e pedidos), custos e metas;
+   · coloca os pagamentos das compras na Agenda de pagamentos;
+   · só vira lançamento quando o grupo está em modo manual no Financeiro
+     (em modo automático o CMV já é calculado pela venda, e lançar a compra
+     contaria o mesmo custo duas vezes).
+   Os dados ficam em Store.dados.logistica.
+============================================================ */
+var Log = {
+  TAMS: ['PP','P','M','G','GG','XG'],
+
+  padrao: function(){
+    return {
+      versao: 1,
+      config: {
+        prazoEnvio: 2,          /* dias úteis entre a compra e a postagem */
+        semanasAlvo: 3,         /* estoque de lisas desejado, em semanas de venda */
+        semanasDtf: 2,          /* estoque de DTF das estampas líderes */
+        capacidadeSemana: 100,  /* peças que a oficina entrega por semana */
+        estampasSP: 8,          /* quantas estampas líderes ficam guardadas */
+        base: 'vendas',         /* vendas = ritmo dos últimos 30 dias · meta = meta do mês */
+        kgPorPeca: 0.2, kgRolo: 20,
+        precoKgClaro: 36.95, precoKgEscuro: 40.80,
+        corte: 1, costura: 3,
+        dtfMetro: 17.90, dtfPorMetro: 8, dtfLocalMetro: 30,
+        kit: 8, saqT: 0.40, saqP: 0.50,
+        etiquetaPacote: 178, etiquetasPacote: 1800,
+        cheirinho: 100, cheirinhoRende: 500,
+        prazoMalha: 1, prazoCorte: 2, prazoCostura: 5, prazoDtf: 7, prazoDtfLocal: 1,
+        prazoKits: 1, prazoEtiquetas: 3, prazoEmbalagem: 0,
+        feriados: '2026-10-12\n2026-11-02\n2026-11-20\n2026-12-25\n2027-01-01\n2027-02-09\n2027-03-26\n2027-04-21\n2027-05-27\n2027-09-07\n2027-10-12\n2027-11-02\n2027-11-15\n2027-12-25'
+      },
+      cores: [ {id:'OFF', nome:'Off-white', clara:true}, {id:'PRETO', nome:'Preto', clara:false} ],
+      tamanhos: ['P','M','G','GG'],
+      mods: ['Tradicional','Baby look'],
+      grade: {
+        'OFF|Tradicional|P':244,'OFF|Tradicional|M':265,'OFF|Tradicional|G':149,'OFF|Tradicional|GG':119,
+        'OFF|Baby look|P':184,'OFF|Baby look|M':160,'OFF|Baby look|G':110,'OFF|Baby look|GG':63,
+        'PRETO|Tradicional|P':51,'PRETO|Tradicional|M':52,'PRETO|Tradicional|G':50,'PRETO|Tradicional|GG':31,
+        'PRETO|Baby look|P':26,'PRETO|Baby look|M':26,'PRETO|Baby look|G':17,'PRETO|Baby look|GG':11
+      },
+      estoque: {
+        lisas: {}, malhaKg: {}, dtf: [],
+        insumos: {capelinha:0, sacolinha:0, saqT:0, saqP:0, etiquetas:0, cheirinho:0}
+      },
+      pedidos: [],
+      compras: [],
+      contagens: []
+    };
+  },
+
+  d: function(){
+    if(!Store.dados.logistica || typeof Store.dados.logistica!=='object') Store.dados.logistica = Log.padrao();
+    var x = Store.dados.logistica, b = Log.padrao();
+    if(!x._ok){
+      x.config = Object.assign({}, b.config, x.config||{});
+      if(!Array.isArray(x.cores) || !x.cores.length) x.cores = b.cores;
+      if(!Array.isArray(x.tamanhos) || !x.tamanhos.length) x.tamanhos = b.tamanhos;
+      if(!Array.isArray(x.mods) || !x.mods.length) x.mods = b.mods;
+      if(!x.grade || typeof x.grade!=='object') x.grade = b.grade;
+      x.estoque = Object.assign({}, b.estoque, x.estoque||{});
+      x.estoque.insumos = Object.assign({}, b.estoque.insumos, x.estoque.insumos||{});
+      if(!x.estoque.lisas || typeof x.estoque.lisas!=='object') x.estoque.lisas = {};
+      if(!x.estoque.malhaKg || typeof x.estoque.malhaKg!=='object') x.estoque.malhaKg = {};
+      if(!Array.isArray(x.estoque.dtf)) x.estoque.dtf = [];
+      ['pedidos','compras','contagens'].forEach(function(k){ if(!Array.isArray(x[k])) x[k] = []; });
+      Object.defineProperty(x, '_ok', {value:true, enumerable:false, configurable:true});
+    }
+    return x;
+  },
+  cfg: function(){ return Log.d().config; },
+  salvar: function(msg){ Store.commit(msg); },
+
+  /* ---------- datas e dias úteis ---------- */
+  feriados: function(){
+    var s = {};
+    (Log.cfg().feriados||'').split('\n').forEach(function(l){ var m=l.trim().match(/^(\d{4}-\d{2}-\d{2})/); if(m) s[m[1]]=1; });
+    return s;
+  },
+  dt: function(iso){ var p=String(iso).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); },
+  util: function(d, H){ var w=d.getDay(); return w!==0 && w!==6 && !H[U.iso(d)]; },
+  somaUteis: function(iso, k){
+    var H = Log.feriados(), d = Log.dt(iso);
+    while(!Log.util(d,H)) d.setDate(d.getDate()+1);
+    var c=0; while(c<k){ d.setDate(d.getDate()+1); if(Log.util(d,H)) c++; }
+    return U.iso(d);
+  },
+  uteisEntre: function(a, b){
+    if(!a || !b || b<=a) return 0;
+    var H = Log.feriados(), d = Log.dt(a), fim = Log.dt(b), c=0;
+    while(d<fim){ d.setDate(d.getDate()+1); if(Log.util(d,H)) c++; }
+    return c;
+  },
+  somaDias: function(iso, k){ var d=Log.dt(iso); d.setDate(d.getDate()+k); return U.iso(d); },
+
+  /* ---------- variações ---------- */
+  chave: function(cor,mod,tam){ return cor+'|'+mod+'|'+tam; },
+  variacoes: function(){
+    var x = Log.d(), out = [];
+    x.cores.forEach(function(c){ x.mods.forEach(function(m){ x.tamanhos.forEach(function(t){
+      out.push({k:Log.chave(c.id,m,t), cor:c, mod:m, tam:t});
+    }); }); });
+    return out;
+  },
+  nomeCor: function(id){ var c = Log.d().cores.find(function(x){ return x.id===id; }); return c ? c.nome : id; },
+  nomeVar: function(k){ var p=k.split('|'); return Log.nomeCor(p[0])+' '+(p[1]==='Baby look'?'baby look':'tradicional')+' '+p[2]; },
+
+  /* ---------- leitura do nome do produto da Nuvemshop ---------- */
+  lerProduto: function(nome, variantes){
+    nome = String(nome||'');
+    var up = nome.toUpperCase();
+    if(!/CAMISETA|BLUSA|BABY|T-SHIRT/.test(up)) return null;
+    var m = nome.match(/\(([^()]*)\)\s*$/);
+    var partes = (m ? m[1].split(',') : []).concat(variantes||[]).map(function(s){ return String(s).trim(); }).filter(Boolean);
+    var tam = partes.find(function(p){ return Log.TAMS.indexOf(p.toUpperCase())>=0; });
+    if(!tam) return null;
+    var low = partes.map(function(p){ return p.toLowerCase(); });
+    var baby = /BABY|FEMININ/.test(up) || low.some(function(p){ return ['acólita','acolita','feminina','baby look'].indexOf(p)>=0; });
+    var cv = low.join(' '), cor = '?';
+    if(/bege|off/.test(cv)) cor='OFF'; else if(/pret/.test(cv)) cor='PRETO'; else if(/branc/.test(cv)) cor='BRANCA'; else if(/azul/.test(cv)) cor='AZUL';
+    else if(/OFF-WHITE|OFF WHITE/.test(up)) cor='OFF'; else if(/PRETA|PRETO/.test(up)) cor='PRETO'; else if(/AZUL/.test(up)) cor='AZUL'; else if(/BRANCA/.test(up)) cor='BRANCA';
+    var base = m ? nome.slice(0, m.index).trim() : nome;
+    var estampa = base.indexOf(' - ')>=0 ? base.slice(base.indexOf(' - ')+3) : base;
+    estampa = estampa.replace(/["“”]/g,'').replace(/\s+FT\..*$/i,'').trim().toUpperCase();
+    return {cor:cor, mod: baby?'Baby look':'Tradicional', tam: tam.toUpperCase(), estampa:estampa};
+  },
+
+  /* ---------- pedidos ---------- */
+  statusNome: {novo:'A separar', separado:'Separado', pronto:'Pronto para postar', enviado:'Enviado'},
+
+  upsertPedido: function(p){
+    var lista = Log.d().pedidos;
+    var i = lista.findIndex(function(x){ return x.id===p.id; });
+    if(i>=0){
+      var a = lista[i];
+      a.numero = p.numero || a.numero; a.cliente = p.cliente || a.cliente; a.uf = p.uf || a.uf;
+      a.data = p.data || a.data;
+      if(!a.baixa && p.itens && p.itens.length) a.itens = p.itens;
+      if(p.enviadoLoja && a.status!=='enviado'){
+        if(a.status==='novo') Log.consumir(a, true);
+        a.status='enviado'; a.enviadoEm = p.enviadoEm || a.enviadoEm || U.hoje();
+      }
+      return 'atualizado';
+    }
+    var n = {
+      id:p.id, numero:p.numero||p.id, data:p.data, cliente:p.cliente||'', uf:p.uf||'',
+      itens:p.itens||[], status:'novo', criado:new Date().toISOString(), origem:p.origem||'manual'
+    };
+    if(p.enviadoLoja){ n.status='enviado'; n.enviadoEm=p.enviadoEm||p.data; n.historico=true; }
+    else if(p.prontoLoja){ n.status='pronto'; n.historico=true; }
+    lista.push(n);
+    return 'novo';
+  },
+
+  prazo: function(p){ return Log.somaUteis(p.data, U.n(Log.cfg().prazoEnvio,2)); },
+
+  camisetasDoPedido: function(p){ return (p.itens||[]).reduce(function(s,i){ return s+U.n(i.qty); },0); },
+
+  /* verifica se há tudo para separar */
+  checar: function(p){
+    var e = Log.d().estoque, falta = [], dtfLocal = [];
+    var precisa = {}, dtfPrec = {};
+    (p.itens||[]).forEach(function(i){
+      var k = Log.chave(i.cor,i.mod,i.tam); precisa[k]=(precisa[k]||0)+U.n(i.qty);
+      var kd = i.estampa+'|'+i.cor; dtfPrec[kd]=(dtfPrec[kd]||0)+U.n(i.qty);
+    });
+    Object.keys(precisa).forEach(function(k){
+      var tem = U.n(e.lisas[k]);
+      if(tem < precisa[k]) falta.push({k:k, qtd:precisa[k]-tem});
+    });
+    Object.keys(dtfPrec).forEach(function(kd){
+      var pr = kd.split('|');
+      var tem = e.dtf.filter(function(x){ return x.estampa===pr[0] && x.cor===pr[1]; }).reduce(function(s,x){ return s+U.n(x.qty); },0);
+      if(tem < dtfPrec[kd]) dtfLocal.push({estampa:pr[0], cor:pr[1], qtd:dtfPrec[kd]-tem});
+    });
+    return {falta:falta, dtfLocal:dtfLocal, precisa:precisa, dtfPrec:dtfPrec};
+  },
+
+  /* dá baixa no estoque (lisas, DTF que houver, insumos) */
+  consumir: function(p, forcar){
+    if(p.baixa) return true;
+    var ch = Log.checar(p);
+    if(ch.falta.length && !forcar){ p.falta = ch.falta; return false; }
+    var e = Log.d().estoque, b = {lisas:{}, dtf:{}, insumos:{}};
+    Object.keys(ch.precisa).forEach(function(k){
+      var q = Math.min(ch.precisa[k], U.n(e.lisas[k]));
+      e.lisas[k] = U.n(e.lisas[k]) - q; b.lisas[k] = q;
+    });
+    Object.keys(ch.dtfPrec).forEach(function(kd){
+      var pr = kd.split('|'), resta = ch.dtfPrec[kd], usado = 0;
+      e.dtf.forEach(function(x){ if(resta>0 && x.estampa===pr[0] && x.cor===pr[1]){ var t=Math.min(U.n(x.qty),resta); x.qty=U.n(x.qty)-t; resta-=t; usado+=t; } });
+      if(usado) b.dtf[kd] = usado;
+    });
+    e.dtf = e.dtf.filter(function(x){ return U.n(x.qty)>0; });
+    var cam = Log.camisetasDoPedido(p);
+    var ins = {capelinha:1, sacolinha:1, saqP:1, saqT:cam, etiquetas:1, cheirinho:1};
+    Object.keys(ins).forEach(function(k){
+      var q = Math.min(ins[k], U.n(e.insumos[k])); e.insumos[k] = U.n(e.insumos[k]) - q; b.insumos[k] = q;
+    });
+    p.baixa = b; p.dtfLocal = ch.dtfLocal; p.falta = ch.falta.length ? ch.falta : null;
+    return true;
+  },
+
+  devolver: function(p){
+    if(!p.baixa) return;
+    var e = Log.d().estoque, b = p.baixa;
+    Object.keys(b.lisas||{}).forEach(function(k){ e.lisas[k] = U.n(e.lisas[k]) + b.lisas[k]; });
+    Object.keys(b.dtf||{}).forEach(function(kd){ Log.addDtf(kd.split('|')[0], kd.split('|')[1], b.dtf[kd]); });
+    Object.keys(b.insumos||{}).forEach(function(k){ e.insumos[k] = U.n(e.insumos[k]) + b.insumos[k]; });
+    p.baixa = null; p.dtfLocal = null;
+  },
+
+  addDtf: function(estampa, cor, q){
+    var e = Log.d().estoque;
+    var x = e.dtf.find(function(y){ return y.estampa===estampa && y.cor===cor; });
+    if(x) x.qty = U.n(x.qty) + q; else e.dtf.push({estampa:estampa, cor:cor, qty:q});
+  },
+
+  mudarStatus: function(id, novo){
+    var p = Log.d().pedidos.find(function(x){ return x.id===id; });
+    if(!p) return;
+    if(novo==='novo'){ Log.devolver(p); p.status='novo'; p.enviadoEm=null; Log.salvar('Pedido voltou para a separação'); return; }
+    if(p.status==='novo'){
+      if(!Log.consumir(p, false)){
+        Log.salvar();
+        UI.toast('Falta camiseta lisa para este pedido. Ele entra na próxima reposição.');
+        return;
+      }
+    }
+    p.status = novo;
+    if(novo==='enviado') p.enviadoEm = U.hoje();
+    else p.enviadoEm = null;
+    Log.salvar(novo==='enviado' ? 'Pedido marcado como enviado' : 'Pedido atualizado');
+  },
+
+  pedidosAbertos: function(){ return Log.d().pedidos.filter(function(p){ return p.status!=='enviado'; }); },
+
+  /* guarda só o necessário: pedidos enviados há mais de 150 dias saem da lista */
+  podar: function(){
+    var lim = Log.somaDias(U.hoje(), -150);
+    Log.d().pedidos = Log.d().pedidos.filter(function(p){ return p.status!=='enviado' || (p.enviadoEm||p.data) >= lim; });
+  },
+
+  /* ---------- CSV da Nuvemshop ---------- */
+  csv: function(texto){
+    var first = texto.slice(0, texto.indexOf('\n'));
+    var sep = first.split(';').length > first.split(',').length ? ';' : ',';
+    var rows = [], row = [], campo = '', q = false;
+    for(var i=0;i<texto.length;i++){
+      var ch = texto[i];
+      if(q){ if(ch==='"'){ if(texto[i+1]==='"'){ campo+='"'; i++; } else q=false; } else campo+=ch; }
+      else if(ch==='"') q=true;
+      else if(ch===sep){ row.push(campo); campo=''; }
+      else if(ch==='\n'){ row.push(campo); rows.push(row); row=[]; campo=''; }
+      else if(ch!=='\r') campo+=ch;
+    }
+    if(campo.length || row.length){ row.push(campo); rows.push(row); }
+    var head = rows[0].map(function(h){ return h.trim().toLowerCase(); });
+    var col = function(n){ return head.indexOf(n.toLowerCase()); };
+    var I = {num:col('Número do Pedido'), data:col('Data'), st:col('Status do Pedido'), pag:col('Status do Pagamento'),
+      env:col('Status do Envio'), cli:col('Nome do comprador'), uf:col('Estado'), prod:col('Nome do Produto'),
+      qtd:col('Quantidade Comprada'), ide:col('Identificador do pedido'), denv:col('Data de envío')};
+    if(I.num<0 || I.data<0 || I.prod<0) throw new Error('Esse arquivo não parece a exportação de vendas da Nuvemshop.');
+    var ufs = {'são paulo':'SP','minas gerais':'MG','rio de janeiro':'RJ','bahia':'BA','paraná':'PR','rio grande do sul':'RS','pernambuco':'PE','ceará':'CE','pará':'PA','santa catarina':'SC','goiás':'GO','maranhão':'MA','paraíba':'PB','amazonas':'AM','espírito santo':'ES','mato grosso':'MT','rio grande do norte':'RN','piauí':'PI','alagoas':'AL','distrito federal':'DF','mato grosso do sul':'MS','sergipe':'SE','rondônia':'RO','tocantins':'TO','acre':'AC','amapá':'AP','roraima':'RR'};
+    var out = [], cur = null;
+    for(var r=1;r<rows.length;r++){
+      var L = rows[r]; if(L.length < head.length/2) continue;
+      if(L[I.data]){
+        var m = L[I.data].match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        var st = (L[I.st]||'').toLowerCase(), pg = (L[I.pag]||'').toLowerCase(), en = (L[I.env]||'').toLowerCase();
+        var ok = m && !/cancel/.test(st) && !/cancel|estorn|recus|pendente/.test(pg);
+        if(ok){
+          var de = I.denv>=0 ? (L[I.denv]||'').match(/(\d{2})\/(\d{2})\/(\d{4})/) : null;
+          var ufTxt = (L[I.uf]||'').trim();
+          cur = {id: (I.ide>=0 && L[I.ide]) ? L[I.ide] : 'n'+L[I.num], numero:L[I.num], data:m[3]+'-'+m[2]+'-'+m[1],
+            cliente:(L[I.cli]||'').split(' ')[0], uf: ufTxt.length===2 ? ufTxt.toUpperCase() : (ufs[ufTxt.toLowerCase()]||''),
+            itens:[], origem:'csv',
+            enviadoLoja: /enviado|entregue/.test(en), prontoLoja: /pronto/.test(en),
+            enviadoEm: de ? de[3]+'-'+de[2]+'-'+de[1] : ''};
+          out.push(cur);
+        } else cur = null;
+      }
+      if(!cur) continue;
+      var pr = Log.lerProduto(L[I.prod]);
+      if(pr) cur.itens.push({estampa:pr.estampa, cor:pr.cor, mod:pr.mod, tam:pr.tam, qty:U.n(L[I.qtd])});
+    }
+    return out;
+  },
+
+  importar: function(lista){
+    var novos=0, atu=0, velhos=0, lim = Log.somaDias(U.hoje(), -60);
+    lista.forEach(function(p){
+      if(!p.data || p.data < lim){ velhos++; return; }
+      if(Log.upsertPedido(p)==='novo') novos++; else atu++;
+    });
+    Log.podar();
+    Log.salvar(novos+' pedido(s) novo(s) e '+atu+' atualizado(s)'+(velhos?'. '+velhos+' com mais de 60 dias ficaram de fora':''));
+  },
+
+  sincronizar: function(dias){
+    var c = Integra.cfg();
+    var ate = U.hoje(), de = Log.somaDias(ate, -(dias||10));
+    var u = Integra.url('expedicao', {de:de, ate:ate});
+    if(!u){ UI.toast('Configure o conector em Integrações, ou importe o CSV da Nuvemshop.'); return; }
+    UI.toast('Buscando pedidos…');
+    fetch(u, {headers: c.chave ? {'x-arcanju-key': c.chave} : {}})
+      .then(function(r){ if(!r.ok) throw new Error('O conector respondeu com erro '+r.status+'. Confira se o arquivo api/expedicao.js foi publicado.'); return r.json(); })
+      .then(function(json){
+        var lista = (Array.isArray(json)?json:[]).map(function(x){
+          var itens = [];
+          (x.itens||[]).forEach(function(i){
+            var pr = Log.lerProduto(i.nome, i.variantes);
+            if(pr) itens.push({estampa:pr.estampa, cor:pr.cor, mod:pr.mod, tam:pr.tam, qty:U.n(i.quantidade)});
+          });
+          return {id:String(x.id), numero:x.numero, data:x.data, cliente:x.cliente, uf:x.uf, itens:itens, origem:'api',
+            enviadoLoja: !!x.enviado, enviadoEm: x.enviadoEm||''};
+        });
+        Log.importar(lista);
+        App.render();
+      })
+      .catch(function(e){
+        var msg = e.message||'falha';
+        if(/Failed to fetch|NetworkError/i.test(msg)) msg = 'Não foi possível falar com o conector.';
+        UI.toast(msg);
+      });
+  },
+
+  /* ---------- consumo (conversa com o Financeiro) ---------- */
+  ritmo: function(){
+    var c = Log.cfg(), hoje = U.hoje(), ini = Log.somaDias(hoje, -30);
+    var cam = 0, ped = 0;
+    Store.dados.lancamentos.forEach(function(l){
+      if(l.tipo!=='receita' || l.grupo!=='vendas') return;
+      if(l.data < ini || l.data >= hoje) return;
+      cam += Calc.camisetasDe(l); ped += U.n(l.pedidos);
+    });
+    var r = {fonte:'vendas', camDia: cam/30, pedDia: ped/30, cam30:cam, ped30:ped};
+    var meta = Store.meta(U.ymAtual());
+    var cpp = U.n(Calc.cfg().camisetasPorPedidoPadrao, 2) || 2;
+    if(c.base==='meta' && U.n(meta.pedidos)>0){
+      var dias = U.diasNoMes(U.ymAtual());
+      r = {fonte:'meta', pedDia: U.n(meta.pedidos)/dias, camDia: U.n(meta.pedidos)*cpp/dias, cam30:cam, ped30:ped};
+    }
+    if(!r.camDia && !r.pedDia && U.n(meta.pedidos)>0){
+      var dd = U.diasNoMes(U.ymAtual());
+      r = {fonte:'meta', pedDia: U.n(meta.pedidos)/dd, camDia: U.n(meta.pedidos)*cpp/dd, cam30:cam, ped30:ped, semVendas:true};
+    }
+    return r;
+  },
+
+  /* participação de cada variação: pedidos dos últimos 60 dias, ou a grade padrão */
+  participacao: function(){
+    var x = Log.d(), lim = Log.somaDias(U.hoje(), -60), acc = {}, tot = 0;
+    x.pedidos.forEach(function(p){
+      if(p.data < lim) return;
+      (p.itens||[]).forEach(function(i){ var k=Log.chave(i.cor,i.mod,i.tam); acc[k]=(acc[k]||0)+U.n(i.qty); tot+=U.n(i.qty); });
+    });
+    var usar = tot >= 40 ? acc : x.grade;
+    var soma = 0; Log.variacoes().forEach(function(v){ soma += U.n(usar[v.k]); });
+    var out = {};
+    Log.variacoes().forEach(function(v){ out[v.k] = soma ? U.n(usar[v.k])/soma : 0; });
+    out._fonte = tot >= 40 ? 'pedidos' : 'grade';
+    return out;
+  },
+
+  /* estampas mais vendidas nos últimos 30 dias */
+  estampas: function(){
+    var lim = Log.somaDias(U.hoje(), -30), acc = {}, tot = 0;
+    Log.d().pedidos.forEach(function(p){
+      if(p.data < lim) return;
+      (p.itens||[]).forEach(function(i){ var k=i.estampa+'|'+i.cor; acc[k]=(acc[k]||0)+U.n(i.qty); tot+=U.n(i.qty); });
+    });
+    return Object.keys(acc).map(function(k){ var pr=k.split('|'); return {estampa:pr[0], cor:pr[1], qtd:acc[k], part: tot?acc[k]/tot:0}; })
+      .sort(function(a,b){ return b.qtd-a.qtd; });
+  },
+
+  /* ---------- custos ---------- */
+  custos: function(){
+    var c = Log.cfg(), pc = Log.participacao(), malha = 0;
+    Log.d().cores.forEach(function(co){
+      var share = 0; Log.variacoes().forEach(function(v){ if(v.cor.id===co.id) share += pc[v.k]; });
+      malha += share * U.n(co.clara===false ? c.precoKgEscuro : c.precoKgClaro) * U.n(c.kgPorPeca);
+    });
+    var dtf = U.div(U.n(c.dtfMetro), U.n(c.dtfPorMetro,8));
+    var lisa = malha + U.n(c.corte) + U.n(c.costura);
+    var brindes = U.n(c.kit) + U.n(c.saqP) + U.n(c.saqT)*U.n(Calc.cfg().camisetasPorPedidoPadrao,2) +
+      U.div(U.n(c.etiquetaPacote), U.n(c.etiquetasPacote)) + U.div(U.n(c.cheirinho), U.n(c.cheirinhoRende));
+    return {malha:malha, lisa:lisa, dtf:dtf, camiseta:lisa+dtf, brindes:brindes};
+  },
+  custoLisa: function(corId){
+    var c = Log.cfg(), co = Log.d().cores.find(function(x){ return x.id===corId; });
+    return U.n(co && co.clara===false ? c.precoKgEscuro : c.precoKgClaro)*U.n(c.kgPorPeca) + U.n(c.corte) + U.n(c.costura);
+  },
+  valorEstoque: function(){
+    var x = Log.d(), c = Log.cfg(), e = x.estoque, v = {lisas:0, malha:0, dtf:0, insumos:0};
+    Object.keys(e.lisas).forEach(function(k){ v.lisas += U.n(e.lisas[k]) * Log.custoLisa(k.split('|')[0]); });
+    Object.keys(e.malhaKg).forEach(function(cor){
+      var co = x.cores.find(function(y){ return y.id===cor; });
+      v.malha += U.n(e.malhaKg[cor]) * U.n(co && co.clara===false ? c.precoKgEscuro : c.precoKgClaro);
+    });
+    v.dtf = e.dtf.reduce(function(s,d){ return s+U.n(d.qty); },0) * U.div(U.n(c.dtfMetro), U.n(c.dtfPorMetro,8));
+    var I = e.insumos;
+    v.insumos = (U.n(I.capelinha)+U.n(I.sacolinha))*U.n(c.kit)/2 + U.n(I.saqT)*U.n(c.saqT) + U.n(I.saqP)*U.n(c.saqP) +
+      U.n(I.etiquetas)*U.div(U.n(c.etiquetaPacote),U.n(c.etiquetasPacote)) + U.n(I.cheirinho)*U.div(U.n(c.cheirinho),U.n(c.cheirinhoRende));
+    v.total = v.lisas + v.malha + v.dtf + v.insumos;
+    return v;
+  },
+
+  /* ---------- a caminho (compras não recebidas) ---------- */
+  aCaminho: function(){
+    var o = {lisas:{}, malhaKg:{}, dtf:{}, insumos:{}};
+    Log.d().compras.forEach(function(cp){
+      if(cp.recebido) return;
+      (cp.itens||[]).forEach(function(i){
+        if(i.tipo==='lisa') o.lisas[i.k] = (o.lisas[i.k]||0) + U.n(i.qtd);
+        else if(i.tipo==='malha') o.malhaKg[i.k] = (o.malhaKg[i.k]||0) + U.n(i.qtd);
+        else if(i.tipo==='dtf') o.dtf[i.k] = (o.dtf[i.k]||0) + U.n(i.qtd);
+        else if(i.tipo==='insumo') o.insumos[i.k] = (o.insumos[i.k]||0) + U.n(i.qtd);
+      });
+    });
+    return o;
+  },
+
+  /* ---------- reposição sugerida ---------- */
+  reposicao: function(){
+    var x = Log.d(), c = x.config, e = x.estoque, r = Log.ritmo(), pc = Log.participacao(), cam = Log.aCaminho();
+    var semana = r.camDia*7, alvoTotal = semana*U.n(c.semanasAlvo,3);
+    /* pedidos que ficaram sem camiseta lisa entram como prioridade */
+    var faltas = {};
+    Log.pedidosAbertos().forEach(function(p){ if(p.status==='novo'){ Log.checar(p).falta.forEach(function(f){ faltas[f.k]=(faltas[f.k]||0)+f.qtd; }); } });
+    var linhas = Log.variacoes().map(function(v){
+      var alvo = Math.ceil(alvoTotal*pc[v.k]);
+      var tem = U.n(e.lisas[v.k]), vem = U.n(cam.lisas[v.k]);
+      var dia = r.camDia*pc[v.k];
+      var cobertura = dia>0 ? (tem)/dia : null;
+      var prec = Math.max(0, alvo + U.n(faltas[v.k]) - tem - vem);
+      return {k:v.k, cor:v.cor, mod:v.mod, tam:v.tam, alvo:alvo, tem:tem, vem:vem, falta:U.n(faltas[v.k]), dia:dia, cobertura:cobertura, sugerido:prec};
+    });
+    var totalSug = linhas.reduce(function(s,l){ return s+l.sugerido; },0);
+    var cap = U.n(c.capacidadeSemana);
+    if(cap>0 && totalSug>cap){
+      /* prioriza faltas e menor cobertura */
+      var ord = linhas.slice().sort(function(a,b){ return (b.falta-a.falta) || ((a.cobertura===null?1e9:a.cobertura)-(b.cobertura===null?1e9:b.cobertura)); });
+      var resta = cap;
+      ord.forEach(function(l){ l.producao = 0; });
+      ord.forEach(function(l){ var q = Math.min(l.falta, l.sugerido, resta); l.producao += q; resta -= q; });
+      var restoPed = ord.map(function(l){ return l.sugerido - l.producao; });
+      var somaR = restoPed.reduce(function(s,v){ return s+v; },0);
+      if(resta>0 && somaR>0){
+        var w = {}; ord.forEach(function(l,i){ w[i]=restoPed[i]; });
+        var dist = Log.distribuir(resta, w);
+        ord.forEach(function(l,i){ l.producao += Math.min(restoPed[i], dist[i]||0); });
+      }
+    } else linhas.forEach(function(l){ l.producao = l.sugerido; });
+    var producao = linhas.reduce(function(s,l){ return s+l.producao; },0);
+
+    /* malha */
+    var malha = x.cores.map(function(co){
+      var pecas = linhas.filter(function(l){ return l.cor.id===co.id; }).reduce(function(s,l){ return s+l.producao; },0);
+      var kg = pecas*U.n(c.kgPorPeca);
+      var tem = U.n(e.malhaKg[co.id]) + U.n(cam.malhaKg[co.id]);
+      var faltaKg = Math.max(0, kg - tem);
+      var rolos = faltaKg>0 ? Math.ceil(faltaKg/U.n(c.kgRolo,20)) : 0;
+      var preco = U.n(co.clara===false ? c.precoKgEscuro : c.precoKgClaro);
+      return {cor:co, pecas:pecas, kg:kg, tem:tem, rolos:rolos, kgCompra:rolos*U.n(c.kgRolo,20), valor:rolos*U.n(c.kgRolo,20)*preco};
+    });
+
+    /* DTF das estampas líderes (SP) */
+    var est = Log.estampas().slice(0, U.n(c.estampasSP,8));
+    var dtf = est.map(function(s){
+      var alvo = Math.ceil(s.part*r.camDia*7*U.n(c.semanasDtf,2));
+      var tem = e.dtf.filter(function(d){ return d.estampa===s.estampa && d.cor===s.cor; }).reduce(function(t,d){ return t+U.n(d.qty); },0);
+      var vem = U.n(cam.dtf[s.estampa+'|'+s.cor]);
+      return {estampa:s.estampa, cor:s.cor, part:s.part, alvo:alvo, tem:tem, vem:vem, pedir:Math.max(0, alvo-tem-vem)};
+    });
+    var dtfPedir = dtf.reduce(function(s,d){ return s+d.pedir; },0);
+    var metros = dtfPedir ? Math.ceil(dtfPedir/U.n(c.dtfPorMetro,8)) : 0;
+    var espaco = metros*U.n(c.dtfPorMetro,8) - dtfPedir;
+    if(espaco>0 && dtf.length){ var wd={}; dtf.forEach(function(d,i){ wd[i]=d.part; }); var dd=Log.distribuir(espaco, wd); dtf.forEach(function(d,i){ d.pedir += dd[i]||0; }); }
+
+    /* insumos: 1 semana para os de D+1, 2 semanas para o resto */
+    var I = e.insumos, pd = r.pedDia, ci = r.camDia;
+    var ins = [
+      {k:'capelinha', nome:'Capelinha', alvo:Math.ceil(pd*7), preco:U.n(c.kit)/2, lote:1, prazo:c.prazoKits, tipoCompra:'kits'},
+      {k:'sacolinha', nome:'Sacolinha', alvo:Math.ceil(pd*7), preco:U.n(c.kit)/2, lote:1, prazo:c.prazoKits, tipoCompra:'kits'},
+      {k:'saqT', nome:'Saquinho transparente', alvo:Math.ceil(ci*14), preco:U.n(c.saqT), lote:1, prazo:c.prazoEmbalagem, tipoCompra:'embalagem'},
+      {k:'saqP', nome:'Saquinho preto', alvo:Math.ceil(pd*14), preco:U.n(c.saqP), lote:1, prazo:c.prazoEmbalagem, tipoCompra:'embalagem'},
+      {k:'etiquetas', nome:'Etiquetas de envio', alvo:Math.ceil(pd*21), preco:U.div(U.n(c.etiquetaPacote),U.n(c.etiquetasPacote)), lote:U.n(c.etiquetasPacote,1800), prazo:c.prazoEtiquetas, tipoCompra:'embalagem', precoLote:U.n(c.etiquetaPacote), nomeLote:'pacote'},
+      {k:'cheirinho', nome:'Cheirinho', alvo:Math.ceil(pd*21), preco:U.div(U.n(c.cheirinho),U.n(c.cheirinhoRende)), lote:U.n(c.cheirinhoRende,500), prazo:c.prazoEmbalagem, tipoCompra:'embalagem', precoLote:U.n(c.cheirinho), nomeLote:'frasco', unidade:'pedidos'}
+    ].map(function(i){
+      i.tem = U.n(I[i.k]); i.vem = U.n(cam.insumos[i.k]);
+      var falta = Math.max(0, i.alvo - i.tem - i.vem);
+      i.lotes = falta>0 ? Math.ceil(falta/i.lote) : 0;
+      i.pedir = i.lotes*i.lote;
+      i.valor = i.precoLote ? i.lotes*i.precoLote : i.pedir*i.preco;
+      return i;
+    });
+
+    var valorOficina = producao*(U.n(c.corte)+U.n(c.costura));
+    return {ritmo:r, participacao:pc, linhas:linhas, producao:producao, totalSugerido:totalSug, cap:cap,
+      malha:malha, dtf:dtf, metros:metros, dtfPedir:dtf.reduce(function(s,d){ return s+d.pedir; },0), insumos:ins,
+      valorMalha: malha.reduce(function(s,m){ return s+m.valor; },0), valorOficina:valorOficina,
+      valorDtf: metros*U.n(c.dtfMetro), valorInsumos: ins.reduce(function(s,i){ return s+i.valor; },0)};
+  },
+
+  distribuir: function(total, pesos){
+    var ks = Object.keys(pesos), soma = ks.reduce(function(s,k){ return s+U.n(pesos[k]); },0), out = {};
+    if(!total || !soma){ ks.forEach(function(k){ out[k]=0; }); return out; }
+    var usado = 0, rest = [];
+    ks.forEach(function(k){ var ex = total*U.n(pesos[k])/soma; out[k]=Math.floor(ex); usado+=out[k]; rest.push([k, ex-out[k]]); });
+    rest.sort(function(a,b){ return b[1]-a[1]; });
+    for(var i=0;i<total-usado;i++) out[rest[i%rest.length][0]]++;
+    return out;
+  },
+
+  /* ---------- compras ---------- */
+  TIPOS: {
+    malha:{nome:'Malha', grupo:'cmv', categoria:'Produção terceirizada'},
+    corte:{nome:'Cortador', grupo:'cmv', categoria:'Produção terceirizada'},
+    costura:{nome:'Costureiras', grupo:'cmv', categoria:'Produção terceirizada'},
+    dtf:{nome:'DTF', grupo:'cmv', categoria:'Estampa'},
+    kits:{nome:'Capelinha e sacolinha', grupo:'embalagem', categoria:'Brinde'},
+    embalagem:{nome:'Embalagens', grupo:'embalagem', categoria:'Embalagem de envio'},
+    outro:{nome:'Outro', grupo:'outros', categoria:'Não classificado'}
+  },
+
+  novaCompra: function(o){
+    var cp = Object.assign({id:U.id(), criado:U.hoje(), data:U.hoje(), tipo:'outro', descricao:'', valor:0,
+      vencimento:U.hoje(), chegada:U.hoje(), itens:[], pago:false, recebido:false}, o);
+    Log.d().compras.push(cp);
+    return cp;
+  },
+
+  gerarCompras: function(rep){
+    var c = Log.cfg(), hoje = U.hoje(), criadas = 0;
+    var envio = Log.somaUteis(hoje, 0);
+    rep.malha.forEach(function(m){
+      if(!m.rolos) return;
+      Log.novaCompra({tipo:'malha', descricao:'Malha '+m.cor.nome.toLowerCase()+': '+m.rolos+' rolo'+(m.rolos>1?'s':'')+' ('+m.kgCompra+' kg)',
+        valor:m.valor, vencimento:hoje, chegada:Log.somaUteis(envio, U.n(c.prazoMalha)),
+        itens:[{tipo:'malha', k:m.cor.id, qtd:m.kgCompra}]});
+      criadas++;
+    });
+    if(rep.producao>0){
+      var inicioCorte = Log.somaUteis(envio, U.n(c.prazoMalha));
+      var fimCorte = Log.somaUteis(inicioCorte, U.n(c.prazoCorte));
+      var fimCostura = Log.somaUteis(fimCorte, U.n(c.prazoCostura));
+      var itens = rep.linhas.filter(function(l){ return l.producao>0; }).map(function(l){ return {tipo:'lisa', k:l.k, qtd:l.producao}; });
+      /* a malha sai do estoque quando vai para o cortador */
+      Log.novaCompra({tipo:'corte', descricao:'Corte de '+rep.producao+' peças', valor:rep.producao*U.n(c.corte),
+        vencimento:fimCorte, chegada:fimCorte, itens:[], consomeMalha: rep.malha.map(function(m){ return {cor:m.cor.id, kg:m.kg}; })});
+      Log.novaCompra({tipo:'costura', descricao:'Costura de '+rep.producao+' camisetas lisas', valor:rep.producao*U.n(c.costura),
+        vencimento:fimCostura, chegada:fimCostura, itens:itens});
+      criadas += 2;
+    }
+    var dtfItens = rep.dtf.filter(function(d){ return d.pedir>0; }).map(function(d){ return {tipo:'dtf', k:d.estampa+'|'+d.cor, qtd:d.pedir}; });
+    if(rep.metros>0 && dtfItens.length){
+      Log.novaCompra({tipo:'dtf', descricao:'DTF de São Paulo: '+rep.metros+' metro'+(rep.metros>1?'s':''), valor:rep.valorDtf,
+        vencimento:hoje, chegada:Log.somaDias(hoje, U.n(c.prazoDtf)), itens:dtfItens});
+      criadas++;
+    }
+    var porTipo = {};
+    rep.insumos.forEach(function(i){
+      if(!i.pedir) return;
+      var t = i.tipoCompra; if(!porTipo[t]) porTipo[t] = {valor:0, itens:[], nomes:[], prazo:0};
+      porTipo[t].valor += i.valor; porTipo[t].itens.push({tipo:'insumo', k:i.k, qtd:i.pedir});
+      porTipo[t].nomes.push(i.nomeLote ? i.lotes+' '+i.nomeLote+(i.lotes>1?'s':'')+' de '+i.nome.toLowerCase() : i.pedir+' '+i.nome.toLowerCase()+(i.pedir>1&&!/s$/.test(i.nome)?'s':''));
+      porTipo[t].prazo = Math.max(porTipo[t].prazo, U.n(i.prazo));
+    });
+    Object.keys(porTipo).forEach(function(t){
+      var x = porTipo[t];
+      Log.novaCompra({tipo:t, descricao:(t==='kits'?'Brindes: ':'Embalagens: ')+x.nomes.join(', '), valor:x.valor,
+        vencimento:hoje, chegada:x.prazo ? Log.somaUteis(hoje, x.prazo) : hoje, itens:x.itens});
+      criadas++;
+    });
+    Log.salvar(criadas ? criadas+' compra(s) criada(s). Os pagamentos já estão na Agenda.' : 'Nada para comprar agora');
+    return criadas;
+  },
+
+  getCompra: function(id){ return Log.d().compras.find(function(x){ return x.id===id; }); },
+
+  /* no Financeiro: vira lançamento só se o grupo estiver em modo manual */
+  viraLancamento: function(cp){
+    var t = Log.TIPOS[cp.tipo] || Log.TIPOS.outro;
+    if(t.grupo==='outros') return true;
+    return Calc.cfg().modo[t.grupo] !== 'auto';
+  },
+
+  pagar: function(id, data){
+    var cp = Log.getCompra(id); if(!cp || cp.pago) return;
+    cp.pago = true; cp.pagoEm = data || U.hoje();
+    if(Log.viraLancamento(cp)){
+      var t = Log.TIPOS[cp.tipo] || Log.TIPOS.outro;
+      var lid = U.id();
+      Store.dados.lancamentos.push({
+        id:lid, data:cp.pagoEm, tipo:'despesa', grupo:t.grupo, categoria:t.categoria,
+        descricao:cp.descricao, canal:'', referencia:'', valor:U.n(cp.valor), freteCobrado:0, valorBruto:0, desconto:0, uf:'',
+        pedidos:0, camisetas:0, pagamento:'', status:'pago', obs:'Compra da Logística',
+        origem:'logistica', externoId:cp.id, criadoEm:new Date().toISOString()
+      });
+      cp.lancId = lid;
+    }
+    Log.salvar('Pagamento registrado');
+  },
+  desfazerPagamento: function(id){
+    var cp = Log.getCompra(id); if(!cp) return;
+    cp.pago = false; cp.pagoEm = null;
+    if(cp.lancId){ Store.dados.lancamentos = Store.dados.lancamentos.filter(function(l){ return l.id!==cp.lancId; }); cp.lancId = null; }
+    Log.salvar('Pagamento desfeito');
+  },
+
+  receber: function(id){
+    var cp = Log.getCompra(id); if(!cp || cp.recebido) return;
+    var e = Log.d().estoque;
+    (cp.itens||[]).forEach(function(i){
+      if(i.tipo==='lisa') e.lisas[i.k] = U.n(e.lisas[i.k]) + U.n(i.qtd);
+      else if(i.tipo==='malha') e.malhaKg[i.k] = U.n(e.malhaKg[i.k]) + U.n(i.qtd);
+      else if(i.tipo==='dtf') Log.addDtf(i.k.split('|')[0], i.k.split('|')[1], U.n(i.qtd));
+      else if(i.tipo==='insumo') e.insumos[i.k] = U.n(e.insumos[i.k]) + U.n(i.qtd);
+    });
+    if(cp.consomeMalha){
+      cp.malhaUsada = [];
+      cp.consomeMalha.forEach(function(m){ var q = Math.min(U.n(e.malhaKg[m.cor]), U.n(m.kg)); e.malhaKg[m.cor] = Math.round((U.n(e.malhaKg[m.cor]) - q)*10)/10; cp.malhaUsada.push({cor:m.cor, kg:q}); });
+    }
+    cp.recebido = true; cp.recebidoEm = U.hoje();
+    Log.salvar('Recebido e somado ao estoque');
+  },
+  desfazerRecebimento: function(id){
+    var cp = Log.getCompra(id); if(!cp || !cp.recebido) return;
+    var e = Log.d().estoque;
+    (cp.itens||[]).forEach(function(i){
+      if(i.tipo==='lisa') e.lisas[i.k] = Math.max(0, U.n(e.lisas[i.k]) - U.n(i.qtd));
+      else if(i.tipo==='malha') e.malhaKg[i.k] = Math.max(0, U.n(e.malhaKg[i.k]) - U.n(i.qtd));
+      else if(i.tipo==='dtf') Log.addDtf(i.k.split('|')[0], i.k.split('|')[1], -U.n(i.qtd));
+      else if(i.tipo==='insumo') e.insumos[i.k] = Math.max(0, U.n(e.insumos[i.k]) - U.n(i.qtd));
+    });
+    (cp.malhaUsada||[]).forEach(function(m){ e.malhaKg[m.cor] = U.n(e.malhaKg[m.cor]) + U.n(m.kg); });
+    e.dtf = e.dtf.filter(function(x){ return U.n(x.qty)>0; });
+    cp.recebido = false; cp.recebidoEm = null; cp.malhaUsada = null;
+    Log.salvar('Recebimento desfeito');
+  },
+  excluirCompra: function(id){
+    var cp = Log.getCompra(id); if(!cp) return;
+    if(cp.recebido) Log.desfazerRecebimento(id);
+    if(cp.lancId) Store.dados.lancamentos = Store.dados.lancamentos.filter(function(l){ return l.id!==cp.lancId; });
+    Log.d().compras = Log.d().compras.filter(function(x){ return x.id!==id; });
+    Log.salvar('Compra excluída');
+  },
+
+  /* ---------- agenda do Financeiro ---------- */
+  ocorrencias: function(ym){
+    var hoje = U.hoje(), out = [];
+    Log.d().compras.forEach(function(cp){
+      var data = cp.pago ? (cp.pagoEm||cp.vencimento) : cp.vencimento;
+      if(U.ym(data)!==ym || !U.n(cp.valor)) return;
+      var t = Log.TIPOS[cp.tipo] || Log.TIPOS.outro;
+      out.push({
+        chave:'g:'+cp.id, origem:'logistica', refId:cp.id, ym:ym,
+        nome:'Logística: '+cp.descricao, valor:U.n(cp.valor), data:data, tipo:'despesa',
+        grupo:t.grupo, categoria:t.categoria, recorrente:false,
+        status: cp.pago ? 'pago' : (data<hoje ? 'atrasado' : 'aberto'), obs:''
+      });
+    });
+    return out;
+  },
+
+  /* ---------- indicadores do mês ---------- */
+  indicadores: function(ym){
+    var ps = Log.d().pedidos.filter(function(p){ return U.ym(p.data)===ym && !p.historico; });
+    var env = ps.filter(function(p){ return p.status==='enviado' && p.enviadoEm; });
+    var noPrazo = env.filter(function(p){ return p.enviadoEm <= Log.prazo(p); });
+    var tempos = env.map(function(p){ return Log.uteisEntre(p.data, p.enviadoEm); });
+    var hoje = U.hoje();
+    var atrasados = ps.filter(function(p){ return p.status!=='enviado' && Log.prazo(p) < hoje; });
+    var comFalta = ps.filter(function(p){ return p.faltouEm || (p.status==='novo' && p.falta && p.falta.length); });
+    var local = ps.filter(function(p){ return p.dtfLocal && p.dtfLocal.length; });
+    var compras = Log.d().compras.filter(function(cp){ return U.ym(cp.vencimento)===ym || (cp.pagoEm && U.ym(cp.pagoEm)===ym); });
+    return {
+      pedidos: ps.length, enviados: env.length, noPrazo: noPrazo.length,
+      pctPrazo: env.length ? noPrazo.length/env.length*100 : null,
+      tempoMedio: tempos.length ? tempos.reduce(function(s,v){ return s+v; },0)/tempos.length : null,
+      atrasados: atrasados.length, comFalta: comFalta.length, dtfLocal: local.length,
+      comprasPagas: compras.filter(function(c){ return c.pago; }).reduce(function(s,c){ return s+U.n(c.valor); },0),
+      comprasAbertas: compras.filter(function(c){ return !c.pago; }).reduce(function(s,c){ return s+U.n(c.valor); },0)
+    };
+  }
+};
+
+/* marca pedidos que ficaram sem estoque (para o indicador de ruptura) */
+(function(){
+  var orig = Log.consumir;
+  Log.consumir = function(p, forcar){
+    var ok = orig(p, forcar);
+    if(!ok && !p.faltouEm) p.faltouEm = U.hoje();
+    return ok;
+  };
+})();
+
+/* ---------- Agenda do Financeiro recebe as compras da Logística ---------- */
+(function(){
+  var ocorr = Agenda.ocorrencias, quitar = Agenda.quitar, desfazer = Agenda.desfazer;
+  Agenda.ocorrencias = function(ym){
+    var out = ocorr(ym);
+    try{ out = out.concat(Log.ocorrencias(ym)); }catch(e){ console.error(e); }
+    return out.sort(function(a,b){ return a.data<b.data?-1:(a.data>b.data?1:0); });
+  };
+  Agenda.quitar = function(oc){
+    if(oc && oc.origem==='logistica'){ Log.pagar(oc.refId); return; }
+    return quitar(oc);
+  };
+  Agenda.desfazer = function(oc){
+    if(oc && oc.origem==='logistica'){ Log.desfazerPagamento(oc.refId); return; }
+    return desfazer(oc);
+  };
+})();
+
+/* ============ TELA LOGÍSTICA ============ */
+Views.logistica = function(){
+  var a = UI.aba;
+  var h = '<div id="logRoot">';
+  if(a==='estoque') h += Views.logEstoque();
+  else if(a==='reposicao') h += Views.logReposicao();
+  else if(a==='compras') h += Views.logCompras();
+  else if(a==='indicadores') h += Views.logIndicadores();
+  else if(a==='ajustes') h += Views.logAjustes();
+  else h += Views.logExpedicao();
+  return h + '</div>';
+};
+
+Views._logNum = function(caminho, valor, op){
+  op = op||{};
+  return '<input type="number" class="lg-num" step="'+(op.step||'any')+'" min="0" data-lgset="'+U.esc(caminho)+'" value="'+(valor===undefined||valor===null?'':valor)+'" aria-label="'+U.esc(op.rot||caminho)+'"'+(op.w?' style="width:'+op.w+'px"':'')+'>';
+};
+
+Views.logExpedicao = function(){
+  var x = Log.d(), hoje = U.hoje();
+  var abertos = Log.pedidosAbertos().sort(function(a,b){ return a.data<b.data?-1:1; });
+  var enviadosHoje = x.pedidos.filter(function(p){ return p.status==='enviado' && p.enviadoEm===hoje && !p.historico; });
+  var atras = abertos.filter(function(p){ return Log.prazo(p) < hoje; });
+  var venceHoje = abertos.filter(function(p){ return Log.prazo(p) === hoje; });
+  var semLisa = abertos.filter(function(p){ return p.status==='novo' && Log.checar(p).falta.length; });
+  var h = '';
+  var frase = atras.length ? atras.length+' pedido(s) passaram do prazo de envio.'
+    : (venceHoje.length ? venceHoje.length+' pedido(s) precisam sair hoje.' : (abertos.length ? 'Tudo dentro do prazo.' : 'Nenhum pedido esperando envio.'));
+  h += '<section class="veredito '+(atras.length?'critico':(venceHoje.length||semLisa.length?'atencao':''))+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+U.esc(frase)+'</div>'+
+    '<div class="veredito-apoio">Prazo de envio: até '+U.n(Log.cfg().prazoEnvio)+' dias úteis depois da compra. '+
+      (semLisa.length ? semLisa.length+' pedido(s) esperam camiseta lisa e entram na próxima reposição.' : 'Separar tira as camisetas, o DTF e os brindes do estoque.')+'</div>'+
+  '</section>';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'A separar', val:U.num(abertos.filter(function(p){ return p.status==='novo'; }).length), destaque:true})+
+    UI.kpi({rot:'Prontos para postar', val:U.num(abertos.filter(function(p){ return p.status==='pronto'||p.status==='separado'; }).length), pequeno:true})+
+    UI.kpi({rot:'Atrasados', val:U.num(atras.length), pequeno:true, classe:atras.length?'neg':'', pt:atras.length?'cr':'ok'})+
+    UI.kpi({rot:'Enviados hoje', val:U.num(enviadosHoje.length), pequeno:true})+
+  '</div>';
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<div style="flex:1;min-width:200px"><div class="cartao-tit">Trazer pedidos</div><div class="cartao-sub" style="margin:0">Pela integração com a Nuvemshop ou pelo CSV exportado em Vendas. Pedidos já existentes são atualizados.</div></div>'+
+    '<button class="btn sm" data-lg="sinc">Buscar na Nuvemshop</button>'+
+    '<button class="btn sec sm" data-lg="csv">Importar CSV</button>'+
+    '<input type="file" id="lgCsv" accept=".csv,text/csv" style="display:none">'+
+  '</div></div>';
+  if(!abertos.length){
+    h += UI.vazio('Nenhum pedido em aberto', 'Quando os pedidos chegarem, eles aparecem aqui na ordem de compra, com o prazo de envio de cada um.');
+  } else {
+    h += '<div class="tabela-env"><table><thead><tr><th>Pedido</th><th>Camisetas</th><th class="c">Envio até</th><th class="c">Situação</th><th></th></tr></thead><tbody>'+
+      abertos.map(function(p){
+        var pz = Log.prazo(p), ch = p.status==='novo' ? Log.checar(p) : null;
+        var cls = pz<hoje ? 'fal' : (pz===hoje ? 'pen' : 'pag');
+        var itens = (p.itens||[]).map(function(i){ return U.num(i.qty)+'× '+U.esc(i.estampa.toLowerCase())+' <span style="color:var(--texto-fraco)">'+U.esc(Log.nomeCor(i.cor).toLowerCase()+', '+(i.mod==='Baby look'?'baby look':'trad.')+' '+i.tam)+'</span>'; }).join('<br>') || '<span style="color:var(--texto-fraco)">sem camisetas identificadas</span>';
+        var aviso = '';
+        if(ch && ch.falta.length) aviso += '<div class="lg-aviso cr">Falta lisa: '+ch.falta.map(function(f){ return f.qtd+' '+U.esc(Log.nomeVar(f.k)); }).join(', ')+'</div>';
+        var dl = ch ? ch.dtfLocal : (p.dtfLocal||[]);
+        if(dl && dl.length) aviso += '<div class="lg-aviso at">DTF da cidade: '+dl.map(function(d){ return d.qtd+' '+U.esc(d.estampa.toLowerCase()); }).join(', ')+'</div>';
+        var prox = {novo:'separado', separado:'pronto', pronto:'enviado'}[p.status];
+        var rotProx = {separado:'Separar', pronto:'Estampado e embalado', enviado:'Postado'}[prox];
+        return '<tr><td style="white-space:nowrap"><b>#'+U.esc(p.numero)+'</b><div style="font-size:11.5px;color:var(--texto-fraco)">'+U.dataBr(p.data)+(p.cliente?' · '+U.esc(p.cliente):'')+(p.uf?' · '+U.esc(p.uf):'')+'</div></td>'+
+          '<td style="font-size:12.5px;line-height:1.5">'+itens+aviso+'</td>'+
+          '<td class="c" style="white-space:nowrap"><span class="etq '+cls+'">'+U.dataBr(pz).slice(0,5)+' '+U.diaSemana(pz)+'</span></td>'+
+          '<td class="c"><span class="etq '+(p.status==='novo'?'pag':'pen')+'">'+Log.statusNome[p.status]+'</span></td>'+
+          '<td class="c" style="white-space:nowrap">'+
+            (prox ? '<button class="btn sm" data-lg="status" data-id="'+U.esc(p.id)+'" data-st="'+prox+'">'+rotProx+'</button> ' : '')+
+            (p.status!=='novo' ? '<button class="btn-icone" title="Voltar para a separação" data-lg="status" data-id="'+U.esc(p.id)+'" data-st="novo">↺</button>' : '')+
+            '<button class="btn-icone" title="Excluir" data-lg="delPedido" data-id="'+U.esc(p.id)+'">✕</button>'+
+          '</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
+  var envRec = x.pedidos.filter(function(p){ return p.status==='enviado' && !p.historico; }).sort(function(a,b){ return (b.enviadoEm||'')<(a.enviadoEm||'')?-1:1; }).slice(0,8);
+  if(envRec.length){
+    h += '<div class="cartao" style="margin-top:12px"><div class="cartao-tit">Últimos enviados</div>'+
+      envRec.map(function(p){ var ok = p.enviadoEm<=Log.prazo(p);
+        return '<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #f1ece8;font-size:13px"><b>#'+U.esc(p.numero)+'</b><span style="color:var(--texto-fraco)">enviado '+U.dataBr(p.enviadoEm)+'</span>'+
+          '<span class="etq '+(ok?'rec':'fal')+'" style="margin-left:auto">'+(ok?'no prazo':'atrasado')+'</span>'+
+          '<button class="btn-icone" title="Desfazer envio" data-lg="status" data-id="'+U.esc(p.id)+'" data-st="pronto">↺</button></div>'; }).join('')+'</div>';
+  }
+  return h;
+};
+
+Views.logEstoque = function(){
+  var x = Log.d(), e = x.estoque, r = Log.ritmo(), pc = Log.participacao(), v = Log.valorEstoque(), cam = Log.aCaminho();
+  var totLisas = Object.keys(e.lisas).reduce(function(s,k){ return s+U.n(e.lisas[k]); },0);
+  var cobertura = r.camDia>0 ? totLisas/r.camDia : null;
+  var h = '';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Camisetas lisas', val:U.num(totLisas), destaque:true, nota: cobertura!==null ? 'dá para '+U.num(cobertura)+' dias de venda' : 'sem vendas para medir'})+
+    UI.kpi({rot:'Dinheiro em estoque', val:U.brl(v.total,0), pequeno:true, ajuda:'Lisas, malha, DTF e insumos pelo custo da Logística. É dinheiro que já saiu e ainda não virou venda.', nota:'lisas '+U.brl(v.lisas,0)})+
+    UI.kpi({rot:'Ritmo de venda', val:U.num(r.camDia,1)+' cam./dia', pequeno:true, nota: r.fonte==='meta' ? 'pela meta do mês' : 'últimos 30 dias do Financeiro'})+
+    UI.kpi({rot:'DTF guardado', val:U.num(e.dtf.reduce(function(s,d){ return s+U.n(d.qty); },0)), pequeno:true, nota:e.dtf.length+' estampa(s)'})+
+  '</div>';
+  /* grade de lisas */
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
+    '<div class="cartao-tit">Camisetas lisas</div><div class="cartao-sub">Digite a contagem para corrigir. A cor mostra quantos dias o estoque dura: vermelho menos de 7, âmbar menos de '+U.num(U.n(Log.cfg().semanasAlvo)*7)+'.</div></div>'+
+    '<button class="btn sec sm" data-lg="zerarContagem">Registrar contagem de hoje</button></div>';
+  x.cores.forEach(function(co){
+    h += '<div class="tabela-env" style="margin-top:10px"><table><thead><tr><th>'+U.esc(co.nome)+'</th>'+x.tamanhos.map(function(t){ return '<th class="c">'+U.esc(t)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      x.mods.map(function(m){
+        return '<tr><td style="white-space:nowrap">'+U.esc(m)+'</td>'+x.tamanhos.map(function(t){
+          var k = Log.chave(co.id,m,t), tem = U.n(e.lisas[k]), dia = r.camDia*pc[k];
+          var dias = dia>0 ? tem/dia : null;
+          var n = dias===null ? '' : (dias<7 ? 'cr' : (dias<U.n(Log.cfg().semanasAlvo)*7 ? 'at' : 'ok'));
+          return '<td class="c"><div class="lg-cel '+n+'">'+Views._logNum('estoque.lisas.'+k, tem, {step:1, w:62, rot:Log.nomeVar(k)})+
+            '<div class="lg-dias">'+(dias===null?'—':U.num(dias)+' dias')+(cam.lisas[k]?' · +'+cam.lisas[k]+' vindo':'')+'</div></div></td>';
+        }).join('')+'</tr>';
+      }).join('')+'</tbody></table></div>';
+  });
+  h += '</div>';
+
+  h += '<div class="grade g2" style="align-items:start">';
+  /* DTF */
+  var lideres = Log.estampas().slice(0, 12);
+  h += '<div class="cartao"><div class="cartao-tit">DTF guardado</div><div class="cartao-sub">As estampas líderes ficam guardadas. As outras são pedidas na cidade quando o pedido chega.</div>';
+  h += '<div class="tabela-env"><table><thead><tr><th>Estampa</th><th>Cor</th><th class="r">Qtd</th><th></th></tr></thead><tbody>'+
+    (e.dtf.length ? e.dtf.map(function(d, i){
+      return '<tr><td>'+U.esc(d.estampa)+'</td><td>'+U.esc(Log.nomeCor(d.cor))+'</td><td class="r">'+Views._logNum('estoque.dtf.'+i+'.qty', d.qty, {step:1, w:62})+'</td>'+
+        '<td class="c"><button class="btn-icone" data-lg="delDtf" data-i="'+i+'">✕</button></td></tr>';
+    }).join('') : '<tr><td colspan="4" style="color:var(--texto-fraco)">Nenhum DTF guardado.</td></tr>')+
+  '</tbody></table></div>'+
+  '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:flex-end">'+
+    '<div class="campo" style="flex:1;min-width:150px;margin:0"><label>Estampa</label><input type="text" id="lgDtfEst" list="lgEstampas"></div>'+
+    '<div class="campo" style="margin:0"><label>Cor</label><select id="lgDtfCor">'+x.cores.map(function(c){ return '<option value="'+c.id+'">'+U.esc(c.nome)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="campo" style="margin:0;width:80px"><label>Qtd</label><input type="number" id="lgDtfQtd" min="1" step="1"></div>'+
+    '<button class="btn sec sm" data-lg="addDtf">Adicionar</button></div>'+
+    '<datalist id="lgEstampas">'+lideres.map(function(s){ return '<option value="'+U.esc(s.estampa)+'">'; }).join('')+'</datalist></div>';
+  /* insumos e malha */
+  var I = e.insumos, pd = r.pedDia;
+  var dias = function(q, porDia){ return porDia>0 ? U.num(q/porDia)+' dias' : '—'; };
+  h += '<div class="cartao"><div class="cartao-tit">Insumos e malha</div><div class="cartao-sub">Cada pedido usa 1 capelinha, 1 sacolinha, 1 saquinho preto, 1 etiqueta e 1 borrifada de cheirinho, e 1 saquinho transparente por camiseta.</div>'+
+    '<div class="tabela-env"><table><tbody>'+
+    [['capelinha','Capelinha',pd],['sacolinha','Sacolinha',pd],['saqT','Saquinho transparente',r.camDia],['saqP','Saquinho preto',pd],['etiquetas','Etiquetas de envio',pd],['cheirinho','Cheirinho (pedidos que ainda rende)',pd]]
+      .map(function(z){ return '<tr><td>'+z[1]+'</td><td class="r">'+Views._logNum('estoque.insumos.'+z[0], I[z[0]], {step:1, w:80, rot:z[1]})+'</td><td class="r" style="color:var(--texto-fraco);white-space:nowrap">'+dias(U.n(I[z[0]]), z[2])+'</td></tr>'; }).join('')+
+    x.cores.map(function(co){ return '<tr><td>Malha '+U.esc(co.nome.toLowerCase())+' (kg)</td><td class="r">'+Views._logNum('estoque.malhaKg.'+co.id, e.malhaKg[co.id], {w:80})+'</td><td class="r" style="color:var(--texto-fraco);white-space:nowrap">'+U.num(U.n(e.malhaKg[co.id])/U.n(Log.cfg().kgPorPeca,0.2))+' peças</td></tr>'; }).join('')+
+    '</tbody></table></div></div>';
+  h += '</div>';
+  if(x.contagens.length){
+    h += '<div class="cartao" style="margin-top:12px"><div class="cartao-tit">Contagens registradas</div>'+
+      x.contagens.slice(-6).reverse().map(function(c){ return '<div style="font-size:13px;padding:4px 0">'+U.dataBr(c.data)+': '+U.num(c.lisas)+' lisas, '+U.brl(c.valor,0)+' em estoque</div>'; }).join('')+'</div>';
+  }
+  return h;
+};
+
+Views.logReposicao = function(){
+  var rep = Log.reposicao(), c = Log.cfg(), r = rep.ritmo;
+  var h = '';
+  var total = rep.valorMalha + rep.valorOficina + rep.valorDtf + rep.valorInsumos;
+  h += '<section class="veredito '+(rep.totalSugerido>rep.cap&&rep.cap>0?'atencao':'')+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+(rep.producao ? 'Produzir '+U.num(rep.producao)+' camisetas lisas nesta reposição.' : 'O estoque de lisas está no alvo.')+'</div>'+
+    '<div class="veredito-apoio">Alvo de '+U.num(c.semanasAlvo)+' semanas de venda ('+U.num(r.camDia*7*U.n(c.semanasAlvo))+' camisetas), com ritmo de '+U.num(r.camDia,1)+' camisetas por dia '+
+      (r.fonte==='meta' ? 'pela meta do mês.' : 'nos últimos 30 dias do Financeiro.')+
+      (rep.totalSugerido>rep.cap && rep.cap>0 ? ' A oficina faz '+U.num(rep.cap)+' por semana; faltaram '+U.num(rep.totalSugerido-rep.cap)+' para a próxima.' : '')+
+      ' Total desta reposição: '+U.brl(total,0)+'.</div>'+
+  '</section>';
+  if(r.semVendas) h += '<div class="aviso">Ainda não há vendas nos últimos 30 dias no Financeiro. A sugestão usa a meta de pedidos do mês.</div>';
+  if(!r.camDia) h += '<div class="aviso">Sem vendas nos últimos 30 dias e sem meta de pedidos no mês. Cadastre a meta em Planejamento, ou mude a base em Ajustes da Logística.</div>';
+  if(rep.participacao._fonte==='grade') h += '<div class="info" style="margin-bottom:12px;font-size:12.5px">A divisão por cor, modelo e tamanho usa a grade padrão. Com 40 camisetas nos pedidos importados, ela passa a usar as vendas reais.</div>';
+
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Malha', val:U.brl(rep.valorMalha,0), pequeno:true, nota:rep.malha.filter(function(m){ return m.rolos; }).map(function(m){ return m.rolos+' rolo(s) '+m.cor.nome.toLowerCase(); }).join(', ')||'tem o suficiente'})+
+    UI.kpi({rot:'Cortador e costureiras', val:U.brl(rep.valorOficina,0), pequeno:true, nota:U.num(rep.producao)+' peças, pagas na entrega'})+
+    UI.kpi({rot:'DTF de São Paulo', val:U.brl(rep.valorDtf,0), pequeno:true, nota:rep.metros+' metro(s), '+U.num(rep.dtfPedir)+' estampas'})+
+    UI.kpi({rot:'Brindes e embalagens', val:U.brl(rep.valorInsumos,0), pequeno:true})+
+  '</div>';
+
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
+    '<div class="cartao-tit">Ordem de corte e costura</div><div class="cartao-sub" style="margin:0">Alvo menos o que tem e o que já está vindo. Pedidos esperando camiseta entram primeiro.</div></div>'+
+    '<button class="btn" data-lg="gerar"'+(total>0?'':' disabled')+'>Criar as compras</button></div>';
+  Log.d().cores.forEach(function(co){
+    var ls = rep.linhas.filter(function(l){ return l.cor.id===co.id; });
+    var tot = ls.reduce(function(s,l){ return s+l.producao; },0);
+    h += '<div class="tabela-env" style="margin-top:10px"><table><thead><tr><th>'+U.esc(co.nome)+' · '+U.num(tot)+'</th>'+Log.d().tamanhos.map(function(t){ return '<th class="c">'+U.esc(t)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+      Log.d().mods.map(function(m){
+        return '<tr><td>'+U.esc(m)+'</td>'+Log.d().tamanhos.map(function(t){
+          var l = ls.find(function(z){ return z.mod===m && z.tam===t; });
+          return '<td class="c"><b>'+(l.producao||'·')+'</b><div class="lg-dias">tem '+l.tem+(l.vem?' +'+l.vem:'')+' · alvo '+l.alvo+(l.falta?' · <span style="color:var(--rubro)">'+l.falta+' em espera</span>':'')+'</div></td>';
+        }).join('')+'</tr>';
+      }).join('')+'</tbody></table></div>';
+  });
+  h += '</div>';
+
+  h += '<div class="grade g2" style="align-items:start">';
+  h += '<div class="cartao"><div class="cartao-tit">DTF das estampas líderes</div><div class="cartao-sub">'+U.num(c.semanasDtf)+' semanas das '+U.num(c.estampasSP)+' estampas que mais saíram nos últimos 30 dias. O espaço que sobra no último metro vai para elas.</div>'+
+    (rep.dtf.length ? '<div class="tabela-env"><table><thead><tr><th>Estampa</th><th class="r">Vendas</th><th class="r">Tem</th><th class="r">Pedir</th></tr></thead><tbody>'+
+      rep.dtf.map(function(d){ return '<tr><td>'+U.esc(d.estampa)+' <span style="color:var(--texto-fraco)">'+U.esc(Log.nomeCor(d.cor).toLowerCase())+'</span></td><td class="r">'+U.pct(d.part*100,0)+'</td><td class="r">'+d.tem+(d.vem?' +'+d.vem:'')+'</td><td class="r"><b>'+d.pedir+'</b></td></tr>'; }).join('')+
+      '</tbody></table></div>' : '<div style="font-size:13px;color:var(--texto-fraco)">Importe pedidos em Expedição para saber quais estampas saem mais.</div>')+'</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Brindes e embalagens</div><div class="cartao-sub">Capelinha e sacolinha para 1 semana (chegam em D+1). Saquinhos para 2 semanas. Etiquetas e cheirinho para 3.</div>'+
+    '<div class="tabela-env"><table><thead><tr><th>Item</th><th class="r">Tem</th><th class="r">Alvo</th><th class="r">Pedir</th><th class="r">Valor</th></tr></thead><tbody>'+
+    rep.insumos.map(function(i){ return '<tr><td>'+U.esc(i.nome)+'</td><td class="r">'+U.num(i.tem)+(i.vem?' +'+U.num(i.vem):'')+'</td><td class="r">'+U.num(i.alvo)+'</td><td class="r"><b>'+(i.pedir ? (i.nomeLote ? i.lotes+' '+i.nomeLote : U.num(i.pedir)) : '·')+'</b></td><td class="r">'+(i.valor?U.brl(i.valor):'')+'</td></tr>'; }).join('')+
+    '</tbody></table></div></div>';
+  h += '</div>';
+  return h;
+};
+
+Views.logCompras = function(){
+  var x = Log.d(), hoje = U.hoje();
+  var lista = x.compras.slice().sort(function(a,b){ return (a.recebido===b.recebido) ? (a.chegada<b.chegada?-1:1) : (a.recebido?1:-1); });
+  var aPagar = x.compras.filter(function(c){ return !c.pago; }).reduce(function(s,c){ return s+U.n(c.valor); },0);
+  var vencido = x.compras.filter(function(c){ return !c.pago && c.vencimento<hoje; }).reduce(function(s,c){ return s+U.n(c.valor); },0);
+  var caminho = x.compras.filter(function(c){ return !c.recebido; }).length;
+  var atrasadas = x.compras.filter(function(c){ return !c.recebido && c.chegada<hoje; }).length;
+  var modoCmv = Calc.cfg().modo.cmv==='auto', modoEmb = Calc.cfg().modo.embalagem==='auto';
+  var h = '';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'A pagar', val:U.brl(aPagar,0), destaque:true, nota:'aparece na Agenda do Financeiro'})+
+    UI.kpi({rot:'Vencido', val:U.brl(vencido,0), pequeno:true, classe:vencido?'neg':'', pt:vencido?'cr':'ok'})+
+    UI.kpi({rot:'A caminho', val:U.num(caminho), pequeno:true, nota:'compras não recebidas'})+
+    UI.kpi({rot:'Chegada atrasada', val:U.num(atrasadas), pequeno:true, pt:atrasadas?'at':'ok'})+
+  '</div>';
+  h += '<div class="info" style="margin-bottom:12px;font-size:12.5px;line-height:1.55">'+
+    'Pagar aqui ou na Agenda dá no mesmo. '+
+    (modoCmv && modoEmb ? 'Como o Financeiro calcula o custo das camisetas e dos brindes sozinho a cada venda, as compras de estoque não viram lançamento, para o custo não ser contado duas vezes.'
+      : 'Compras de grupos em modo manual no Financeiro viram lançamento ao serem pagas'+(modoCmv?' (camisetas estão em modo automático e não viram)':'')+(modoEmb?' (brindes estão em modo automático e não viram)':'')+'.')+'</div>';
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="cartao-tit">Compras</div>'+
+    '<div class="cartao-sub" style="margin:0">Receber soma ao estoque. Ao receber o corte, a malha usada sai do estoque.</div></div>'+
+    '<button class="btn sec sm" data-lg="novaCompra">Nova compra</button></div></div>';
+  if(!lista.length) return h + UI.vazio('Nenhuma compra', 'Crie as compras pela aba Reposição, ou registre uma compra avulsa.');
+  h += '<div class="tabela-env"><table><thead><tr><th>Compra</th><th class="r">Valor</th><th class="c">Paga em</th><th class="c">Chega em</th><th class="c">Pagamento</th><th class="c">Recebimento</th><th></th></tr></thead><tbody>'+
+    lista.map(function(cp){
+      var t = Log.TIPOS[cp.tipo]||Log.TIPOS.outro;
+      return '<tr'+(cp.pago&&cp.recebido?' style="opacity:.6"':'')+'><td><b>'+U.esc(cp.descricao)+'</b><div style="font-size:11.5px;color:var(--texto-fraco)">'+U.esc(t.nome)+' · criada '+U.dataBr(cp.criado)+'</div></td>'+
+        '<td class="r">'+U.brl(cp.valor)+'</td>'+
+        '<td class="c" style="white-space:nowrap">'+U.dataBr(cp.pago?cp.pagoEm:cp.vencimento)+'</td>'+
+        '<td class="c" style="white-space:nowrap">'+U.dataBr(cp.recebido?cp.recebidoEm:cp.chegada)+'</td>'+
+        '<td class="c">'+(cp.pago ? '<button class="etq rec" data-lg="despagar" data-id="'+cp.id+'" title="Desfazer">pago</button>'
+          : '<button class="btn sm '+(cp.vencimento<hoje?'perigo':'sec')+'" data-lg="pagar" data-id="'+cp.id+'">Pagar</button>')+'</td>'+
+        '<td class="c">'+(cp.recebido ? '<button class="etq rec" data-lg="desreceber" data-id="'+cp.id+'" title="Desfazer">recebido</button>'
+          : '<button class="btn sm '+(cp.chegada<hoje?'perigo':'sec')+'" data-lg="receber" data-id="'+cp.id+'">Receber</button>')+'</td>'+
+        '<td class="c" style="white-space:nowrap"><button class="btn-icone" data-lg="editCompra" data-id="'+cp.id+'">✎</button><button class="btn-icone" data-lg="delCompra" data-id="'+cp.id+'">✕</button></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  return h;
+};
+
+Views.logIndicadores = function(){
+  var ym = UI.ym, ind = Log.indicadores(ym), c = Log.custos(), v = Log.valorEstoque(), r = Log.ritmo();
+  var fin = {camiseta: Calc.custoCamiseta(ym)};
+  var insFin = Calc.cfgM(ym).insumos || [];
+  var achar = function(re){ var i = insFin.find(function(x){ return re.test((x.nome||'').toLowerCase()); }); return i ? U.n(i.custo) : null; };
+  var capF = achar(/capel/), sacF = achar(/sacol/);
+  var h = '';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Enviados no prazo', val: ind.pctPrazo===null ? '—' : U.pct(ind.pctPrazo,0), destaque:true, pt: ind.pctPrazo===null?'':(ind.pctPrazo>=95?'ok':(ind.pctPrazo>=85?'at':'cr')), nota:U.num(ind.noPrazo)+' de '+U.num(ind.enviados)+' enviados'})+
+    UI.kpi({rot:'Tempo até o envio', val: ind.tempoMedio===null ? '—' : U.num(ind.tempoMedio,1)+' dias úteis', pequeno:true, nota:'média do mês'})+
+    UI.kpi({rot:'Ficaram sem estoque', val:U.num(ind.comFalta), pequeno:true, pt:ind.comFalta?'at':'ok', nota:'pedidos que esperaram camiseta'})+
+    UI.kpi({rot:'DTF da cidade', val:U.num(ind.dtfLocal), pequeno:true, nota:'pedidos com estampa fora do estoque'})+
+  '</div>';
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Pedidos do mês', val:U.num(ind.pedidos), pequeno:true, nota:'na Logística'})+
+    UI.kpi({rot:'Atrasados em aberto', val:U.num(ind.atrasados), pequeno:true, classe:ind.atrasados?'neg':'', pt:ind.atrasados?'cr':'ok'})+
+    UI.kpi({rot:'Compras pagas no mês', val:U.brl(ind.comprasPagas,0), pequeno:true, nota:U.brl(ind.comprasAbertas,0)+' em aberto'})+
+    UI.kpi({rot:'Dinheiro em estoque', val:U.brl(v.total,0), pequeno:true, nota: r.camDia ? 'giro de '+U.num((r.camDia*30*c.camiseta)/(v.total||1),1)+'x por mês' : ''})+
+  '</div>';
+  var linhas = [
+    ['Camiseta pronta (lisa + DTF)', c.camiseta, fin.camiseta],
+    ['Capelinha', U.n(Log.cfg().kit)/2, capF],
+    ['Sacolinha', U.n(Log.cfg().kit)/2, sacF]
+  ];
+  h += '<div class="cartao"><div class="cartao-tit">Custo real contra o custo do Financeiro</div>'+
+    '<div class="cartao-sub">O Financeiro calcula o lucro com os custos cadastrados em Custos. Se o custo real subir, a margem mostrada fica maior do que a verdadeira.</div>'+
+    '<div class="tabela-env"><table><thead><tr><th>Item</th><th class="r">Logística (real)</th><th class="r">Financeiro</th><th class="c"></th></tr></thead><tbody>'+
+    linhas.map(function(l){
+      var dif = l[2]===null ? null : l[1]-l[2];
+      return '<tr><td>'+l[0]+'</td><td class="r">'+U.brl(l[1])+'</td><td class="r">'+(l[2]===null?'—':U.brl(l[2]))+'</td>'+
+        '<td class="c">'+(dif===null ? '<span class="etq pag">não cadastrado</span>' : (dif>0.009 ? '<span class="etq fal">real maior</span>' : '<span class="etq rec">coberto</span>'))+'</td></tr>';
+    }).join('')+'</tbody></table></div>'+
+    '<div style="font-size:12.5px;color:var(--texto-medio);margin-top:8px">Detalhe da camiseta: malha '+U.brl(c.malha)+', cortador e costureiras '+U.brl(U.n(Log.cfg().corte)+U.n(Log.cfg().costura))+', DTF '+U.brl(c.dtf)+'. Brindes e embalagens por pedido: '+U.brl(c.brindes)+'.</div>'+
+    (c.camiseta > fin.camiseta+0.009 ? '<button class="btn sm" data-lg="custoFin" style="margin-top:10px">Usar '+U.brl(Math.ceil(c.camiseta*2)/2)+' como custo da camiseta no Financeiro a partir de '+U.nomeMes(U.ymAtual())+'</button>' : '')+
+  '</div>';
+  return h;
+};
+
+Views.logAjustes = function(){
+  var c = Log.cfg(), x = Log.d();
+  var campo = function(rot, k, op){ op=op||{};
+    return '<div class="campo"><label>'+rot+'</label>'+Views._logNum('config.'+k, c[k], {step:op.step, rot:rot})+(op.dica?'<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">'+op.dica+'</div>':'')+'</div>'; };
+  var h = '<div class="grade g2" style="align-items:start">';
+  h += '<div class="cartao"><div class="cartao-tit">Regras da operação</div>'+
+    '<div class="linha-campos lc2">'+campo('Prazo de envio (dias úteis)','prazoEnvio',{step:1})+campo('Oficina: peças por semana','capacidadeSemana',{step:1})+'</div>'+
+    '<div class="linha-campos lc2">'+campo('Estoque de lisas (semanas)','semanasAlvo',{step:1})+campo('Estoque de DTF (semanas)','semanasDtf',{step:1})+'</div>'+
+    campo('Estampas líderes guardadas','estampasSP',{step:1})+
+    '<div class="campo"><label>Base do ritmo de venda</label><select data-lgset="config.base">'+
+      '<option value="vendas"'+(c.base!=='meta'?' selected':'')+'>Vendas dos últimos 30 dias (Financeiro)</option>'+
+      '<option value="meta"'+(c.base==='meta'?' selected':'')+'>Meta de pedidos do mês (Planejamento)</option></select></div>'+
+  '</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Prazos dos fornecedores</div>'+
+    '<div class="linha-campos lc3">'+campo('Malha (dias úteis)','prazoMalha',{step:1})+campo('Corte (dias úteis)','prazoCorte',{step:1})+campo('Costura (dias úteis)','prazoCostura',{step:1})+'</div>'+
+    '<div class="linha-campos lc3">'+campo('DTF SP (dias corridos)','prazoDtf',{step:1})+campo('DTF cidade (dias úteis)','prazoDtfLocal',{step:1})+campo('Capelinha e sacolinha','prazoKits',{step:1})+'</div>'+
+    '<div class="linha-campos lc2">'+campo('Etiquetas (dias úteis)','prazoEtiquetas',{step:1})+campo('Saquinhos e cheirinho','prazoEmbalagem',{step:1})+'</div>'+
+  '</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Preços</div>'+
+    '<div class="linha-campos lc2">'+campo('Malha clara, kg (rolo)','precoKgClaro')+campo('Malha escura, kg (rolo)','precoKgEscuro')+'</div>'+
+    '<div class="linha-campos lc3">'+campo('Kg por camiseta','kgPorPeca')+campo('Kg por rolo','kgRolo')+campo('Cortador por peça','corte')+'</div>'+
+    '<div class="linha-campos lc3">'+campo('Costureiras por peça','costura')+campo('DTF SP, metro','dtfMetro')+campo('DTF cidade, metro','dtfLocalMetro')+'</div>'+
+    '<div class="linha-campos lc3">'+campo('Estampas por metro','dtfPorMetro',{step:1})+campo('Capelinha + sacolinha','kit')+campo('Saquinho transparente','saqT')+'</div>'+
+    '<div class="linha-campos lc3">'+campo('Saquinho preto','saqP')+campo('Pacote de etiquetas','etiquetaPacote')+campo('Etiquetas por pacote','etiquetasPacote',{step:1})+'</div>'+
+    '<div class="linha-campos lc2">'+campo('Cheirinho, frasco','cheirinho')+campo('Pedidos por frasco','cheirinhoRende',{step:1})+'</div>'+
+  '</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Grade padrão e feriados</div>'+
+    '<div class="cartao-sub">Peso de cada variação enquanto não houver pedidos suficientes importados.</div>'+
+    x.cores.map(function(co){
+      return '<div class="tabela-env" style="margin-bottom:8px"><table><thead><tr><th>'+U.esc(co.nome)+'</th>'+x.tamanhos.map(function(t){ return '<th class="c">'+U.esc(t)+'</th>'; }).join('')+'</tr></thead><tbody>'+
+        x.mods.map(function(m){ return '<tr><td>'+U.esc(m)+'</td>'+x.tamanhos.map(function(t){ var k=Log.chave(co.id,m,t); return '<td class="c">'+Views._logNum('grade.'+k, x.grade[k], {step:1, w:60})+'</td>'; }).join('')+'</tr>'; }).join('')+
+      '</tbody></table></div>';
+    }).join('')+
+    '<div class="campo"><label>Feriados (um por linha, ano-mês-dia)</label><textarea data-lgset="config.feriados" rows="5">'+U.esc(c.feriados)+'</textarea></div>'+
+  '</div>';
+  h += '</div>';
+  return h;
+};
+
+/* ---------- formulário de compra ---------- */
+Form.logCompra = function(id){
+  var cp = id ? Object.assign({}, Log.getCompra(id)) : {tipo:'outro', descricao:'', valor:'', vencimento:U.hoje(), chegada:U.hoje()};
+  UI.modal({
+    titulo: id ? 'Editar compra' : 'Nova compra',
+    corpo:
+      '<div class="campo"><label>Descrição</label><input type="text" id="gcDesc" value="'+U.esc(cp.descricao)+'"></div>'+
+      '<div class="linha-campos lc2">'+
+        '<div class="campo"><label>Tipo</label><select id="gcTipo">'+Object.keys(Log.TIPOS).map(function(k){ return '<option value="'+k+'"'+(cp.tipo===k?' selected':'')+'>'+Log.TIPOS[k].nome+'</option>'; }).join('')+'</select></div>'+
+        '<div class="campo"><label>Valor (R$)</label><input type="number" id="gcValor" step="0.01" value="'+(cp.valor===''?'':U.n(cp.valor))+'"></div>'+
+      '</div>'+
+      '<div class="linha-campos lc2">'+
+        '<div class="campo"><label>Pagar em</label><input type="date" id="gcVenc" value="'+U.esc(cp.vencimento)+'"></div>'+
+        '<div class="campo"><label>Chega em</label><input type="date" id="gcCheg" value="'+U.esc(cp.chegada)+'"></div>'+
+      '</div>'+
+      (id && (cp.itens||[]).length ? '<div style="font-size:12px;color:var(--texto-medio)">Esta compra soma ao estoque ao ser recebida: '+cp.itens.map(function(i){ return U.num(i.qtd,i.tipo==='malha'?1:0)+(i.tipo==='malha'?' kg ':' ')+U.esc(i.tipo==='lisa'?Log.nomeVar(i.k):(i.tipo==='dtf'?i.k.split('|')[0].toLowerCase():(i.tipo==='malha'?Log.nomeCor(i.k):i.k))); }).join(', ')+'.</div>' : ''),
+    rodape:'<button class="btn sec" data-fechar>Cancelar</button><button class="btn" id="gcSalvar">Salvar</button>',
+    aoAbrir: function(el, fechar){
+      el.querySelector('#gcSalvar').addEventListener('click', function(){
+        var desc = el.querySelector('#gcDesc').value.trim();
+        if(!desc){ UI.toast('Descreva a compra.'); return; }
+        var dados = {descricao:desc, tipo:el.querySelector('#gcTipo').value, valor:U.n(el.querySelector('#gcValor').value),
+          vencimento:el.querySelector('#gcVenc').value||U.hoje(), chegada:el.querySelector('#gcCheg').value||U.hoje()};
+        if(id){
+          var alvo = Log.getCompra(id); Object.assign(alvo, dados);
+          if(alvo.lancId){ var l = Store.getLancamento(alvo.lancId); if(l){ l.valor = dados.valor; l.descricao = dados.descricao; } }
+          Log.salvar('Compra atualizada');
+        } else { Log.novaCompra(dados); Log.salvar('Compra criada. O pagamento já está na Agenda.'); }
+        fechar(); App.render();
+      });
+    }
+  });
+};
+
+/* ---------- eventos da Logística ---------- */
+Log.eventos = function(){
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-lg]'); if(!t) return;
+    var ac = t.getAttribute('data-lg'), id = t.getAttribute('data-id');
+    if(ac==='sinc'){ Log.sincronizar(12); return; }
+    if(ac==='csv'){ var inp = document.getElementById('lgCsv'); if(inp) inp.click(); return; }
+    if(ac==='status'){ Log.mudarStatus(id, t.getAttribute('data-st')); App.render(); return; }
+    if(ac==='delPedido'){
+      UI.confirmar('Excluir pedido da Logística?', 'O que ele tirou do estoque volta. No Financeiro nada muda.', function(){
+        var p = Log.d().pedidos.find(function(x){ return x.id===id; }); if(p) Log.devolver(p);
+        Log.d().pedidos = Log.d().pedidos.filter(function(x){ return x.id!==id; });
+        Log.salvar('Pedido excluído'); App.render();
+      });
+      return;
+    }
+    if(ac==='addDtf'){
+      var est = (document.getElementById('lgDtfEst').value||'').trim().toUpperCase();
+      var q = U.n(document.getElementById('lgDtfQtd').value);
+      if(!est || !q){ UI.toast('Informe a estampa e a quantidade.'); return; }
+      Log.addDtf(est, document.getElementById('lgDtfCor').value, q);
+      Log.salvar('DTF adicionado'); App.render(); return;
+    }
+    if(ac==='delDtf'){ Log.d().estoque.dtf.splice(parseInt(t.getAttribute('data-i'),10),1); Log.salvar('DTF removido'); App.render(); return; }
+    if(ac==='zerarContagem'){
+      var e2 = Log.d().estoque;
+      Log.d().contagens.push({data:U.hoje(), lisas:Object.keys(e2.lisas).reduce(function(s,k){ return s+U.n(e2.lisas[k]); },0), valor:Log.valorEstoque().total});
+      Log.salvar('Contagem registrada'); App.render(); return;
+    }
+    if(ac==='gerar'){
+      var rep = Log.reposicao();
+      UI.confirmar('Criar as compras desta reposição?',
+        'Serão criadas as compras de malha, corte, costura, DTF e insumos sugeridas, com as datas de pagamento e de chegada. Os pagamentos entram na Agenda do Financeiro.',
+        function(){ Log.gerarCompras(rep); UI.aba='compras'; App.render(); }, 'Criar compras');
+      return;
+    }
+    if(ac==='novaCompra'){ Form.logCompra(); return; }
+    if(ac==='editCompra'){ Form.logCompra(id); return; }
+    if(ac==='delCompra'){ UI.confirmar('Excluir compra?', 'Se ela já foi recebida, o estoque volta ao que era. O pagamento sai da Agenda.', function(){ Log.excluirCompra(id); App.render(); }); return; }
+    if(ac==='pagar'){ Log.pagar(id); App.render(); return; }
+    if(ac==='despagar'){ Log.desfazerPagamento(id); App.render(); return; }
+    if(ac==='receber'){ Log.receber(id); App.render(); return; }
+    if(ac==='desreceber'){ Log.desfazerRecebimento(id); App.render(); return; }
+    if(ac==='custoFin'){
+      var novo = Math.ceil(Log.custos().camiseta*2)/2, ym = U.ymAtual();
+      UI.confirmar('Atualizar o custo da camiseta no Financeiro?',
+        'O produto padrão passa a custar <b>'+U.brl(novo)+'</b> a partir de '+U.nomeMes(ym)+'. Os meses anteriores continuam com o custo da época.',
+        function(){
+          var cfg = Calc.cfg(), prem = Store.snapshotPremissas(cfg);
+          var pr = prem.produtos.find(function(x){ return x.padrao; }) || prem.produtos[0];
+          if(pr) pr.custo = novo;
+          Store.salvarVigencia(ym, prem, 'Custo real vindo da Logística');
+          App.render();
+        }, 'Atualizar custo');
+      return;
+    }
+  });
+  document.addEventListener('change', function(e){
+    var el = e.target;
+    if(el.id==='lgCsv'){
+      var f = el.files && el.files[0]; if(!f) return;
+      f.arrayBuffer().then(function(buf){
+        var txt; try{ txt = new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(er){ txt = new TextDecoder('windows-1252').decode(buf); }
+        try{ Log.importar(Log.csv(txt)); App.render(); }
+        catch(er){ UI.toast(er.message); }
+      });
+      return;
+    }
+    var cam = el.getAttribute && el.getAttribute('data-lgset');
+    if(!cam) return;
+    var val = el.type==='number' ? (el.value===''?0:U.n(el.value)) : el.value;
+    var partes = cam.split('.'), alvo = Log.d();
+    for(var i=0;i<partes.length-1;i++){ if(alvo[partes[i]]===undefined) alvo[partes[i]] = {}; alvo = alvo[partes[i]]; }
+    alvo[partes[partes.length-1]] = val;
+    Log.salvar();
+    var ativo = document.activeElement;
+    var sel = ativo && ativo.getAttribute ? ativo.getAttribute('data-lgset') : null;
+    App.render();
+    if(sel){ var n = document.querySelector('[data-lgset="'+sel.replace(/"/g,'\\"')+'"]'); if(n){ n.focus(); if(n.select) try{ n.select(); }catch(er){} } }
+  });
+};
+Log.eventos();
+
+/* ============ PROJETO LAZARUS (separado) ============ */
+/* Roda em um quadro próprio (lazarus.html). Não lê nem escreve nada do Painel. */
+Views.lazarus = function(){
+  var src = location.protocol==='file:' ? 'lazarus.html' : '/lazarus';
+  return '<div class="lz-topo"><span>Projeto Lazarus funciona separado do Financeiro e da Logística. Os dados dele ficam só nele.</span>'+
+    '<a class="btn sec sm" href="'+src+'" target="_blank" rel="noopener">Abrir em tela cheia</a></div>'+
+    '<iframe class="lz-quadro" src="'+src+'" title="Projeto Lazarus"></iframe>';
+};
+
 
 document.addEventListener('DOMContentLoaded', App.init);
 })();
