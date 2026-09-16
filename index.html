@@ -2064,7 +2064,9 @@ var ABAS = {
     {id:'expedicao', nome:'Expedição'},
     {id:'estoque', nome:'Estoque'},
     {id:'reposicao', nome:'Reposição'},
+    {id:'agenda', nome:'Agenda'},
     {id:'compras', nome:'Compras'},
+    {id:'meta', nome:'Meta'},
     {id:'indicadores', nome:'Indicadores'},
     {id:'ajustes', nome:'Ajustes'}
   ],
@@ -5596,7 +5598,7 @@ var App = {
     });
     var semPeriodo = ['custos','integracoes','config','lazarus'];
     var abaLog = UI.tela==='logistica' ? (UI.aba||'expedicao') : '';
-    var semMes = semPeriodo.indexOf(UI.tela)>=0 || (UI.tela==='logistica' && abaLog!=='indicadores');
+    var semMes = semPeriodo.indexOf(UI.tela)>=0 || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta');
     document.getElementById('periodoCtrl').style.display = semMes ? 'none' : '';
     document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus') ? 'none' : '';
     alvo.classList.toggle('cheio', UI.tela==='lazarus');
@@ -6368,6 +6370,7 @@ var Log = {
         cheirinho: 100, cheirinhoRende: 500,
         prazoMalha: 1, prazoCorte: 2, prazoCostura: 5, prazoDtf: 7, prazoDtfLocal: 1,
         prazoKits: 1, prazoEtiquetas: 3, prazoEmbalagem: 0,
+        diaReposicao: 1, pessoasOficina: 2, capacidadeCorte: 0, minutosPorPedido: 6, horasExpedicao: 6, segurancaDias: 2, horizonte: 60, projecao: 'meta',
         feriados: '2026-10-12\n2026-11-02\n2026-11-20\n2026-12-25\n2027-01-01\n2027-02-09\n2027-03-26\n2027-04-21\n2027-05-27\n2027-09-07\n2027-10-12\n2027-11-02\n2027-11-15\n2027-12-25'
       },
       cores: [ {id:'OFF', nome:'Off-white', clara:true}, {id:'PRETO', nome:'Preto', clara:false} ],
@@ -6762,12 +6765,16 @@ var Log = {
   },
 
   /* ---------- reposição sugerida ---------- */
-  reposicao: function(){
-    var x = Log.d(), c = x.config, e = x.estoque, r = Log.ritmo(), pc = Log.participacao(), cam = Log.aCaminho();
+  reposicao: function(opt){
+    opt = opt||{};
+    var x = Log.d(), c = x.config, e = opt.e || x.estoque, r = opt.r || Log.ritmo(), pc = opt.pc || Log.participacao(), cam = opt.cam || Log.aCaminho();
     var semana = r.camDia*7, alvoTotal = semana*U.n(c.semanasAlvo,3);
     /* pedidos que ficaram sem camiseta lisa entram como prioridade */
-    var faltas = {};
-    Log.pedidosAbertos().forEach(function(p){ if(p.status==='novo'){ Log.checar(p).falta.forEach(function(f){ faltas[f.k]=(faltas[f.k]||0)+f.qtd; }); } });
+    var faltas = opt.faltas;
+    if(!faltas){
+      faltas = {};
+      Log.pedidosAbertos().forEach(function(p){ if(p.status==='novo'){ Log.checar(p).falta.forEach(function(f){ faltas[f.k]=(faltas[f.k]||0)+f.qtd; }); } });
+    }
     var linhas = Log.variacoes().map(function(v){
       var alvo = Math.ceil(alvoTotal*pc[v.k]);
       var tem = U.n(e.lisas[v.k]), vem = U.n(cam.lisas[v.k]);
@@ -6806,7 +6813,7 @@ var Log = {
     });
 
     /* DTF das estampas líderes (SP) */
-    var est = Log.estampas().slice(0, U.n(c.estampasSP,8));
+    var est = (opt.estampas || Log.estampas()).slice(0, U.n(c.estampasSP,8));
     var dtf = est.map(function(s){
       var alvo = Math.ceil(s.part*r.camDia*7*U.n(c.semanasDtf,2));
       var tem = e.dtf.filter(function(d){ return d.estampa===s.estampa && d.cor===s.cor; }).reduce(function(t,d){ return t+U.n(d.qty); },0);
@@ -6871,33 +6878,30 @@ var Log = {
     return cp;
   },
 
-  gerarCompras: function(rep){
-    var c = Log.cfg(), hoje = U.hoje(), criadas = 0;
-    var envio = Log.somaUteis(hoje, 0);
+  /* monta as compras de uma reposição a partir de um dia (sem salvar) */
+  planoCompras: function(rep, base){
+    var c = Log.cfg(), out = [];
+    var dia = Log.somaUteis(base, 0);
     rep.malha.forEach(function(m){
       if(!m.rolos) return;
-      Log.novaCompra({tipo:'malha', descricao:'Malha '+m.cor.nome.toLowerCase()+': '+m.rolos+' rolo'+(m.rolos>1?'s':'')+' ('+m.kgCompra+' kg)',
-        valor:m.valor, vencimento:hoje, chegada:Log.somaUteis(envio, U.n(c.prazoMalha)),
+      out.push({tipo:'malha', descricao:'Malha '+m.cor.nome.toLowerCase()+': '+m.rolos+' rolo'+(m.rolos>1?'s':'')+' ('+m.kgCompra+' kg)',
+        valor:m.valor, vencimento:dia, chegada:Log.somaUteis(dia, U.n(c.prazoMalha)),
         itens:[{tipo:'malha', k:m.cor.id, qtd:m.kgCompra}]});
-      criadas++;
     });
     if(rep.producao>0){
-      var inicioCorte = Log.somaUteis(envio, U.n(c.prazoMalha));
+      var inicioCorte = Log.somaUteis(dia, U.n(c.prazoMalha));
       var fimCorte = Log.somaUteis(inicioCorte, U.n(c.prazoCorte));
       var fimCostura = Log.somaUteis(fimCorte, U.n(c.prazoCostura));
       var itens = rep.linhas.filter(function(l){ return l.producao>0; }).map(function(l){ return {tipo:'lisa', k:l.k, qtd:l.producao}; });
-      /* a malha sai do estoque quando vai para o cortador */
-      Log.novaCompra({tipo:'corte', descricao:'Corte de '+rep.producao+' peças', valor:rep.producao*U.n(c.corte),
+      out.push({tipo:'corte', descricao:'Corte de '+rep.producao+' peças', valor:rep.producao*U.n(c.corte),
         vencimento:fimCorte, chegada:fimCorte, itens:[], consomeMalha: rep.malha.map(function(m){ return {cor:m.cor.id, kg:m.kg}; })});
-      Log.novaCompra({tipo:'costura', descricao:'Costura de '+rep.producao+' camisetas lisas', valor:rep.producao*U.n(c.costura),
+      out.push({tipo:'costura', descricao:'Costura de '+rep.producao+' camisetas lisas', valor:rep.producao*U.n(c.costura),
         vencimento:fimCostura, chegada:fimCostura, itens:itens});
-      criadas += 2;
     }
     var dtfItens = rep.dtf.filter(function(d){ return d.pedir>0; }).map(function(d){ return {tipo:'dtf', k:d.estampa+'|'+d.cor, qtd:d.pedir}; });
     if(rep.metros>0 && dtfItens.length){
-      Log.novaCompra({tipo:'dtf', descricao:'DTF de São Paulo: '+rep.metros+' metro'+(rep.metros>1?'s':''), valor:rep.valorDtf,
-        vencimento:hoje, chegada:Log.somaDias(hoje, U.n(c.prazoDtf)), itens:dtfItens});
-      criadas++;
+      out.push({tipo:'dtf', descricao:'DTF de São Paulo: '+rep.metros+' metro'+(rep.metros>1?'s':''), valor:rep.valorDtf,
+        vencimento:dia, chegada:Log.somaDias(dia, U.n(c.prazoDtf)), itens:dtfItens});
     }
     var porTipo = {};
     rep.insumos.forEach(function(i){
@@ -6909,12 +6913,17 @@ var Log = {
     });
     Object.keys(porTipo).forEach(function(t){
       var x = porTipo[t];
-      Log.novaCompra({tipo:t, descricao:(t==='kits'?'Brindes: ':'Embalagens: ')+x.nomes.join(', '), valor:x.valor,
-        vencimento:hoje, chegada:x.prazo ? Log.somaUteis(hoje, x.prazo) : hoje, itens:x.itens});
-      criadas++;
+      out.push({tipo:t, descricao:(t==='kits'?'Brindes: ':'Embalagens: ')+x.nomes.join(', '), valor:x.valor,
+        vencimento:dia, chegada:x.prazo ? Log.somaUteis(dia, x.prazo) : dia, itens:x.itens});
     });
-    Log.salvar(criadas ? criadas+' compra(s) criada(s). Os pagamentos já estão na Agenda.' : 'Nada para comprar agora');
-    return criadas;
+    return out;
+  },
+
+  gerarCompras: function(rep){
+    var lista = Log.planoCompras(rep, U.hoje());
+    lista.forEach(function(o){ Log.novaCompra(o); });
+    Log.salvar(lista.length ? lista.length+' compra(s) criada(s). Os pagamentos já estão na Agenda.' : 'Nada para comprar agora');
+    return lista.length;
   },
 
   getCompra: function(id){ return Log.d().compras.find(function(x){ return x.id===id; }); },
@@ -7061,6 +7070,8 @@ Views.logistica = function(){
   if(a==='estoque') h += Views.logEstoque();
   else if(a==='reposicao') h += Views.logReposicao();
   else if(a==='compras') h += Views.logCompras();
+  else if(a==='agenda') h += Views.logAgenda();
+  else if(a==='meta') h += Views.logMeta();
   else if(a==='indicadores') h += Views.logIndicadores();
   else if(a==='ajustes') h += Views.logAjustes();
   else h += Views.logExpedicao();
@@ -7158,7 +7169,7 @@ Views.logEstoque = function(){
           var dias = dia>0 ? tem/dia : null;
           var n = dias===null ? '' : (dias<7 ? 'cr' : (dias<U.n(Log.cfg().semanasAlvo)*7 ? 'at' : 'ok'));
           return '<td class="c"><div class="lg-cel '+n+'">'+Views._logNum('estoque.lisas.'+k, tem, {step:1, w:62, rot:Log.nomeVar(k)})+
-            '<div class="lg-dias">'+(dias===null?'—':U.num(dias)+' dias')+(cam.lisas[k]?' · +'+cam.lisas[k]+' vindo':'')+'</div></div></td>';
+            '<div class="lg-dias">'+(dias===null?'—':'acaba '+U.dataBr(Log.somaDias(U.hoje(), Math.floor(dias))).slice(0,5))+(cam.lisas[k]?' · +'+cam.lisas[k]+' vindo':'')+'</div></div></td>';
         }).join('')+'</tr>';
       }).join('')+'</tbody></table></div>';
   });
@@ -7333,7 +7344,9 @@ Views.logAjustes = function(){
   h += '<div class="cartao"><div class="cartao-tit">Regras da operação</div>'+
     '<div class="linha-campos lc2">'+campo('Prazo de envio (dias úteis)','prazoEnvio',{step:1})+campo('Oficina: peças por semana','capacidadeSemana',{step:1})+'</div>'+
     '<div class="linha-campos lc2">'+campo('Estoque de lisas (semanas)','semanasAlvo',{step:1})+campo('Estoque de DTF (semanas)','semanasDtf',{step:1})+'</div>'+
-    campo('Estampas líderes guardadas','estampasSP',{step:1})+
+    '<div class="linha-campos lc2">'+campo('Estampas líderes guardadas','estampasSP',{step:1})+campo('Folga ao pedir (dias)','segurancaDias',{step:1})+'</div>'+
+    '<div class="linha-campos lc2">'+campo('Costureiras','pessoasOficina',{step:1})+campo('Cortador: peças por semana','capacidadeCorte',{step:1,dica:'0 = sem limite informado'})+'</div>'+
+    '<div class="linha-campos lc2">'+campo('Minutos por pedido na expedição','minutosPorPedido',{step:1})+campo('Horas por pessoa na expedição','horasExpedicao',{step:1})+'</div>'+
     '<div class="campo"><label>Base do ritmo de venda</label><select data-lgset="config.base">'+
       '<option value="vendas"'+(c.base!=='meta'?' selected':'')+'>Vendas dos últimos 30 dias (Financeiro)</option>'+
       '<option value="meta"'+(c.base==='meta'?' selected':'')+'>Meta de pedidos do mês (Planejamento)</option></select></div>'+
@@ -7480,6 +7493,356 @@ Log.eventos = function(){
   });
 };
 Log.eventos();
+
+
+/* ============ LOGÍSTICA: PROJEÇÃO, AGENDA E META ============ */
+Log.camPorPedido = function(){
+  var r = Log.ritmo();
+  return r.ped30>0 ? r.cam30/r.ped30 : (U.n(Calc.cfg().camisetasPorPedidoPadrao,2)||2);
+};
+/* ritmo de venda num dia futuro: meta do mês (se escolhida e cadastrada) ou ritmo atual */
+Log.ritmoEm = function(iso, atual, modo){
+  var ym = iso.slice(0,7), meta = Store.meta(ym);
+  if((modo||Log.cfg().projecao)==='meta' && U.n(meta.pedidos)>0){
+    var dias = U.diasNoMes(ym), cpp = Log.camPorPedido();
+    return {pedDia:U.n(meta.pedidos)/dias, camDia:U.n(meta.pedidos)*cpp/dias, fonte:'meta'};
+  }
+  return {pedDia:atual.pedDia, camDia:atual.camDia, fonte:atual.fonte};
+};
+Log.subUteis = function(iso, k){
+  var H = Log.feriados(), d = Log.dt(iso), c = 0;
+  while(c<k){ d.setDate(d.getDate()-1); if(Log.util(d,H)) c++; }
+  return U.iso(d);
+};
+Log.INSUMOS = [
+  {k:'capelinha', nome:'Capelinha', base:'ped', prazo:'prazoKits'},
+  {k:'sacolinha', nome:'Sacolinha', base:'ped', prazo:'prazoKits'},
+  {k:'saqT', nome:'Saquinho transparente', base:'cam', prazo:'prazoEmbalagem'},
+  {k:'saqP', nome:'Saquinho preto', base:'ped', prazo:'prazoEmbalagem'},
+  {k:'etiquetas', nome:'Etiquetas de envio', base:'ped', prazo:'prazoEtiquetas'},
+  {k:'cheirinho', nome:'Cheirinho', base:'ped', prazo:'prazoEmbalagem'}
+];
+
+/* Simula dia a dia: chegadas, reposição semanal, consumo.
+   op.semReposicao = só o estoque atual e o que já foi comprado. */
+Log.projetar = function(dias, op){
+  op = op||{};
+  var x = Log.d(), c = x.config, hoje = U.hoje(), fim = Log.somaDias(hoje, dias);
+  var e = JSON.parse(JSON.stringify(x.estoque));
+  var atual = Log.ritmo(), pc = Log.participacao(), est = Log.estampas();
+  var lideres = est.slice(0, U.n(c.estampasSP,8));
+  var modo = op.modo || c.projecao;
+  var pend = [], pagamentos = [], reposicoes = [], acabou = {}, depois = {}, primeira = null;
+  x.compras.forEach(function(cp){
+    if(!cp.recebido) pend.push({data: cp.chegada<hoje?hoje:cp.chegada, itens:cp.itens||[], consomeMalha:cp.consomeMalha});
+    if(!cp.pago) pagamentos.push({data:cp.vencimento, descricao:cp.descricao, valor:U.n(cp.valor), tipo:cp.tipo, real:true, id:cp.id});
+  });
+  var criouHoje = x.compras.some(function(cp){ return cp.criado===hoje; });
+  var addDtf = function(k, q){
+    var p = k.split('|'), it = e.dtf.find(function(z){ return z.estampa===p[0] && z.cor===p[1]; });
+    if(it) it.qty = U.n(it.qty)+q; else e.dtf.push({estampa:p[0], cor:p[1], qty:q});
+  };
+  var aplicar = function(p){
+    (p.itens||[]).forEach(function(i){
+      if(i.tipo==='lisa') e.lisas[i.k] = U.n(e.lisas[i.k]) + U.n(i.qtd);
+      else if(i.tipo==='malha') e.malhaKg[i.k] = U.n(e.malhaKg[i.k]) + U.n(i.qtd);
+      else if(i.tipo==='dtf') addDtf(i.k, U.n(i.qtd));
+      else if(i.tipo==='insumo') e.insumos[i.k] = U.n(e.insumos[i.k]) + U.n(i.qtd);
+    });
+    (p.consomeMalha||[]).forEach(function(m){ e.malhaKg[m.cor] = Math.max(0, U.n(e.malhaKg[m.cor]) - U.n(m.kg)); });
+  };
+  var caminho = function(){
+    var o = {lisas:{}, malhaKg:{}, dtf:{}, insumos:{}};
+    pend.forEach(function(p){ (p.itens||[]).forEach(function(i){
+      var alvo = i.tipo==='lisa'?o.lisas:(i.tipo==='malha'?o.malhaKg:(i.tipo==='dtf'?o.dtf:o.insumos));
+      alvo[i.k] = (alvo[i.k]||0) + U.n(i.qtd);
+    }); });
+    return o;
+  };
+  var marcar = function(k, d){ if(!acabou[k]) acabou[k] = d; };
+  for(var i=0;i<=dias;i++){
+    var d = Log.somaDias(hoje, i);
+    pend = pend.filter(function(p){ if(p.data>d) return true; aplicar(p); return false; });
+    if(!op.semReposicao && Log.dt(d).getDay()===U.n(c.diaReposicao,1) && !(i===0 && criouHoje)){
+      var r = Log.ritmoEm(d, atual, modo);
+      var eS = {lisas:{}, malhaKg:e.malhaKg, insumos:{},
+        dtf: e.dtf.filter(function(z){ return U.n(z.qty)>0; }).map(function(z){ return {estampa:z.estampa, cor:z.cor, qty:Math.floor(z.qty)}; })};
+      var faltas = {};
+      Object.keys(e.lisas).forEach(function(k){ var v = U.n(e.lisas[k]); if(v<0) faltas[k] = Math.ceil(-v); eS.lisas[k] = Math.max(0, Math.floor(v)); });
+      Object.keys(e.insumos).forEach(function(k){ eS.insumos[k] = Math.max(0, Math.floor(U.n(e.insumos[k]))); });
+      var rep = Log.reposicao({e:eS, r:r, pc:pc, cam:caminho(), faltas:faltas, estampas:est});
+      var plano = Log.planoCompras(rep, d);
+      var tot = 0;
+      plano.forEach(function(o){
+        tot += U.n(o.valor);
+        pagamentos.push({data:o.vencimento, descricao:o.descricao, valor:U.n(o.valor), tipo:o.tipo, real:false, pedirEm:d});
+        pend.push({data:o.chegada, itens:o.itens, consomeMalha:o.consomeMalha});
+        if(o.tipo==='costura' && (!primeira || o.chegada<primeira)) primeira = o.chegada;
+      });
+      if(plano.length) reposicoes.push({data:d, valor:tot, pecas:rep.producao, sugerido:rep.totalSugerido, cap:rep.cap, metros:rep.metros});
+    }
+    var rd = Log.ritmoEm(d, atual, modo);
+    Log.variacoes().forEach(function(v){
+      e.lisas[v.k] = U.n(e.lisas[v.k]) - rd.camDia*pc[v.k];
+      if(e.lisas[v.k] < 0 && rd.camDia*pc[v.k] > 0){ marcar('lisa|'+v.k, d); if(primeira && d>primeira && !depois[v.k]) depois[v.k] = d; }
+    });
+    lideres.forEach(function(s){
+      var k = s.estampa+'|'+s.cor, q = rd.camDia*s.part;
+      addDtf(k, -q);
+      var tem = e.dtf.filter(function(z){ return z.estampa===s.estampa && z.cor===s.cor; }).reduce(function(t,z){ return t+U.n(z.qty); },0);
+      if(tem < 0) marcar('dtf|'+k, d);
+    });
+    Log.INSUMOS.forEach(function(it){
+      e.insumos[it.k] = U.n(e.insumos[it.k]) - (it.base==='cam' ? rd.camDia : rd.pedDia);
+      if(e.insumos[it.k] < 0) marcar('ins|'+it.k, d);
+    });
+  }
+  pagamentos = pagamentos.filter(function(p){ return p.data<=fim; }).sort(function(a,b){ return a.data<b.data?-1:(a.data>b.data?1:0); });
+  return {inicio:hoje, fim:fim, pagamentos:pagamentos, reposicoes:reposicoes, acabou:acabou, depois:depois, primeira:primeira, lideres:lideres, atual:atual, modo:modo};
+};
+
+/* quando cada item acaba sem novas compras, e até quando pedir */
+Log.quandoAcaba = function(){
+  var c = Log.cfg(), hoje = U.hoje(), p = Log.projetar(180, {semReposicao:true}), seg = U.n(c.segurancaDias,2);
+  var leadLisa = U.n(c.prazoMalha)+U.n(c.prazoCorte)+U.n(c.prazoCostura);
+  var linha = function(nome, k, tipoPrazo, lead){
+    var acaba = p.acabou[k] || null, pedir = null;
+    if(acaba) pedir = tipoPrazo==='corridos' ? Log.somaDias(acaba, -(lead+seg)) : Log.subUteis(acaba, lead+seg);
+    var n = !acaba ? 'ok' : (pedir<=hoje ? 'cr' : (pedir<=Log.somaDias(hoje,7) ? 'at' : 'ok'));
+    return {nome:nome, k:k, acaba:acaba, pedir:pedir, n:n, lead:lead, tipoPrazo:tipoPrazo};
+  };
+  var out = [];
+  var porCor = {};
+  Log.variacoes().forEach(function(v){
+    var l = linha(Log.nomeVar(v.k), 'lisa|'+v.k, 'uteis', leadLisa);
+    l.grupo = 'Camisetas lisas'; l.cor = v.cor.id;
+    out.push(l);
+  });
+  p.lideres.forEach(function(s){
+    var l = linha('DTF '+s.estampa.toLowerCase()+' ('+Log.nomeCor(s.cor).toLowerCase()+')', 'dtf|'+s.estampa+'|'+s.cor, 'corridos', U.n(c.prazoDtf));
+    l.grupo = 'DTF das estampas líderes'; out.push(l);
+  });
+  Log.INSUMOS.forEach(function(it){
+    var l = linha(it.nome, 'ins|'+it.k, 'uteis', U.n(c[it.prazo]));
+    l.grupo = 'Brindes e embalagens'; out.push(l);
+  });
+  return {linhas:out, proj:p};
+};
+
+/* a operação aguenta a meta? */
+Log.avaliarMeta = function(pedidosMes, ym){
+  var c = Log.cfg(), cpp = Log.camPorPedido(), dias = U.diasNoMes(ym||U.ymAtual());
+  var ped = U.n(pedidosMes), cam = ped*cpp;
+  var camSem = cam/dias*7, pedDia = ped/dias, pedSem = ped/dias*7;
+  var cap = U.n(c.capacidadeSemana), pessoas = Math.max(1, U.n(c.pessoasOficina,2));
+  var porPessoa = cap/pessoas;
+  var folga = 1.15;
+  var capNec = Math.ceil(camSem*folga/10)*10;
+  var pessoasNec = porPessoa>0 ? Math.ceil(camSem*folga/porPessoa) : null;
+  var capCorte = U.n(c.capacidadeCorte);
+  var kgSem = camSem*U.n(c.kgPorPeca), rolosSem = kgSem/U.n(c.kgRolo,20);
+  var est = Log.estampas(), lid = est.slice(0, U.n(c.estampasSP,8));
+  var partLid = lid.reduce(function(s,x){ return s+x.part; },0) || 0.7;
+  var metrosSem = camSem*partLid/U.n(c.dtfPorMetro,8);
+  var localSem = camSem*(1-partLid);
+  var custos = Log.custos();
+  var minutos = pedDia*U.n(c.minutosPorPedido,6);
+  var horasDia = minutos/60;
+  var pessoasExp = Math.max(1, Math.ceil(horasDia/U.n(c.horasExpedicao,6)));
+  var alvoPecas = camSem*U.n(c.semanasAlvo,3);
+  var alvoValor = alvoPecas*custos.lisa + camSem*U.n(c.semanasDtf,2)*partLid*custos.dtf + pedSem*2*custos.brindes;
+  var valorAtual = Log.valorEstoque().total;
+  var comprasMes = cam*(custos.lisa) + cam*partLid*custos.dtf + cam*(1-partLid)*U.div(U.n(c.dtfLocalMetro),U.n(c.dtfPorMetro,8)) + ped*custos.brindes;
+  var leadSem = (U.n(c.prazoMalha)+U.n(c.prazoCorte)+U.n(c.prazoCostura))/5;
+  var ajustes = [];
+  if(cap>0 && camSem*folga > cap){
+    ajustes.push({n:'cr', t:'Aumentar a oficina para '+U.num(capNec)+' peças por semana',
+      x:'Hoje ela faz '+U.num(cap)+'. Com '+U.num(porPessoa,0)+' peças por costureira, são '+pessoasNec+' costureira(s), '+Math.max(0,pessoasNec-pessoas)+' a mais que hoje.', acao:'oficina'});
+  }
+  if(capCorte>0 && camSem*folga > capCorte) ajustes.push({n:'cr', t:'O cortador não acompanha', x:'Ele corta '+U.num(capCorte)+' peças por semana e a meta pede '+U.num(camSem*folga,0)+'. Procure um segundo cortador ou peça mais dias.'});
+  if(U.n(c.semanasAlvo) < leadSem+1) ajustes.push({n:'at', t:'Aumentar o estoque de lisas para '+Math.ceil(leadSem+1)+' semanas', x:'Uma reposição leva '+U.num(leadSem*7,0)+' dias entre malha, corte e costura. Com menos estoque que isso, um atraso da oficina vira pedido atrasado.'});
+  if(alvoValor > valorAtual*1.05) ajustes.push({n:'at', t:'Investir '+U.brl(alvoValor-valorAtual,0)+' para chegar ao estoque alvo', x:'O estoque alvo dessa meta vale '+U.brl(alvoValor,0)+'. Hoje há '+U.brl(valorAtual,0)+'.'});
+  if(pessoasExp>1) ajustes.push({n:'at', t:'Ter '+pessoasExp+' pessoas na expedição', x:'São '+U.num(pedDia,1)+' pedidos por dia, cerca de '+U.num(horasDia,1)+' horas de separar, prensar e embalar.'});
+  if(rolosSem>=1) ajustes.push({n:'ok', t:'Comprar malha toda semana', x:U.num(rolosSem,1)+' rolo(s) por semana. Vale negociar preço por volume.'});
+  var ok = !ajustes.some(function(a){ return a.n==='cr'; });
+  return {ped:ped, cpp:cpp, cam:cam, camSem:camSem, pedDia:pedDia, pedSem:pedSem, cap:cap, pessoas:pessoas, porPessoa:porPessoa,
+    capNec:capNec, pessoasNec:pessoasNec, kgSem:kgSem, rolosSem:rolosSem, metrosSem:metrosSem, localSem:localSem, partLid:partLid,
+    horasDia:horasDia, pessoasExp:pessoasExp, alvoPecas:alvoPecas, alvoValor:alvoValor, valorAtual:valorAtual,
+    comprasMes:comprasMes, leadSem:leadSem, ajustes:ajustes, ok:ok, uso: cap? camSem/cap*100 : null};
+};
+
+Views.logAgenda = function(){
+  var c = Log.cfg(), hoje = U.hoje();
+  var q = Log.quandoAcaba();
+  var dias = U.n(c.horizonte,60);
+  var p = Log.projetar(dias);
+  var incluirFin = !!Views._logFin;
+  var h = '';
+  var urgentes = q.linhas.filter(function(l){ return l.n==='cr'; });
+  var semana = q.linhas.filter(function(l){ return l.n==='at'; });
+  var rupturas = Object.keys(p.depois);
+  var antes = Object.keys(p.acabou).filter(function(k){ return k.indexOf('lisa|')===0 && !p.depois[k.slice(5)]; });
+  var frase = urgentes.length ? urgentes.length+' item(ns) precisam ser pedidos hoje.' :
+    (semana.length ? semana.length+' item(ns) precisam ser pedidos esta semana.' : 'Nada precisa ser pedido nos próximos 7 dias.');
+  h += '<section class="veredito '+(urgentes.length||rupturas.length?'critico':(semana.length?'atencao':''))+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+U.esc(frase)+'</div>'+
+    '<div class="veredito-apoio">Ritmo usado: '+(c.projecao==='meta'?'a meta de pedidos de cada mês (Planejamento), e o ritmo dos últimos 30 dias quando o mês não tem meta.':'o ritmo dos últimos 30 dias do Financeiro.')+
+      (antes.length && p.primeira ? ' '+antes.length+' variação(ões) de camiseta acabam antes de a próxima reposição chegar ('+U.dataBr(p.primeira)+'): esses pedidos vão esperar a produção.' : '')+
+      (rupturas.length ? ' Mesmo depois das reposições, '+rupturas.length+' variação(ões) continuam faltando: a oficina não acompanha esse ritmo. Veja a aba Meta.' : '')+'</div>'+
+  '</section>';
+
+  h += '<div class="cartao" style="margin-bottom:12px"><div class="linha-campos lc3" style="align-items:end">'+
+    '<div class="campo" style="margin:0"><label>Período</label><select data-lgset="config.horizonte">'+[30,60,90].map(function(n){ return '<option value="'+n+'"'+(dias===n?' selected':'')+'>Próximos '+n+' dias</option>'; }).join('')+'</select></div>'+
+    '<div class="campo" style="margin:0"><label>Ritmo de venda da previsão</label><select data-lgset="config.projecao"><option value="meta"'+(c.projecao==='meta'?' selected':'')+'>Meta de cada mês</option><option value="vendas"'+(c.projecao!=='meta'?' selected':'')+'>Ritmo atual</option></select></div>'+
+    '<div class="campo" style="margin:0"><label>Dia da reposição</label><select data-lgset="config.diaReposicao">'+['domingo','segunda','terça','quarta','quinta','sexta','sábado'].map(function(n,i){ return '<option value="'+i+'"'+(U.n(c.diaReposicao)===i?' selected':'')+'>'+n+'</option>'; }).join('')+'</select></div>'+
+  '</div></div>';
+
+  /* quando acaba */
+  var grupos = {};
+  q.linhas.forEach(function(l){ (grupos[l.grupo]=grupos[l.grupo]||[]).push(l); });
+  h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Quando acaba e até quando pedir</div>'+
+    '<div class="cartao-sub">Com o estoque de hoje e o que já foi comprado, sem novas compras. "Pedir até" desconta o prazo do fornecedor e '+U.num(c.segurancaDias)+' dias de folga.</div>'+
+    '<div class="tabela-env"><table><thead><tr><th>Item</th><th class="c">Acaba em</th><th class="c">Pedir até</th><th class="c"></th></tr></thead><tbody>'+
+    Object.keys(grupos).map(function(g){
+      var ls = grupos[g].slice().sort(function(a,b){ return (a.acaba||'9999')<(b.acaba||'9999')?-1:1; });
+      if(g==='Camisetas lisas') ls = ls.slice(0,6);
+      return '<tr class="total"><td colspan="4">'+U.esc(g)+(g==='Camisetas lisas'?' <span style="font-weight:400;color:var(--texto-fraco)">(as 6 que acabam primeiro)</span>':'')+'</td></tr>'+
+        ls.map(function(l){
+          var st = !l.acaba ? '<span class="etq rec">não acaba em 6 meses</span>' : (l.n==='cr' ? '<span class="etq fal">pedir hoje</span>' : (l.n==='at' ? '<span class="etq pen">pedir esta semana</span>' : '<span class="etq pag">no prazo</span>'));
+          return '<tr><td>'+U.esc(l.nome)+'</td><td class="c">'+(l.acaba?U.dataBr(l.acaba)+' <span style="color:var(--texto-fraco)">'+U.diaSemana(l.acaba)+'</span>':'—')+'</td>'+
+            '<td class="c">'+(l.pedir?U.dataBr(l.pedir):'—')+'</td><td class="c">'+st+'</td></tr>';
+        }).join('');
+    }).join('')+'</tbody></table></div></div>';
+
+  /* pagamentos */
+  var pags = p.pagamentos.slice();
+  if(incluirFin){
+    var meses = {}; for(var i=0;i<=dias;i+=15) meses[Log.somaDias(hoje,i).slice(0,7)] = 1; meses[p.fim.slice(0,7)] = 1;
+    Object.keys(meses).forEach(function(ym){
+      Agenda.ocorrencias(ym).forEach(function(o){
+        if(o.origem==='logistica' || o.status==='pago' || o.tipo!=='despesa') return;
+        if(o.data<hoje || o.data>p.fim) return;
+        pags.push({data:o.data, descricao:o.nome, valor:o.valor, tipo:'financeiro', real:true, fin:true});
+      });
+    });
+    pags.sort(function(a,b){ return a.data<b.data?-1:(a.data>b.data?1:0); });
+  }
+  var atrasadas = pags.filter(function(x){ return x.real && x.data<hoje; });
+  var totReal = pags.filter(function(x){ return x.real && !x.fin; }).reduce(function(s,x){ return s+x.valor; },0);
+  var totPrev = pags.filter(function(x){ return !x.real; }).reduce(function(s,x){ return s+x.valor; },0);
+  var totFin = pags.filter(function(x){ return x.fin; }).reduce(function(s,x){ return s+x.valor; },0);
+  var prox = p.reposicoes[0];
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Compras já feitas a pagar', val:U.brl(totReal,0), destaque:true, nota:atrasadas.length?atrasadas.length+' vencida(s)':'até '+U.dataBr(p.fim)})+
+    UI.kpi({rot:'Compras previstas', val:U.brl(totPrev,0), pequeno:true, nota:p.reposicoes.length+' reposição(ões) no período'})+
+    UI.kpi({rot:'Próxima reposição', val: prox ? U.dataBr(prox.data).slice(0,5)+' '+U.diaSemana(prox.data) : '—', pequeno:true, nota: prox ? U.brl(prox.valor,0)+', '+U.num(prox.pecas)+' peças' : 'nada a repor'})+
+    UI.kpi({rot:incluirFin?'Contas do Financeiro':'Total da operação', val:U.brl(incluirFin?totFin:totReal+totPrev,0), pequeno:true, nota:incluirFin?'contas e lançamentos em aberto':'compras feitas e previstas'})+
+  '</div>';
+
+  h += '<div class="cartao"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="cartao-tit">Agenda de pagamentos</div>'+
+    '<div class="cartao-sub" style="margin:0">Compras já feitas (valor exato) e reposições previstas (valor estimado pelos preços de Ajustes). As previstas viram compras de verdade quando você usa "Criar as compras" na Reposição.</div></div>'+
+    '<label class="chk"><input type="checkbox" data-lg="togFin" '+(incluirFin?'checked':'')+'> Incluir contas do Financeiro</label></div>';
+  if(!pags.length) h += '<div style="font-size:13px;color:var(--texto-fraco);margin-top:10px">Nada a pagar no período.</div>';
+  else {
+    var semanaAtual = null, linhas = '';
+    pags.forEach(function(x){
+      var d = Log.dt(x.data < hoje ? hoje : x.data), seg = new Date(d); while(seg.getDay()!==1) seg.setDate(seg.getDate()-1);
+      var ks = U.iso(seg);
+      if(ks!==semanaAtual){
+        semanaAtual = ks;
+        var fimS = Log.somaDias(ks, 6);
+        var soma = pags.filter(function(y){ var dd = y.data<hoje?hoje:y.data; return dd>=ks && dd<=fimS; }).reduce(function(s,y){ return s+y.valor; },0);
+        linhas += '<tr class="total"><td colspan="3">Semana de '+U.dataBr(ks).slice(0,5)+' a '+U.dataBr(fimS).slice(0,5)+'</td><td class="r" style="white-space:nowrap">'+U.brl(soma)+'</td><td></td></tr>';
+      }
+      var t = x.fin ? {nome:'Financeiro'} : (Log.TIPOS[x.tipo]||Log.TIPOS.outro);
+      linhas += '<tr><td style="white-space:nowrap">'+U.dataBr(x.data)+' <span style="color:var(--texto-fraco);font-size:11.5px">'+U.diaSemana(x.data)+'</span></td>'+
+        '<td>'+U.esc(x.descricao)+(x.pedirEm && x.pedirEm!==x.data?' <span style="color:var(--texto-fraco);font-size:11.5px">(pedido em '+U.dataBr(x.pedirEm).slice(0,5)+')</span>':'')+'</td>'+
+        '<td style="color:var(--texto-medio)">'+U.esc(t.nome)+'</td>'+
+        '<td class="r" style="font-weight:600;white-space:nowrap">'+U.brl(x.valor)+'</td>'+
+        '<td class="c" style="white-space:nowrap">'+(x.fin ? '<span class="etq pag">conta</span>' : (x.real ? (x.data<hoje?'<span class="etq fal">vencida</span>':'<span class="etq pen">comprada</span>') : '<span class="etq pag">previsão</span>'))+
+          (x.real && x.id ? ' <button class="btn sm sec" data-lg="pagar" data-id="'+x.id+'">Pagar</button>' : '')+'</td></tr>';
+    });
+    h += '<div class="tabela-env" style="margin-top:10px"><table><thead><tr><th>Data</th><th>O quê</th><th>Tipo</th><th class="r">Valor</th><th class="c"></th></tr></thead><tbody>'+linhas+'</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+};
+
+Views._logMeta = null;
+Views.logMeta = function(){
+  var ym = UI.ym, meta = Store.meta(ym), r = Log.ritmo();
+  var base = U.n(meta.pedidos) > 0 ? U.n(meta.pedidos) : Math.round(r.pedDia*U.diasNoMes(ym));
+  var ped = Views._logMeta!==null ? Views._logMeta : base;
+  var a = Log.avaliarMeta(ped, ym), c = Log.cfg();
+  var h = '';
+  var fonte = Views._logMeta!==null ? 'simulação' : (U.n(meta.pedidos)>0 ? 'meta de '+U.nomeMes(ym)+' no Planejamento' : 'ritmo atual, porque '+U.nomeMes(ym)+' não tem meta');
+  h += '<section class="veredito '+(a.ok?(a.ajustes.length?'atencao':''):'critico')+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+(a.ok ? 'A operação aguenta '+U.num(a.ped)+' pedidos no mês.' : 'Para '+U.num(a.ped)+' pedidos no mês, a oficina precisa crescer.')+'</div>'+
+    '<div class="veredito-apoio">Base: '+U.esc(fonte)+'. São '+U.num(a.cam)+' camisetas no mês, '+U.num(a.camSem)+' por semana, com '+U.num(a.cpp,1)+' camisetas por pedido.'+
+      (a.uso!==null ? ' A oficina ficaria em '+U.pct(a.uso,0)+' da capacidade.' : '')+'</div>'+
+  '</section>';
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">'+
+    '<div class="campo" style="margin:0;width:180px"><label>Simular outra meta (pedidos no mês)</label><input type="number" id="lgMetaSim" min="0" step="1" value="'+U.num(ped).replace(/\./g,'')+'"></div>'+
+    '<button class="btn sec sm" data-lg="metaSim">Simular</button>'+
+    (Views._logMeta!==null ? '<button class="btn sec sm" data-lg="metaVoltar">Voltar para a meta do Planejamento</button>' : '')+
+    (Views._logMeta!==null && Views._logMeta!==U.n(meta.pedidos) ? '<button class="btn sm" data-lg="metaSalvar">Usar como meta de '+U.nomeMes(ym)+'</button>' : '')+
+  '</div></div>';
+
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Camisetas por semana', val:U.num(a.camSem), destaque:true, nota:U.num(a.pedDia,1)+' pedidos por dia'})+
+    UI.kpi({rot:'Oficina necessária', val:U.num(a.capNec)+'/semana', pequeno:true, pt: a.cap && a.camSem*1.15>a.cap ? 'cr':'ok', nota:'hoje: '+U.num(a.cap)+' com '+a.pessoas+' costureira(s)'})+
+    UI.kpi({rot:'Compras do mês', val:U.brl(a.comprasMes,0), pequeno:true, ajuda:'Malha, oficina, DTF e brindes pelos custos da Logística.', nota:'camisetas, DTF e brindes'})+
+    UI.kpi({rot:'Estoque alvo', val:U.brl(a.alvoValor,0), pequeno:true, nota:'hoje: '+U.brl(a.valorAtual,0)})+
+  '</div>';
+
+  h += '<div class="grade g2" style="align-items:start">';
+  h += '<div class="cartao"><div class="cartao-tit">Ajustes para essa meta</div>'+
+    (a.ajustes.length ? a.ajustes.map(function(x){
+      return '<div class="diag '+x.n+'"><span class="pt '+x.n+'" style="margin-top:5px"></span><div class="diag-corpo"><div class="diag-tit">'+U.esc(x.t)+'</div><div class="diag-txt">'+U.esc(x.x)+'</div>'+
+        (x.acao==='oficina' ? '<button class="diag-acao" data-lg="metaOficina" data-cap="'+a.capNec+'" data-pes="'+a.pessoasNec+'">Atualizar a oficina em Ajustes</button>' : '')+'</div></div>';
+    }).join('') : '<div class="diag ok"><span class="pt ok" style="margin-top:5px"></span><div class="diag-corpo"><div class="diag-tit">Nada a ajustar</div><div class="diag-txt">Oficina, estoque e expedição dão conta dessa meta.</div></div></div>')+
+  '</div>';
+  var linhas = [
+    ['Oficina', U.num(a.camSem*1.15)+' peças por semana com 15% de folga', a.pessoasNec!==null ? a.pessoasNec+' costureira(s) com '+U.num(a.porPessoa)+' peças cada' : ''],
+    ['Cortador', U.num(a.camSem)+' peças por semana', U.n(c.capacidadeCorte) ? 'capacidade de '+U.num(c.capacidadeCorte) : 'capacidade não informada'],
+    ['Malha', U.num(a.kgSem,1)+' kg por semana', U.num(a.rolosSem,1)+' rolo(s) por semana'],
+    ['DTF de São Paulo', U.num(a.metrosSem,1)+' metros por semana', U.pct(a.partLid*100,0)+' das camisetas'],
+    ['DTF da cidade', U.num(a.localSem)+' estampas por semana', 'estampas fora das líderes'],
+    ['Capelinha e sacolinha', U.num(a.pedSem)+' de cada por semana', 'chegam em D+1'],
+    ['Expedição', U.num(a.horasDia,1)+' horas por dia', a.pessoasExp+' pessoa(s)'],
+    ['Estoque de lisas', U.num(a.alvoPecas)+' camisetas', U.num(c.semanasAlvo)+' semanas; a reposição leva '+U.num(a.leadSem*7,0)+' dias']
+  ];
+  h += '<div class="cartao"><div class="cartao-tit">O que essa meta pede</div><div class="tabela-env"><table><tbody>'+
+    linhas.map(function(l){ return '<tr><td style="font-weight:500">'+l[0]+'</td><td>'+l[1]+'</td><td style="color:var(--texto-fraco)">'+l[2]+'</td></tr>'; }).join('')+
+    '</tbody></table></div></div>';
+  h += '</div>';
+  return h;
+};
+
+Views._logFin = true;
+Log.eventosAgenda = function(){
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-lg]'); if(!t) return;
+    var ac = t.getAttribute('data-lg');
+    if(ac==='togFin'){ Views._logFin = t.checked; App.render(); return; }
+    if(ac==='metaSim'){ var v = U.n(document.getElementById('lgMetaSim').value); Views._logMeta = v; App.render(); return; }
+    if(ac==='metaVoltar'){ Views._logMeta = null; App.render(); return; }
+    if(ac==='metaSalvar'){
+      var ym = UI.ym, m = Object.assign({}, Store.meta(ym), {pedidos: Views._logMeta});
+      UI.confirmar('Usar '+U.num(Views._logMeta)+' pedidos como meta de '+U.nomeMes(ym)+'?',
+        'A meta de pedidos do Planejamento muda para esse número. As outras metas do mês continuam iguais.',
+        function(){ Store.setMeta(ym, m); Views._logMeta = null; App.render(); }, 'Usar meta');
+      return;
+    }
+    if(ac==='metaOficina'){
+      var cap = U.n(t.getAttribute('data-cap')), pes = U.n(t.getAttribute('data-pes'));
+      UI.confirmar('Atualizar a oficina?', 'A capacidade passa para <b>'+U.num(cap)+' peças por semana</b> com <b>'+pes+' costureira(s)</b>. Faça isso quando a oficina já estiver assim de verdade, senão a reposição vai pedir mais do que ela entrega.',
+        function(){ Log.cfg().capacidadeSemana = cap; Log.cfg().pessoasOficina = pes; Log.salvar('Oficina atualizada'); App.render(); }, 'Atualizar');
+      return;
+    }
+  });
+};
+Log.eventosAgenda();
 
 /* ============ PROJETO LAZARUS (separado) ============ */
 /* Roda em um quadro próprio (lazarus.html). Não lê nem escreve nada do Painel. */
