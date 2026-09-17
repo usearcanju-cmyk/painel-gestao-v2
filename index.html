@@ -7911,7 +7911,8 @@ var Prod = {
     linkNuvemshop: 'https://usearcanju.lojavirtualnuvem.com.br/admin/orders/{id}',
     limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
     prensa: {temp:120, tempo:10, pressao:'média'},
-    rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+    rotina: ['08:00 | Imprimir todas as OS do dia e colocar cada uma na sua cesta (aba Pedidos)',
+      '08:05 | Ligar a prensa em 120 °C e ver o plano do dia',
       '08:10 | Recortar de uma vez todos os DTF do dia (lista na aba Prensa)',
       '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
       '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
@@ -7924,7 +7925,8 @@ var Prod = {
       '17:00 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
       '17:15 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
       '17:40 | Limpeza e arrumação'].join('\n'),
-    rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+    rotinaSexta: ['08:00 | Imprimir todas as OS do dia e colocar cada uma na sua cesta',
+      '08:05 | Ligar a prensa em 120 °C e ver o plano do dia',
       '08:10 | Recortar de uma vez todos os DTF do dia',
       '08:40 | Onda 1: separar, prensar, conferir e embalar',
       '11:00 | Onda 2: separar e prensar',
@@ -7936,7 +7938,7 @@ var Prod = {
       '15:30 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
       '16:30 | Limpeza da semana',
       '17:40 | Limpeza e arrumação'].join('\n'),
-    rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
+    rotinaSabado: ['08:00 | Imprimir as OS do dia, ligar a prensa e ver o plano',
       '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
       '10:45 | Pagar e colar as etiquetas',
       '11:15 | Levar à agência (sábado o limite é 12:00)',
@@ -8054,7 +8056,7 @@ var Prod = {
       var abertosRemotos = {}; remotas.forEach(function(o){ if(!(o.etapas && o.etapas.expedir)) abertosRemotos[o.id]=1; });
       enviados.forEach(function(p){ if(abertosRemotos[p.id]){ etapas[p.id]='expedir'; abertos.push(p); } });
       var d = Prod.d();
-      d.remoto = {ordens: remotas, avisos: r.avisos||[], feitos: r.feitos||{}, hoje: r.hoje};
+      d.remoto = {ordens: remotas, avisos: r.avisos||[], feitos: r.feitos||{}, hoje: r.hoje, nuvemStatus: r.nuvemStatus||null};
       d.equipe = r.equipe || d.equipe;
       if(r.config && Object.keys(r.config).length && !d.configLocal) d.config = r.config;
       d.sincronizado = new Date().toISOString();
@@ -8147,6 +8149,12 @@ Views.prodPainel = function(){
     UI.kpi({rot:'Embalar e etiquetar', val:U.num(por.embalar.length+por.etiqueta.length), pequeno:true})+
     UI.kpi({rot:'Postados hoje', val:U.num(postHoje.length), pequeno:true, nota:por.expedir.length+' pacote(s) esperando ir à agência'})+
   '</div>';
+  var st = rem.nuvemStatus;
+  if(st){
+    h += st.erro ? '<div class="aviso">A busca de pedidos na loja falhou: '+U.esc(st.erro)+'</div>'
+      : (st.pausado ? '<div class="info" style="margin-bottom:12px;font-size:12.5px">'+U.esc(st.pausado)+'</div>'
+      : '<div class="info" style="margin-bottom:12px;font-size:12.5px">Loja verificada em '+new Date(st.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+': '+U.num(st.porEmbalar||0)+' pedido(s) pagos esperando envio.</div>');
+  }
   var avisos = (rem.avisos||[]).filter(function(a){ return !a.resolvido; });
   if(avisos.length) h += '<div class="aviso">'+avisos.length+' aviso(s) da produção sem resposta. Veja na aba Avisos.</div>';
   var abertas = ord.filter(function(o){ return !(o.etapas && o.etapas.expedir); })
@@ -8221,7 +8229,8 @@ Views.prodGuia = function(){
   h += '<div class="cartao"><div class="cartao-tit">Limpeza</div>'+area('Todo dia','limpezaDia',6)+area('Sexta (semanal)','limpezaSemana',4)+'</div>';
   h += '<div class="cartao"><div class="cartao-tit">Padrões da aba Guia</div>'+
     area('Passo a passo','guia',12,'Linhas com "## " viram títulos; as outras viram passos. Vazio usa o guia padrão do portal.')+'</div>';
-  h += '</div><div style="margin-top:12px"><button class="btn" data-pd="salvarGuia">Salvar e enviar ao portal</button></div>';
+  h += '</div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-pd="salvarGuia">Salvar e enviar ao portal</button>'+
+    '<button class="btn sec" data-pd="guiaPadrao">Voltar ao roteiro e guia padrão</button></div>';
   return h;
 };
 
@@ -8394,6 +8403,7 @@ Views.prodAvisos = function(){
     if(ac==='delPessoa'){ d.equipe.splice(parseInt(t.getAttribute('data-i'),10),1); App.render(); return; }
     if(ac==='salvarEquipe'){ Prod.salvarEquipe(); return; }
     if(ac==='salvarGuia'){ Prod.salvarConfig(); return; }
+    if(ac==='guiaPadrao'){ UI.confirmar('Voltar ao roteiro padrão?', 'O roteiro, a limpeza e o guia voltam ao texto padrão, que já inclui imprimir as OS no começo do dia e dar baixa na Nuvemshop no fim. Prensa, horários da agência e links continuam como estão.', function(){ var c = Prod.d().config; ['rotina','rotinaSexta','rotinaSabado','limpezaDia','limpezaSemana','guia'].forEach(function(k){ delete c[k]; }); Prod.salvarConfig(); }, 'Voltar ao padrão'); return; }
     if(ac==='selTodos'){ Log.pedidosAbertos().forEach(function(p){ Views._prodSel[p.id]=true; }); App.render(); return; }
     if(ac==='imprimir'){ Prod.imprimir(); return; }
     if(ac==='aviso' || ac==='avisoDel'){

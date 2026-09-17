@@ -5,7 +5,7 @@
 //   · painel (e Lazarus): usa a APP_KEY para enviar ordens, equipe e guia.
 // Nada de financeiro passa por aqui.
 import crypto from 'node:crypto';
-import { pedidosNuvemshop, pedidoValido } from './_lib.js';
+import { pedidoValido } from './_lib.js';
 
 const RURL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
 const RTOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
@@ -78,10 +78,28 @@ function osDaNuvemshop(p, cfg) {
       endereco: String(e.address || ''), numero: String(e.number || ''), complemento: String(e.floor || ''),
       bairro: String(e.locality || ''), cidade: String(e.city || ''), uf: sigla(e.province), cep: String(e.zipcode || ''),
       envio: String(p.shipping_option || (p.shipping_option_reference || '') || p.shipping || ''),
-      rastreio: String(p.shipping_tracking_number || ''), nota: String(p.note || '')
+      rastreio: String(p.shipping_tracking_url || p.shipping_tracking_number || ''), nota: String(p.note || '')
     },
     enviado: ['fulfilled', 'shipped', 'delivered'].includes(envio) || Boolean(p.shipped_at)
   };
+}
+
+async function pedidosAbertos() {
+  const loja = process.env.NUVEMSHOP_STORE_ID, token = process.env.NUVEMSHOP_TOKEN;
+  if (!loja || !token) throw new Error('NUVEMSHOP_STORE_ID ou NUVEMSHOP_TOKEN não configurados na Vercel.');
+  const todos = [];
+  for (let pagina = 1; pagina <= 10; pagina++) {
+    const r = await fetch('https://api.tiendanube.com/v1/' + loja + '/orders?status=open&payment_status=paid&per_page=200&page=' + pagina, {
+      headers: { Authentication: 'bearer ' + token, 'User-Agent': 'Painel do Gestor Use Arcanju (contato@usearcanju.com.br)', 'Content-Type': 'application/json' }
+    });
+    if (r.status === 404) break;
+    if (!r.ok) throw new Error('Nuvemshop respondeu ' + r.status + ': ' + (await r.text()).slice(0, 160));
+    const lote = await r.json();
+    if (!Array.isArray(lote) || !lote.length) break;
+    todos.push(...lote);
+    if (lote.length < 200) break;
+  }
+  return todos;
 }
 
 async function nuvem(metodo, caminho, corpo, versao) {
@@ -192,10 +210,10 @@ function limparOS(o, modo) {
     destino: d ? {
       nome: txt(d.nome, 120), telefone: txt(d.telefone, 40), endereco: txt(d.endereco, 160), numero: txt(d.numero, 20),
       complemento: txt(d.complemento, 120), bairro: txt(d.bairro, 80), cidade: txt(d.cidade, 80), uf: txt(d.uf, 20),
-      cep: txt(d.cep, 12), envio: txt(d.envio, 160), rastreio: txt(d.rastreio, 60), nota: txt(d.nota, 500)
+      cep: txt(d.cep, 12), envio: txt(d.envio, 160), rastreio: txt(d.rastreio, 300), nota: txt(d.nota, 500)
     } : null,
     outros: (Array.isArray(o.outros) ? o.outros : []).slice(0, 20).map((x) => ({ nome: txt(x.nome, 120), qty: Math.max(0, Math.min(99, Number(x.qty) || 0)) })),
-    id: txt(o.id, 60), modo, numero: txt(o.numero, 30), cliente: txt(o.cliente, 40), uf: txt(o.uf, 2),
+    id: txt(o.id, 60), modo, numero: txt(o.numero, 30), cliente: txt(o.cliente, 40), uf: sigla(o.uf).slice(0, 2),
     prazo: txt(o.prazo, 10), liberadoEm: txt(o.liberadoEm, 10), lote: txt(o.lote, 60), loteId: txt(o.loteId, 60),
     obs: txt(o.obs, 200),
     itens: (Array.isArray(o.itens) ? o.itens : []).slice(0, 40).map((i) => ({
@@ -244,7 +262,7 @@ export default async function handler(req, res) {
       const r = await pipeline([
         ['GET', 'prod:config'], ['GET', 'prod:equipe'],
         ['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus'],
-        ['HGETALL', 'prod:feito:' + hoje], ['HGETALL', 'prod:lotes:lazarus']
+        ['HGETALL', 'prod:feito:' + hoje], ['HGETALL', 'prod:lotes:lazarus'], ['GET', 'prod:nuvem:status']
       ]);
       const equipe = ler(r[1], []).filter((x) => x.ativo !== false).map((x) => ({ id: x.id, nome: x.nome, dias: x.dias, inicio: x.inicio, fim: x.fim, capacidade: x.capacidade, jornada: x.jornada || 8, almocoMin: x.almocoMin || 60, almocoMax: x.almocoMax || 120 }));
       const ponto = ler(await redis('HGET', 'prod:ponto:' + hoje.slice(0, 7), s.id + '|' + hoje), null);
@@ -253,7 +271,7 @@ export default async function handler(req, res) {
       const feitos = {};
       Object.entries(hashObj(r[4])).forEach(([k, v]) => { feitos[k] = ler(v, null); });
       const lotes = Object.values(hashObj(r[5])).map((v) => ler(v, null)).filter(Boolean);
-      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes, ponto });
+      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes, ponto, nuvemStatus: ler(r[6], null) });
     }
 
     if (acao === 'etapa' && req.method === 'POST') {
@@ -399,58 +417,71 @@ export default async function handler(req, res) {
     }
 
     if (acao === 'nuvemshop') {
-      /* traz os pedidos pagos da loja direto para o portal */
+      /* traz os pedidos pagos e ainda não enviados da loja direto para o portal */
       const cron = process.env.CRON_SECRET
         ? req.headers.authorization === 'Bearer ' + process.env.CRON_SECRET
         : /vercel-cron/i.test(String(req.headers['user-agent'] || ''));
       const s = cron ? null : await sessao(req);
       if (!cron && !s && !chaveOk(req)) return falha(res, 401, 'Sem permissão.');
-      const forcar = chaveOk(req) && String(req.query.forcar || '') === '1';
+      const forcar = (chaveOk(req) || s) && String(req.query.forcar || '') === '1';
+      const guardar = async (st) => { st.em = new Date().toISOString(); await redis('SET', 'prod:nuvem:status', JSON.stringify(st)); return st; };
       const ultima = Number(await redis('GET', 'prod:nuvem:ultima')) || 0;
-      if (!forcar && Date.now() - ultima < 3 * 60 * 1000) return res.status(200).json({ ok: true, pulado: true });
+      if (!forcar && Date.now() - ultima < 3 * 60 * 1000) {
+        return res.status(200).json({ ok: true, pulado: true, status: ler(await redis('GET', 'prod:nuvem:status'), null) });
+      }
       await redis('SET', 'prod:nuvem:ultima', String(Date.now()));
       const cfg = ler(await redis('GET', 'prod:config'), {});
       const modoImp = cfg.importar || 'auto';
-      if (modoImp === 'nunca') return res.status(200).json({ ok: true, desligado: true });
+      if (modoImp === 'nunca') return res.status(200).json({ ok: true, status: await guardar({ pausado: 'A busca na loja está desligada no painel (Guia e rotina).' }) });
       if (modoImp === 'auto') {
         const lotes = Object.values(hashObj(await redis('HGETALL', 'prod:lotes:lazarus'))).map((v) => ler(v, null)).filter(Boolean);
         const lim = new Date(Date.now() - 21 * 864e5).toISOString().slice(0, 10);
-        if (lotes.some((l) => (l.postarEm || l.recebeEm || '') >= lim)) return res.status(200).json({ ok: true, lazarusAtivo: true });
-      }
-      const hoje = hojeBR();
-      const de = new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10);
-      const pedidos = (await pedidosNuvemshop(de, hoje)).filter(pedidoValido);
-      const r = await pipeline([['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus']]);
-      const atuais = hashObj(r[0]);
-      const doLazarus = new Set(Object.values(hashObj(r[1])).map((v) => (ler(v, {}) || {}).pedidoId).filter(Boolean));
-      const cmds = [];
-      let novas = 0, atualizadas = 0, enviadas = 0;
-      const quando = new Date().toISOString();
-      pedidos.forEach((p) => {
-        const n = osDaNuvemshop(p, cfg);
-        if (doLazarus.has(n.pedidoId)) return;
-        const antes = ler(atuais[n.id], null);
-        if (antes) {
-          let mudou = false;
-          if (!antes.destino || !antes.destino.endereco) { antes.destino = n.destino; mudou = true; }
-          if (!antes.link && n.link) { antes.link = n.link; mudou = true; }
-          if (n.destino.rastreio && antes.destino && antes.destino.rastreio !== n.destino.rastreio) { antes.destino.rastreio = n.destino.rastreio; mudou = true; }
-          if (n.enviado && !(antes.etapas && antes.etapas.expedir)) {
-            antes.etapas = antes.etapas || {};
-            ETAPAS.forEach((e) => { if (!antes.etapas[e]) antes.etapas[e] = { em: quando, por: 'Nuvemshop' }; });
-            mudou = true; enviadas++;
-          }
-          if (mudou) { cmds.push(['HSET', 'prod:os:arcanju', n.id, JSON.stringify(antes)]); atualizadas++; }
-          return;
+        if (lotes.some((l) => (l.postarEm || l.recebeEm || '') >= lim)) {
+          return res.status(200).json({ ok: true, status: await guardar({ pausado: 'Projeto Lazarus ativo: os pedidos entram pelos lotes. Dá para mudar em Guia e rotina.' }) });
         }
-        if (n.enviado) return;
-        const o = limparOS(n, 'arcanju');
-        o.etapas = {}; o.criado = quando;
-        cmds.push(['HSET', 'prod:os:arcanju', o.id, JSON.stringify(o)]);
-        novas++;
-      });
-      await pipeline(cmds);
-      return res.status(200).json({ ok: true, novas, atualizadas, enviadas, lidos: pedidos.length });
+      }
+      try {
+        const pedidos = (await pedidosAbertos()).filter(pedidoValido);
+        const r = await pipeline([['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus']]);
+        const atuais = hashObj(r[0]);
+        const doLazarus = new Set(Object.values(hashObj(r[1])).map((v) => (ler(v, {}) || {}).pedidoId).filter(Boolean));
+        const cmds = [];
+        let novas = 0, atualizadas = 0, enviadas = 0, porEmbalar = 0;
+        const quando = new Date().toISOString();
+        pedidos.forEach((p) => {
+          const n = osDaNuvemshop(p, cfg);
+          if (doLazarus.has(n.pedidoId)) return;
+          if (!n.enviado) porEmbalar++;
+          const antes = ler(atuais[n.id], null);
+          if (antes) {
+            let mudou = false;
+            if (!antes.destino || !antes.destino.endereco) { antes.destino = n.destino; mudou = true; }
+            if (!antes.link && n.link) { antes.link = n.link; mudou = true; }
+            if (!antes.pedidoId) { antes.pedidoId = n.pedidoId; mudou = true; }
+            if (antes.uf && antes.uf.length === 2 && antes.uf !== n.uf && n.uf.length === 2 && /[^A-Z]/.test(antes.uf)) { antes.uf = n.uf; mudou = true; }
+            if (n.destino.rastreio && antes.destino && antes.destino.rastreio !== n.destino.rastreio) { antes.destino.rastreio = n.destino.rastreio; mudou = true; }
+            if (n.enviado && !(antes.etapas && antes.etapas.expedir)) {
+              antes.etapas = antes.etapas || {};
+              ETAPAS.forEach((e) => { if (!antes.etapas[e]) antes.etapas[e] = { em: quando, por: 'Nuvemshop' }; });
+              antes.nuvem = Object.assign({}, antes.nuvem, { enviado: quando });
+              mudou = true; enviadas++;
+            }
+            if (mudou) { cmds.push(['HSET', 'prod:os:arcanju', n.id, JSON.stringify(antes)]); atualizadas++; }
+            return;
+          }
+          if (n.enviado) return;
+          const o = limparOS(n, 'arcanju');
+          o.etapas = {}; o.criado = quando;
+          cmds.push(['HSET', 'prod:os:arcanju', o.id, JSON.stringify(o)]);
+          novas++;
+        });
+        await pipeline(cmds);
+        const status = await guardar({ ok: true, lidos: pedidos.length, porEmbalar, novas, atualizadas, enviadas });
+        return res.status(200).json({ ok: true, novas, atualizadas, enviadas, lidos: pedidos.length, status });
+      } catch (e) {
+        const status = await guardar({ erro: e.message });
+        return res.status(200).json({ ok: false, status });
+      }
     }
 
     /* ---------------- painel e Lazarus (APP_KEY) ---------------- */
@@ -462,7 +493,7 @@ export default async function handler(req, res) {
       const cmds = modos.map((m) => ['HGETALL', 'prod:os:' + m]);
       const soArcanju = modos.length > 1;
       if (!soArcanju) cmds.push(['HGETALL', 'prod:avisos']);
-      if (soArcanju) cmds.push(['GET', 'prod:equipe'], ['GET', 'prod:config'], ['HGETALL', 'prod:avisos'], ['HGETALL', 'prod:feito:' + hojeBR()]);
+      if (soArcanju) cmds.push(['GET', 'prod:equipe'], ['GET', 'prod:config'], ['HGETALL', 'prod:avisos'], ['HGETALL', 'prod:feito:' + hojeBR()], ['GET', 'prod:nuvem:status']);
       const r = await pipeline(cmds);
       const ordens = {};
       modos.forEach((m, i) => { ordens[m] = Object.values(hashObj(r[i])).map((v) => ler(v, null)).filter(Boolean); });
@@ -480,6 +511,7 @@ export default async function handler(req, res) {
         const feitos = {};
         Object.entries(hashObj(r[n + 3])).forEach(([k, v]) => { feitos[k] = ler(v, null); });
         out.feitos = feitos;
+        out.nuvemStatus = ler(r[n + 4], null);
       }
       return res.status(200).json(out);
     }

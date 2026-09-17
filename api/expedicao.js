@@ -4,6 +4,8 @@
 import { cors, autorizado, periodo, erro, pedidosNuvemshop, pedidoValido } from './_lib.js';
 
 const ENVIADO = ['fulfilled', 'shipped', 'delivered'];
+const UFS = {'são paulo':'SP','minas gerais':'MG','rio de janeiro':'RJ','bahia':'BA','paraná':'PR','rio grande do sul':'RS','pernambuco':'PE','ceará':'CE','pará':'PA','santa catarina':'SC','goiás':'GO','maranhão':'MA','paraíba':'PB','amazonas':'AM','espírito santo':'ES','mato grosso':'MT','rio grande do norte':'RN','piauí':'PI','alagoas':'AL','distrito federal':'DF','mato grosso do sul':'MS','sergipe':'SE','rondônia':'RO','tocantins':'TO','acre':'AC','amapá':'AP','roraima':'RR'};
+function sigla(uf) { const t = String(uf || '').trim(); return t.length === 2 ? t.toUpperCase() : (UFS[t.toLowerCase()] || ''); }
 
 export default async function handler(req, res) {
   cors(res);
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
         numero: String(p.number || p.id),
         data: String(p.created_at || p.completed_at || '').slice(0, 10),
         cliente: String(cliente.name || endereco.name || '').split(' ')[0],
-        uf: String(endereco.province || endereco.state || '').slice(0, 2).toUpperCase(),
+        uf: sigla(endereco.province || endereco.state),
         enviado: ENVIADO.includes(envio) || Boolean(enviadoEm),
         enviadoEm,
         link: process.env.NUVEMSHOP_ADMIN_URL ? process.env.NUVEMSHOP_ADMIN_URL.replace('{id}', String(p.id)) : '',
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
           nome: String(endereco.name || cliente.name || ''), telefone: String(endereco.phone || p.contact_phone || cliente.phone || ''),
           endereco: String(endereco.address || ''), numero: String(endereco.number || ''), complemento: String(endereco.floor || ''),
           bairro: String(endereco.locality || ''), cidade: String(endereco.city || ''), uf: String(endereco.province || ''),
-          cep: String(endereco.zipcode || ''), envio: String(p.shipping_option || ''), rastreio: String(p.shipping_tracking_number || ''),
+          cep: String(endereco.zipcode || ''), envio: String(p.shipping_option || ''), rastreio: String(p.shipping_tracking_url || p.shipping_tracking_number || ''),
           nota: String(p.note || '')
         },
         itens: (Array.isArray(p.products) ? p.products : []).map((i) => ({

@@ -200,7 +200,8 @@ var PADRAO = {
   limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
   prensa: {temp:120, tempo:10, pressao:'média'},
   envioUrl: '',
-  rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+  rotina: ['08:00 | Imprimir todas as OS do dia e colocar cada uma na sua cesta (aba Pedidos)',
+    '08:05 | Ligar a prensa em 120 °C e ver o plano do dia',
     '08:10 | Recortar de uma vez todos os DTF do dia (lista na aba Prensa)',
     '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
     '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
@@ -213,7 +214,8 @@ var PADRAO = {
     '17:00 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
     '17:15 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
     '17:40 | Limpeza e arrumação'].join('\n'),
-  rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+  rotinaSexta: ['08:00 | Imprimir todas as OS do dia e colocar cada uma na sua cesta',
+    '08:05 | Ligar a prensa em 120 °C e ver o plano do dia',
     '08:10 | Recortar de uma vez todos os DTF do dia',
     '08:40 | Onda 1: separar, prensar, conferir e embalar',
     '11:00 | Onda 2: separar e prensar',
@@ -225,7 +227,7 @@ var PADRAO = {
     '15:30 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
     '16:30 | Limpeza da semana',
     '17:40 | Limpeza e arrumação'].join('\n'),
-  rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
+  rotinaSabado: ['08:00 | Imprimir as OS do dia, ligar a prensa e ver o plano',
     '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
     '10:45 | Pagar e colar as etiquetas',
     '11:15 | Levar à agência (sábado o limite é 12:00)',
@@ -288,10 +290,10 @@ function hojeISO(){ return S.dados ? S.dados.hoje : new Date().toISOString().sli
 function diaSemana(){ return dt(hojeISO()).getDay(); }
 
 /* ---------- servidor ---------- */
-function api(acao, corpo){
+function api(acao, corpo, forcar){
   var op = {method: corpo?'POST':'GET', headers:{'x-prod-token':S.token}};
   if(corpo){ op.headers['content-type']='application/json'; op.body=JSON.stringify(corpo); }
-  return fetch(API+'?acao='+acao, op).then(function(r){
+  return fetch(API+'?acao='+acao+(forcar?'&forcar='+forcar:''), op).then(function(r){
     return r.json().catch(function(){ return {}; }).then(function(j){
       if(r.status===401 && acao!=='entrar'){ sair(true); throw new Error(j.erro||'Sessão expirada.'); }
       if(!r.ok) throw new Error(j.erro||('Erro '+r.status));
@@ -470,9 +472,22 @@ function render(){
   $('#conteudo').innerHTML = h;
 }
 
+function lojaStatus(){
+  var st = S.dados && S.dados.nuvemStatus;
+  if(!st) return '';
+  var q = st.em ? ' <span class="fraco">às '+hm(st.em)+'</span>' : '';
+  if(st.erro) return '<div class="cartao" style="border-color:var(--rubro)"><b style="color:var(--rubro)">A busca na loja falhou.</b> <span class="medio pequeno">'+esc(st.erro)+q+'</span></div>';
+  if(st.pausado) return '<div class="cartao"><b>Os pedidos não estão vindo da loja sozinhos.</b> <span class="medio pequeno">'+esc(st.pausado)+q+'</span></div>';
+  return '<div class="pequeno fraco" style="margin:-4px 0 10px">Loja verificada'+q+': '+(st.porEmbalar||0)+' pedido(s) pagos esperando envio'+(st.novas?', '+st.novas+' novo(s)':'')+'.</div>';
+}
 function vHoje(){
   var p = plano(S.modo), c = cfg(), eq = equipeHoje();
   var ponto = vPonto();
+  var semOS = p.hoje.filter(function(o){ return !o.impressaEm; });
+  var primeira = p.hoje.length ? '<div class="cartao" style="border-color:var(--vinho)"><h3>Comece por aqui</h3>'+
+    '<p class="medio pequeno" style="margin-top:0">Imprima as OS do dia e coloque cada uma na cesta do pedido.</p>'+
+    (semOS.length ? '<button class="btn grande" data-imprimir-dia="faltam">Imprimir '+semOS.length+' OS e montar as cestas</button>'
+      : '<div class="chip ok">As '+p.hoje.length+' OS do dia já foram impressas</div>')+'</div>' : '';
   var lim = limiteHoje(), falta = minutosAte(lim);
   var feitas = feitasHoje(S.modo).length, meta = p.hoje.length + feitas;
   var pct = meta ? Math.round(feitas/meta*100) : 0;
@@ -485,7 +500,7 @@ function vHoje(){
     '<div class="fraco pequeno">'+(eq.length ? 'Equipe hoje: '+eq.map(function(f){ return esc(f.nome); }).join(', ')+'. Capacidade de '+p.cap+' pedidos.' : 'Ninguém está escalado para hoje.')+
       (p.depois.length ? ' '+p.depois.length+' pedido(s) ficam para amanhã.' : '')+'</div>'+
   '</div>';
-  h = ponto + h;
+  h = ponto + lojaStatus() + primeira + h;
   if(p.atrasadas.length) h += '<div class="cartao" style="border-color:var(--rubro)"><b style="color:var(--rubro)">'+p.atrasadas.length+' pedido(s) passaram do prazo.</b> <span class="medio">Eles estão no começo da onda 1. Faça esses primeiro.</span></div>';
   h += '<div class="grade2" style="margin-bottom:12px">'+
     '<div class="kpi"><b class="num">'+p.onda1.filter(proxima).length+'</b><span>na onda 1 (manhã)</span></div>'+
@@ -586,8 +601,10 @@ function vPedidos(){
       (lista.length ? lista.map(osHTML).join('') : '<div class="medio pequeno">Nada nesta onda.</div>');
   };
   var faltam = p.hoje.filter(function(o){ return !o.impressaEm; });
-  var h = '<div class="barra-imp"><button class="btn" data-imprimir-dia="todas"'+(p.hoje.length?'':' disabled')+'>Imprimir todas as OS do dia ('+p.hoje.length+')</button>'+
-    (faltam.length && faltam.length!==p.hoje.length ? '<button class="btn sec" data-imprimir-dia="faltam">Só as que faltam ('+faltam.length+')</button>' : '')+'</div>';
+  var h = lojaStatus();
+  h += '<div class="barra-imp"><button class="btn" data-imprimir-dia="todas"'+(p.hoje.length?'':' disabled')+'>Imprimir todas as OS do dia ('+p.hoje.length+')</button>'+
+    (faltam.length && faltam.length!==p.hoje.length ? '<button class="btn sec" data-imprimir-dia="faltam">Só as que faltam ('+faltam.length+')</button>' : '')+
+    '<button class="btn leve" data-buscar="1">Buscar pedidos na loja</button></div>';
   h += '<p class="medio pequeno" style="margin-top:0">Na ordem de prioridade. Toque no pedido para ver as camisetas e marcar a etapa. Cada pedido tem a sua cesta com a ordem de serviço dentro.</p>';
   h += onda('Onda 1, manhã', p.onda1) + onda('Onda 2, tarde', p.onda2);
   if(p.depois.length) h += '<div class="onda-cab"><h3>Se sobrar tempo <span class="medio" style="font-weight:500">('+p.depois.length+')</span></h3></div>'+p.depois.map(osHTML).join('');
@@ -808,6 +825,7 @@ document.addEventListener('click', function(e){
   var t;
   if((t = e.target.closest('[data-aba]'))){ S.aba = t.getAttribute('data-aba'); render(); window.scrollTo(0,0); return; }
   if((t = e.target.closest('[data-modo]'))){ S.modo = t.getAttribute('data-modo'); localStorage.setItem('prod_modo', S.modo); S.aberta=null; render(); return; }
+  if((t = e.target.closest('[data-buscar]'))){ toast('Buscando na loja…'); api('nuvemshop', null, '1').then(function(){ return carregar(); }).then(function(){ toast('Pronto'); }).catch(function(er){ toast(er.message); }); return; }
   if((t = e.target.closest('[data-ponto]'))){ var tp = t.getAttribute('data-ponto'); if(tp==='saida' && !confirm('Encerrar o dia agora?')) return; marcarPonto(tp); return; }
   if((t = e.target.closest('[data-baixa]'))){ darBaixa(t); return; }
   if((t = e.target.closest('[data-imprimir]'))){ imprimirOS([acharOS(t.getAttribute('data-imprimir'))]); return; }
