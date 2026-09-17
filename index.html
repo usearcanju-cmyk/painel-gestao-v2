@@ -372,6 +372,24 @@ button.etq{cursor:pointer;border:none}
 .lz-topo span{flex:1;min-width:200px}
 .lz-quadro{display:block;width:100%;height:calc(100vh - 106px);border:0;background:#E4E9EC}
 
+#printArea{display:none}
+@page{size:A4;margin:8mm}
+@media print{
+  body.imprimindo > *:not(#printArea){display:none!important}
+  body.imprimindo{background:#fff}
+  body.imprimindo #printArea{display:block}
+  .os-folha{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:136mm;gap:5mm;page-break-after:always;break-after:page}
+  .os-print{border:1.5px dashed #555;border-radius:3mm;padding:5mm;font-family:Arial,sans-serif;font-size:10.5pt;color:#000;display:flex;flex-direction:column;gap:3mm;overflow:hidden}
+  .os-top{display:flex;justify-content:space-between;gap:4mm;border-bottom:1.5px solid #000;padding-bottom:3mm}
+  .os-num{font-size:24pt;font-weight:800;line-height:1}
+  .os-prazo{font-size:16pt;font-weight:800}
+  .os-lab{font-size:8.5pt;color:#333}
+  .os-tab{width:100%;border-collapse:collapse}
+  .os-tab th,.os-tab td{border-bottom:1px solid #999;padding:1.5mm;text-align:left;font-size:10pt;vertical-align:top}
+  .os-tab th{font-size:8.5pt}
+  .os-etapas{margin-top:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:2mm;font-size:10pt;border-top:1px solid #000;padding-top:3mm}
+}
+
 </style>
 </head>
 <body>
@@ -2035,7 +2053,8 @@ var NAV = [
     {id:'custos', nome:'Custos', ico:'M20 7 12 3 4 7v10l8 4 8-4zM12 11v10M4 7l8 4 8-4'}
   ]},
   {g:'Operação', itens:[
-    {id:'logistica', nome:'Logística', ico:'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'}
+    {id:'logistica', nome:'Logística', ico:'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'},
+    {id:'producao', nome:'Produção', ico:'M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z'}
   ]},
   {g:'Missões', itens:[
     {id:'lazarus', nome:'Projeto Lazarus', ico:'M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7z'}
@@ -2069,6 +2088,13 @@ var ABAS = {
     {id:'meta', nome:'Meta'},
     {id:'indicadores', nome:'Indicadores'},
     {id:'ajustes', nome:'Ajustes'}
+  ],
+  producao: [
+    {id:'painel', nome:'Acompanhamento'},
+    {id:'imprimir', nome:'Ordens de serviço'},
+    {id:'equipe', nome:'Equipe'},
+    {id:'guia', nome:'Guia e rotina'},
+    {id:'avisos', nome:'Avisos'}
   ],
   caixa: [
     {id:'saldo', nome:'Caixa e contas'},
@@ -5596,11 +5622,11 @@ var App = {
     document.querySelectorAll('.nav-item').forEach(function(b){
       b.classList.toggle('ativo', b.getAttribute('data-tela')===UI.tela);
     });
-    var semPeriodo = ['custos','integracoes','config','lazarus'];
+    var semPeriodo = ['custos','integracoes','config','lazarus','producao'];
     var abaLog = UI.tela==='logistica' ? (UI.aba||'expedicao') : '';
     var semMes = semPeriodo.indexOf(UI.tela)>=0 || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta');
     document.getElementById('periodoCtrl').style.display = semMes ? 'none' : '';
-    document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus') ? 'none' : '';
+    document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus'||UI.tela==='producao') ? 'none' : '';
     alvo.classList.toggle('cheio', UI.tela==='lazarus');
 
     var h = '';
@@ -5623,6 +5649,7 @@ var App = {
     else if(UI.tela==='config') h += Views.config();
     else if(UI.tela==='logistica') h += Views.logistica();
     else if(UI.tela==='lazarus') h += Views.lazarus();
+    else if(UI.tela==='producao') h += Views.producao();
     else h += Views.hoje();
 
     alvo.innerHTML = h;
@@ -7852,6 +7879,377 @@ Views.lazarus = function(){
     '<a class="btn sec sm" href="'+src+'" target="_blank" rel="noopener">Abrir em tela cheia</a></div>'+
     '<iframe class="lz-quadro" src="'+src+'" title="Projeto Lazarus"></iframe>';
 };
+
+/* ============================================================
+   PRODUÇÃO — acompanha o portal da equipe (/producao)
+   Envia as ordens de serviço da Logística, recebe o andamento,
+   cuida da equipe, do guia do dia e dos avisos.
+   O portal só enxerga as tarefas da produção.
+============================================================ */
+var Prod = {
+  PADRAO: {
+    limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
+    prensa: {temp:120, tempo:10, pressao:'média'},
+    rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+      '08:10 | Recortar de uma vez todos os DTF do dia (lista na aba Prensa)',
+      '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
+      '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
+      '10:45 | Onda 1: conferir e embalar',
+      '12:00 | Almoço',
+      '13:00 | Onda 2: separar e prensar',
+      '14:15 | Onda 2: conferir e embalar',
+      '15:15 | Pagar todas as etiquetas no site, imprimir e colar',
+      '16:00 | Conferir o nome da etiqueta com a ordem e levar à agência',
+      '17:00 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
+      '17:40 | Limpeza e arrumação'].join('\n'),
+    rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+      '08:10 | Recortar de uma vez todos os DTF do dia',
+      '08:40 | Onda 1: separar, prensar, conferir e embalar',
+      '11:00 | Onda 2: separar e prensar',
+      '12:00 | Almoço',
+      '13:00 | Onda 2: conferir e embalar',
+      '13:45 | Pagar todas as etiquetas, imprimir e colar',
+      '14:15 | Levar à agência (hoje o limite é 15:00)',
+      '15:15 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
+      '16:30 | Limpeza da semana',
+      '17:40 | Limpeza e arrumação'].join('\n'),
+    rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
+      '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
+      '10:45 | Pagar e colar as etiquetas',
+      '11:15 | Levar à agência (sábado o limite é 12:00)'].join('\n'),
+    limpezaDia: 'Tirar os recortes e filmes de DTF das mesas\nLimpar a base e o teflon da prensa, com ela fria\nVarrer o chão\nEsvaziar o lixo\nDevolver as cestas vazias ao lugar\nDesligar a prensa da tomada',
+    limpezaSemana: 'Limpar as prateleiras\nContar as camisetas lisas e anotar\nOrganizar as pastas de DTF por estampa\nRepor saquinhos, etiquetas e kits na mesa de embalagem',
+    guia: ''
+  },
+  pins: {},
+  ETAPAS: ['separar','prensar','conferir','embalar','etiqueta','expedir'],
+  NOME: {separar:'A separar', prensar:'A prensar', conferir:'A conferir', embalar:'A embalar', etiqueta:'Etiqueta', expedir:'Levar à agência'},
+
+  d: function(){
+    if(!Store.dados.producao || typeof Store.dados.producao!=='object') Store.dados.producao = {};
+    var p = Store.dados.producao;
+    if(!Array.isArray(p.equipe)) p.equipe = [];
+    if(!p.config || typeof p.config!=='object') p.config = {};
+    return p;
+  },
+  cfg: function(){
+    var c = Prod.d().config, o = {};
+    Object.keys(Prod.PADRAO).forEach(function(k){ o[k] = (c[k]!==undefined && c[k]!=='') ? c[k] : Prod.PADRAO[k]; });
+    o.limites = Object.assign({}, Prod.PADRAO.limites, c.limites||{});
+    o.prensa = Object.assign({}, Prod.PADRAO.prensa, c.prensa||{});
+    return o;
+  },
+  url: function(params){
+    var u = Integra.url('producao', params);
+    if(u) return u;
+    if(/^https?:/.test(location.protocol)){
+      var q = Object.keys(params||{}).map(function(k){ return k+'='+encodeURIComponent(params[k]); }).join('&');
+      return '/api/producao'+(q?'?'+q:'');
+    }
+    return null;
+  },
+  portal: function(){
+    var base = (Integra.cfg().proxyUrl||'').replace(/\/+$/,'').replace(/\/api$/,'');
+    if(base) return base+'/producao';
+    return /^https?:/.test(location.protocol) ? location.origin+'/producao' : '/producao';
+  },
+  chamar: function(acao, corpo, extra){
+    var u = Prod.url(Object.assign({acao:acao}, extra||{}));
+    if(!u) return Promise.reject(new Error('Configure o endereço do conector em Integrações.'));
+    var h = {'x-arcanju-key': Integra.cfg().chave||''};
+    var op = {method: corpo?'POST':'GET', headers:h};
+    if(corpo){ h['content-type']='application/json'; op.body = JSON.stringify(corpo); }
+    return fetch(u, op).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){
+        if(!r.ok) throw new Error(j.erro || ('O portal respondeu com erro '+r.status+'.'));
+        return j;
+      });
+    }).catch(function(e){
+      if(/Failed to fetch|NetworkError/i.test(e.message||'')) throw new Error('Não foi possível falar com o portal. Confira se api/producao.js foi publicado.');
+      throw e;
+    });
+  },
+
+  /* pedido da Logística → ordem de serviço */
+  paraOS: function(p){
+    return {
+      id: p.id, numero: p.numero, cliente: p.cliente||'', uf: p.uf||'', prazo: Log.prazo(p),
+      itens: (p.itens||[]).map(function(i){ return {estampa:i.estampa, cor:i.cor, corNome:Log.nomeCor(i.cor), mod:i.mod, tam:i.tam, qty:i.qty}; }),
+      brindes: true
+    };
+  },
+  ultimaEtapa: function(o){
+    var e = o.etapas||{}, u = null;
+    Prod.ETAPAS.forEach(function(x){ if(e[x]) u = x; });
+    return u;
+  },
+
+  /* traz o andamento, atualiza a Logística e envia os pedidos abertos */
+  sincronizar: function(silencioso){
+    if(!silencioso) UI.toast('Sincronizando com a produção…');
+    return Prod.chamar('painel').then(function(r){
+      var remotas = (r.ordens && r.ordens.arcanju) || [];
+      var x = Log.d(), mudou = 0;
+      var ordem = {novo:0, separado:1, pronto:2, enviado:3};
+      remotas.forEach(function(o){
+        var p = x.pedidos.find(function(y){ return y.id===o.id; });
+        if(!p) return;
+        var u = Prod.ultimaEtapa(o);
+        var alvo = u==='expedir' ? 'enviado' : ((u==='embalar'||u==='etiqueta') ? 'pronto' : (u ? 'separado' : null));
+        if(!alvo || ordem[alvo] <= ordem[p.status]) return;
+        if(p.status==='novo'){ Log.consumir(p, true); }
+        p.status = alvo;
+        if(alvo==='enviado') p.enviadoEm = U.iso(new Date(o.etapas.expedir.em));
+        mudou++;
+      });
+      var abertos = Log.pedidosAbertos();
+      var idsAbertos = {}; abertos.forEach(function(p){ idsAbertos[p.id]=1; });
+      var remover = remotas.filter(function(o){ return !idsAbertos[o.id] && !(o.etapas && o.etapas.expedir); }).map(function(o){ return o.id; });
+      var etapas = {};
+      abertos.forEach(function(p){ if(p.status==='pronto') etapas[p.id]='embalar'; });
+      var d = Prod.d();
+      d.remoto = {ordens: remotas, avisos: r.avisos||[], feitos: r.feitos||{}, hoje: r.hoje};
+      d.equipe = r.equipe || d.equipe;
+      if(r.config && Object.keys(r.config).length && !d.configLocal) d.config = r.config;
+      d.sincronizado = new Date().toISOString();
+      Log.salvar(mudou ? mudou+' pedido(s) atualizados pela produção' : undefined);
+      return Prod.chamar('publicar', {modo:'arcanju', ordens: abertos.map(Prod.paraOS), remover: remover, etapas: etapas}).then(function(res){
+        return Prod.chamar('painel').then(function(r2){
+          Prod.d().remoto.ordens = (r2.ordens && r2.ordens.arcanju) || [];
+          Store.salvar();
+          if(!silencioso) UI.toast(res.enviadas+' ordem(ns) na produção'+(mudou?', '+mudou+' pedido(s) atualizados aqui':''));
+          App.render();
+        });
+      });
+    }).catch(function(e){ if(!silencioso) UI.toast(e.message); App.render(); });
+  },
+
+  salvarEquipe: function(){
+    var d = Prod.d();
+    var lista = d.equipe.map(function(f){ return {id:f.id, nome:f.nome, pin:Prod.pins[f.id]||'', dias:f.dias, inicio:f.inicio, fim:f.fim, capacidade:f.capacidade, ativo:f.ativo!==false}; });
+    if(lista.some(function(f){ return !f.nome; })){ UI.toast('Toda pessoa precisa de um nome.'); return; }
+    Prod.chamar('equipe', {equipe:lista}).then(function(r){
+      d.equipe = r.equipe; Prod.pins = {}; Store.commit('Equipe enviada ao portal'); App.render();
+    }).catch(function(e){ UI.toast(e.message); });
+  },
+  salvarConfig: function(){
+    var d = Prod.d(); d.configLocal = true;
+    var c = Prod.cfg();
+    Prod.chamar('config', {config:c}).then(function(){ Store.commit('Guia enviado ao portal'); App.render(); })
+      .catch(function(e){ Store.salvar(); UI.toast(e.message); });
+  },
+  capacidadeSemana: function(){
+    var s = 0; Prod.d().equipe.forEach(function(f){ if(f.ativo!==false) s += U.n(f.capacidade,20)*(f.dias||[]).length; });
+    return s;
+  }
+};
+
+Views.producao = function(){
+  var a = UI.aba;
+  var h = '<div id="prodRoot">';
+  if(a==='equipe') h += Views.prodEquipe();
+  else if(a==='guia') h += Views.prodGuia();
+  else if(a==='imprimir') h += Views.prodImprimir();
+  else if(a==='avisos') h += Views.prodAvisos();
+  else h += Views.prodPainel();
+  return h+'</div>';
+};
+
+Views.prodPainel = function(){
+  var d = Prod.d(), rem = d.remoto, hoje = U.hoje();
+  var capSem = Prod.capacidadeSemana();
+  var r = Log.ritmo(), meta = Store.meta(U.ymAtual());
+  var pedSem = U.n(meta.pedidos)>0 ? U.n(meta.pedidos)/U.diasNoMes(U.ymAtual())*7 : r.pedDia*7;
+  var h = '';
+  var falta = capSem>0 && pedSem > capSem;
+  h += '<section class="veredito '+(!capSem?'atencao':(falta?'critico':''))+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+(!capSem ? 'Cadastre a equipe da produção.' : (falta ? 'A equipe faz '+U.num(capSem)+' pedidos por semana e a meta pede '+U.num(pedSem)+'.' : 'A equipe dá conta: '+U.num(capSem)+' pedidos por semana para '+U.num(pedSem)+' da meta.'))+'</div>'+
+    '<div class="veredito-apoio">'+(falta ? 'Faltam cerca de '+U.num(Math.ceil((pedSem-capSem)/Math.max(1, capSem/Math.max(1,d.equipe.length))))+' pessoa(s) no mesmo ritmo, ou um sábado de trabalho. ' : '')+
+      'Endereço do portal: <b>'+U.esc(Prod.portal())+'</b>. Cada pessoa entra com o próprio PIN e vê só as tarefas do dia.</div>'+
+  '</section>';
+  h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
+    '<div class="cartao-tit">Sincronizar com a produção</div><div class="cartao-sub" style="margin:0">Envia os pedidos em aberto da Logística como ordens de serviço e traz o que a equipe já fez: separado, embalado e postado atualizam o estoque e a expedição aqui.'+
+    (d.sincronizado ? ' Última vez: '+new Date(d.sincronizado).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'.' : '')+'</div></div>'+
+    '<button class="btn" data-pd="sinc">Sincronizar agora</button></div></div>';
+  if(!rem) return h + UI.vazio('Ainda sem dados do portal', 'Cadastre a equipe, configure o banco de dados na Vercel e toque em Sincronizar agora.');
+  var ord = rem.ordens||[];
+  var por = {}; Prod.ETAPAS.forEach(function(e){ por[e]=[]; });
+  var postHoje = [];
+  ord.forEach(function(o){
+    var u = Prod.ultimaEtapa(o);
+    var prox = u ? Prod.ETAPAS[Prod.ETAPAS.indexOf(u)+1] : 'separar';
+    if(prox) por[prox].push(o);
+    else if(o.etapas.expedir && U.iso(new Date(o.etapas.expedir.em))===hoje) postHoje.push(o);
+  });
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'A separar', val:U.num(por.separar.length), destaque:true})+
+    UI.kpi({rot:'Prensar e conferir', val:U.num(por.prensar.length+por.conferir.length), pequeno:true})+
+    UI.kpi({rot:'Embalar e etiquetar', val:U.num(por.embalar.length+por.etiqueta.length), pequeno:true})+
+    UI.kpi({rot:'Postados hoje', val:U.num(postHoje.length), pequeno:true, nota:por.expedir.length+' pacote(s) esperando ir à agência'})+
+  '</div>';
+  var avisos = (rem.avisos||[]).filter(function(a){ return !a.resolvido; });
+  if(avisos.length) h += '<div class="aviso">'+avisos.length+' aviso(s) da produção sem resposta. Veja na aba Avisos.</div>';
+  var abertas = ord.filter(function(o){ return !(o.etapas && o.etapas.expedir); })
+    .sort(function(a,b){ return (a.prazo||'')<(b.prazo||'')?-1:1; });
+  h += '<div class="tabela-env"><table><thead><tr><th>Pedido</th><th class="c">Envio até</th><th>Etapa</th><th>Último registro</th></tr></thead><tbody>'+
+    (abertas.length ? abertas.map(function(o){
+      var u = Prod.ultimaEtapa(o), prox = u ? Prod.ETAPAS[Prod.ETAPAS.indexOf(u)+1] : 'separar';
+      var reg = u ? o.etapas[u] : null;
+      var cls = o.prazo<hoje ? 'fal' : (o.prazo===hoje ? 'pen' : 'pag');
+      return '<tr><td><b>#'+U.esc(o.numero)+'</b> <span style="color:var(--texto-fraco)">'+(o.itens||[]).reduce(function(s,i){ return s+i.qty; },0)+' cam.</span></td>'+
+        '<td class="c"><span class="etq '+cls+'">'+U.dataBr(o.prazo).slice(0,5)+'</span></td>'+
+        '<td>'+Prod.NOME[prox]+'</td>'+
+        '<td style="color:var(--texto-medio);font-size:12.5px">'+(reg ? U.esc(reg.por)+', '+new Date(reg.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—')+'</td></tr>';
+    }).join('') : '<tr><td colspan="4" style="color:var(--texto-fraco)">Nenhuma ordem em aberto no portal.</td></tr>')+
+  '</tbody></table></div>';
+  var feitos = rem.feitos||{}, rot = Object.keys(feitos).filter(function(k){ return k.indexOf('rot:')===0; }).length;
+  var limp = Object.keys(feitos).filter(function(k){ return k.indexOf('limp:')===0; }).length;
+  h += '<div class="info" style="margin-top:12px;font-size:12.5px">Hoje no portal: '+rot+' passo(s) do roteiro e '+limp+' item(ns) de limpeza marcados.</div>';
+  return h;
+};
+
+Views.prodEquipe = function(){
+  var d = Prod.d(), dias = ['dom','seg','ter','qua','qui','sex','sáb'];
+  var h = '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Equipe da produção</div>'+
+    '<div class="cartao-sub">Cada pessoa entra no portal com o próprio PIN (4 a 8 números). O PIN não fica guardado aqui: depois de enviado, só dá para trocar. A capacidade é quantos pedidos a pessoa termina por dia, do começo ao fim.</div>'+
+    '<div class="tabela-env"><table><thead><tr><th>Nome</th><th>PIN</th><th>Dias</th><th class="c">Início</th><th class="c">Fim</th><th class="c">Pedidos/dia</th><th class="c">Ativo</th><th></th></tr></thead><tbody>'+
+    (d.equipe.length ? d.equipe.map(function(f,i){
+      return '<tr><td><input type="text" data-pdeq="'+i+'.nome" value="'+U.esc(f.nome)+'" style="min-width:110px"></td>'+
+        '<td><input type="password" inputmode="numeric" autocomplete="new-password" data-pdeq="'+i+'._pin" placeholder="'+(f.temPin?'••• trocar':'novo PIN')+'" value="'+U.esc(Prod.pins[f.id]||'')+'" style="width:100px"></td>'+
+        '<td style="white-space:nowrap">'+dias.map(function(n,di){ return '<label style="font-size:11.5px;margin-right:4px"><input type="checkbox" data-pddia="'+i+'.'+di+'" '+((f.dias||[]).indexOf(di)>=0?'checked':'')+'> '+n+'</label>'; }).join('')+'</td>'+
+        '<td class="c"><input type="time" data-pdeq="'+i+'.inicio" value="'+U.esc(f.inicio||'08:00')+'"></td>'+
+        '<td class="c"><input type="time" data-pdeq="'+i+'.fim" value="'+U.esc(f.fim||'18:00')+'"></td>'+
+        '<td class="c"><input type="number" min="1" step="1" data-pdeq="'+i+'.capacidade" value="'+U.n(f.capacidade,20)+'" style="width:70px"></td>'+
+        '<td class="c"><input type="checkbox" data-pdeq="'+i+'.ativo" '+(f.ativo!==false?'checked':'')+'></td>'+
+        '<td class="c"><button class="btn-icone" data-pd="delPessoa" data-i="'+i+'">✕</button></td></tr>';
+    }).join('') : '<tr><td colspan="8" style="color:var(--texto-fraco)">Ninguém cadastrado.</td></tr>')+
+    '</tbody></table></div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" data-pd="addPessoa">Adicionar pessoa</button><button class="btn sm" data-pd="salvarEquipe">Salvar e enviar ao portal</button></div></div>';
+  var cap = Prod.capacidadeSemana();
+  h += '<div class="info" style="font-size:12.5px">Capacidade da equipe: '+U.num(cap)+' pedidos por semana, cerca de '+U.num(cap*4.3)+' por mês.</div>';
+  return h;
+};
+
+Views.prodGuia = function(){
+  var c = Prod.cfg(), dias = ['','segunda','terça','quarta','quinta','sexta','sábado'];
+  var area = function(rot, k, linhas, dica){ return '<div class="campo"><label>'+rot+'</label><textarea data-pdcfg="'+k+'" rows="'+linhas+'">'+U.esc(c[k])+'</textarea>'+(dica?'<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">'+dica+'</div>':'')+'</div>'; };
+  var h = '<div class="grade g2" style="align-items:start">';
+  h += '<div class="cartao"><div class="cartao-tit">Prensa e agência</div>'+
+    '<div class="linha-campos lc3">'+
+      '<div class="campo"><label>Temperatura (°C)</label><input type="number" data-pdcfg="prensa.temp" value="'+U.esc(c.prensa.temp)+'"></div>'+
+      '<div class="campo"><label>Tempo (segundos)</label><input type="number" data-pdcfg="prensa.tempo" value="'+U.esc(c.prensa.tempo)+'"></div>'+
+      '<div class="campo"><label>Pressão</label><input type="text" data-pdcfg="prensa.pressao" value="'+U.esc(c.prensa.pressao)+'"></div></div>'+
+    '<div class="cartao-sub" style="margin-top:6px">Horário limite da agência (vazio = sem postagem)</div>'+
+    '<div class="linha-campos lc3">'+[1,2,3,4,5,6].map(function(d){ return '<div class="campo"><label>'+dias[d]+'</label><input type="time" data-pdcfg="limites.'+d+'" value="'+U.esc(c.limites[String(d)]||'')+'"></div>'; }).join('')+'</div>'+
+  '</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Roteiro do dia</div>'+
+    area('Segunda a quinta','rotina',9,'Uma linha por passo: horário | tarefa')+
+    area('Sexta','rotinaSexta',7)+area('Sábado','rotinaSabado',4)+'</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Limpeza</div>'+area('Todo dia','limpezaDia',6)+area('Sexta (semanal)','limpezaSemana',4)+'</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Padrões da aba Guia</div>'+
+    area('Passo a passo','guia',12,'Linhas com "## " viram títulos; as outras viram passos. Vazio usa o guia padrão do portal.')+'</div>';
+  h += '</div><div style="margin-top:12px"><button class="btn" data-pd="salvarGuia">Salvar e enviar ao portal</button></div>';
+  return h;
+};
+
+Views._prodSel = null;
+Views.prodImprimir = function(){
+  var abertos = Log.pedidosAbertos().sort(function(a,b){ return a.data<b.data?-1:1; });
+  if(Views._prodSel===null){ Views._prodSel = {}; abertos.forEach(function(p){ if(p.status==='novo') Views._prodSel[p.id]=true; }); }
+  var n = abertos.filter(function(p){ return Views._prodSel[p.id]; }).length;
+  var h = '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
+    '<div class="cartao-tit">Ordens de serviço para imprimir</div><div class="cartao-sub" style="margin:0">Quatro por folha A4, na impressora comum. Recorte e coloque cada uma na cesta do pedido.</div></div>'+
+    '<button class="btn sec sm" data-pd="selTodos">Marcar todos</button><button class="btn sm" data-pd="imprimir"'+(n?'':' disabled')+'>Imprimir '+n+' ordem(ns)</button></div></div>';
+  if(!abertos.length) return h + UI.vazio('Nenhum pedido em aberto', 'Traga os pedidos na aba Expedição da Logística.');
+  h += '<div class="tabela-env"><table><thead><tr><th></th><th>Pedido</th><th>Camisetas</th><th class="c">Envio até</th><th class="c">Situação</th></tr></thead><tbody>'+
+    abertos.map(function(p){
+      return '<tr><td><input type="checkbox" data-pdsel="'+U.esc(p.id)+'" '+(Views._prodSel[p.id]?'checked':'')+'></td><td><b>#'+U.esc(p.numero)+'</b></td>'+
+        '<td>'+Log.camisetasDoPedido(p)+'</td><td class="c">'+U.dataBr(Log.prazo(p))+'</td><td class="c">'+Log.statusNome[p.status]+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  return h;
+};
+Prod.imprimir = function(){
+  var sel = Log.pedidosAbertos().filter(function(p){ return Views._prodSel && Views._prodSel[p.id]; });
+  if(!sel.length) return;
+  var area = document.getElementById('printArea');
+  if(!area){ area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
+  var etapas = ['Separado','Prensado','Conferido','Embalado','Etiqueta','Postado'];
+  var folhas = [];
+  for(var i=0;i<sel.length;i+=4) folhas.push(sel.slice(i,i+4));
+  area.innerHTML = folhas.map(function(f){
+    return '<div class="os-folha">'+f.map(function(p){
+      var cam = Log.camisetasDoPedido(p);
+      return '<div class="os-print"><div class="os-top"><div><div class="os-num">#'+U.esc(p.numero)+'</div><div>'+U.esc(p.cliente||'')+(p.uf?' · '+U.esc(p.uf):'')+'</div></div>'+
+        '<div style="text-align:right"><div class="os-lab">Envio até</div><div class="os-prazo">'+U.dataBr(Log.prazo(p))+'</div><div class="os-lab">Compra '+U.dataBr(p.data)+'</div></div></div>'+
+        '<table class="os-tab"><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
+        (p.itens||[]).map(function(i){ return '<tr><td><b>'+i.qty+'</b></td><td>'+U.esc(i.estampa)+'</td><td>'+U.esc(Log.nomeCor(i.cor))+'</td><td>'+U.esc(i.mod)+'</td><td><b>'+U.esc(i.tam)+'</b></td></tr>'; }).join('')+
+        '</tbody></table><div class="os-lab">'+cam+' camiseta'+(cam!==1?'s':'')+' · brindes: capelinha, sacolinha e cheirinho</div>'+
+        '<div class="os-etapas">'+etapas.map(function(e){ return '<span>☐ '+e+'</span>'; }).join('')+'</div></div>';
+    }).join('')+'</div>';
+  }).join('');
+  document.body.classList.add('imprimindo');
+  setTimeout(function(){ window.print(); setTimeout(function(){ document.body.classList.remove('imprimindo'); }, 500); }, 60);
+};
+
+Views.prodAvisos = function(){
+  var rem = Prod.d().remoto;
+  var h = '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="cartao-tit">Avisos da produção</div>'+
+    '<div class="cartao-sub" style="margin:0">O que a equipe registrou pelo botão Avisar problema.</div></div><button class="btn sec sm" data-pd="sinc">Atualizar</button></div></div>';
+  var lista = (rem && rem.avisos) || [];
+  if(!lista.length) return h + UI.vazio('Nenhum aviso', 'Quando a equipe avisar um problema, ele aparece aqui.');
+  h += lista.map(function(a){
+    return '<div class="diag '+(a.resolvido?'ok':'at')+'"><span class="pt '+(a.resolvido?'ok':'at')+'" style="margin-top:5px"></span><div class="diag-corpo">'+
+      '<div class="diag-tit">'+U.esc(a.tipo)+(a.os?' · pedido #'+U.esc(a.os):'')+'</div>'+
+      '<div class="diag-txt">'+U.esc(a.texto||'Sem descrição.')+'<br><span style="color:var(--texto-fraco)">'+U.esc(a.por)+', '+new Date(a.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span></div>'+
+      '<button class="diag-acao" data-pd="aviso" data-id="'+U.esc(a.id)+'" data-res="'+(a.resolvido?'0':'1')+'">'+(a.resolvido?'Reabrir':'Marcar como resolvido')+'</button> '+
+      '<button class="diag-acao" data-pd="avisoDel" data-id="'+U.esc(a.id)+'">Excluir</button></div></div>';
+  }).join('');
+  return h;
+};
+
+(function(){
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-pd]'); if(!t) return;
+    var ac = t.getAttribute('data-pd'), d = Prod.d();
+    if(ac==='sinc'){ Prod.sincronizar(false); return; }
+    if(ac==='addPessoa'){ d.equipe.push({id:U.id(), nome:'', dias:[1,2,3,4,5], inicio:'08:00', fim:'18:00', capacidade:20, ativo:true}); App.render(); return; }
+    if(ac==='delPessoa'){ d.equipe.splice(parseInt(t.getAttribute('data-i'),10),1); App.render(); return; }
+    if(ac==='salvarEquipe'){ Prod.salvarEquipe(); return; }
+    if(ac==='salvarGuia'){ Prod.salvarConfig(); return; }
+    if(ac==='selTodos'){ Log.pedidosAbertos().forEach(function(p){ Views._prodSel[p.id]=true; }); App.render(); return; }
+    if(ac==='imprimir'){ Prod.imprimir(); return; }
+    if(ac==='aviso' || ac==='avisoDel'){
+      var id = t.getAttribute('data-id');
+      Prod.chamar('aviso', ac==='avisoDel' ? {id:id, excluir:true} : {id:id, resolvido: t.getAttribute('data-res')==='1'})
+        .then(function(){ return Prod.sincronizar(true); }).catch(function(er){ UI.toast(er.message); });
+      return;
+    }
+  });
+  document.addEventListener('change', function(e){
+    var el = e.target, v;
+    if((v = el.getAttribute && el.getAttribute('data-pdeq'))){
+      var p = v.split('.'), f = Prod.d().equipe[+p[0]]; if(!f) return;
+      if(p[1]==='_pin'){ Prod.pins[f.id] = el.value.replace(/\D/g,''); return; }
+      f[p[1]] = el.type==='checkbox' ? el.checked : (el.type==='number' ? U.n(el.value) : el.value);
+      Store.salvar();
+      return;
+    }
+    if((v = el.getAttribute && el.getAttribute('data-pddia'))){
+      var q = v.split('.'), g = Prod.d().equipe[+q[0]], dia = +q[1]; if(!g) return;
+      g.dias = (g.dias||[]).filter(function(x){ return x!==dia; });
+      if(el.checked) g.dias.push(dia);
+      g.dias.sort(); Store.salvar(); return;
+    }
+    if((v = el.getAttribute && el.getAttribute('data-pdcfg'))){
+      var c = Prod.d().config, partes = v.split('.');
+      if(partes.length===2){ c[partes[0]] = Object.assign({}, Prod.cfg()[partes[0]], c[partes[0]]||{}); c[partes[0]][partes[1]] = el.type==='number' ? U.n(el.value) : el.value; }
+      else c[v] = el.value;
+      Prod.d().configLocal = true;
+      Store.salvar(); return;
+    }
+    if((v = el.getAttribute && el.getAttribute('data-pdsel'))){ Views._prodSel[v] = el.checked; App.render(); return; }
+  });
+})();
 
 
 document.addEventListener('DOMContentLoaded', App.init);

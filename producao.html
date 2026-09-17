@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2a1714">
+<title>Produção · Use Arcanju</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --vinho:#5a332e; --vinho-escuro:#2a1714; --vinho-claro:#8a5a52;
+  --verde:#1f9d6c; --verde-fundo:#e8f5ef; --ambar:#b07a1e; --ambar-fundo:#fbf2e0; --rubro:#a8322c; --rubro-fundo:#fbeceb;
+  --papel:#fbf9f7; --carta:#fff; --linha:#e9e3dc; --linha-forte:#d8cfc6;
+  --texto:#1f1a18; --medio:#6b615b; --fraco:#94897f;
+  --serif:'Spectral',Georgia,serif; --sans:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--papel);color:var(--texto);font-family:var(--sans);font-size:15px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--vinho);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* entrada */
+.entrada{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--vinho-escuro);color:#f5ece6}
+.entrada .caixa{width:100%;max-width:340px;text-align:center}
+.entrada h1{font-family:var(--serif);font-weight:600;font-size:30px;margin:0 0 4px}
+.entrada p{margin:0 0 22px;opacity:.75}
+.pinvis{display:flex;justify-content:center;gap:12px;margin-bottom:20px}
+.pinvis i{width:14px;height:14px;border-radius:50%;border:2px solid #f5ece6;display:block}
+.pinvis i.on{background:#f5ece6}
+.teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.teclado button{height:62px;border-radius:14px;border:1px solid rgba(245,236,230,.25);background:rgba(245,236,230,.06);color:#f5ece6;font-size:24px;font-weight:600;cursor:pointer}
+.teclado button:active{background:rgba(245,236,230,.2)}
+.msg-erro{color:#ffb4ab;min-height:22px;margin-top:12px;font-size:14px}
+
+/* app */
+.topo{position:sticky;top:0;z-index:10;background:var(--vinho-escuro);color:#f5ece6;padding:12px 16px 0}
+.topo .linha1{display:flex;align-items:center;gap:10px;max-width:980px;margin:0 auto}
+.topo h1{font-family:var(--serif);font-size:20px;font-weight:600;margin:0;flex:1;min-width:0}
+.topo h1 small{display:block;font-family:var(--sans);font-size:12px;font-weight:400;opacity:.7}
+.btn-topo{border:1px solid rgba(245,236,230,.3);background:none;color:#f5ece6;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
+.modos{display:flex;gap:6px;max-width:980px;margin:10px auto 0}
+.modos button{flex:1;border:0;border-radius:10px 10px 0 0;padding:9px;font-weight:600;cursor:pointer;background:rgba(245,236,230,.08);color:#f5ece6}
+.modos button[aria-pressed="true"]{background:var(--papel);color:var(--vinho-escuro)}
+main{max-width:980px;margin:0 auto;padding:16px 16px 96px}
+.abas{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;background:var(--carta);border-top:1px solid var(--linha);padding-bottom:env(safe-area-inset-bottom)}
+.abas button{flex:1;border:0;background:none;padding:10px 4px 12px;font-size:12px;font-weight:600;color:var(--fraco);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.abas button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.abas button[aria-selected="true"]{color:var(--vinho)}
+@media (min-width:860px){
+  .abas{position:static;max-width:980px;margin:0 auto;border:0;border-bottom:1px solid var(--linha);background:none}
+  .abas button{flex-direction:row;justify-content:center;font-size:14px;padding:12px}
+  main{padding-bottom:40px}
+}
+
+h2{font-family:var(--serif);font-weight:600;font-size:22px;margin:4px 0 10px}
+h3{font-size:15px;font-weight:700;margin:0 0 8px}
+.cartao{background:var(--carta);border:1px solid var(--linha);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.destaque{background:var(--vinho-escuro);color:#f5ece6;border:0}
+.destaque .fraco{color:rgba(245,236,230,.7)}
+.fraco{color:var(--fraco)}
+.medio{color:var(--medio)}
+.pequeno{font-size:13px}
+.grade2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--carta);border:1px solid var(--linha);border-radius:12px;padding:12px}
+.kpi b{display:block;font-family:var(--serif);font-size:28px;line-height:1.1}
+.kpi span{font-size:12.5px;color:var(--medio)}
+.barra{height:10px;border-radius:5px;background:rgba(245,236,230,.2);overflow:hidden;margin:10px 0 4px}
+.barra i{display:block;height:100%;background:#7fd1ae}
+.relogio{font-family:var(--serif);font-size:34px;line-height:1;font-weight:600}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.chip.cr{background:var(--rubro-fundo);color:var(--rubro)}
+.chip.at{background:var(--ambar-fundo);color:#8a5e13}
+.chip.ok{background:var(--verde-fundo);color:#157a53}
+.chip.neu{background:#f1ece8;color:var(--medio)}
+
+.tarefa{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--linha)}
+.tarefa:last-child{border-bottom:0}
+.tarefa .hora{font-variant-numeric:tabular-nums;font-weight:700;min-width:46px;color:var(--vinho)}
+.tarefa .txt{flex:1}
+.tarefa.feita .txt,.tarefa.feita .hora{opacity:.45;text-decoration:line-through}
+.caixinha{width:28px;height:28px;border-radius:8px;border:2px solid var(--linha-forte);background:var(--carta);flex:0 0 auto;cursor:pointer;display:grid;place-items:center;color:#fff;font-weight:800}
+.caixinha.on{background:var(--verde);border-color:var(--verde)}
+.agora{background:var(--ambar-fundo);margin:0 -16px;padding:11px 16px}
+
+.os{border:1px solid var(--linha);border-radius:14px;background:var(--carta);margin-bottom:10px;overflow:hidden}
+.os-cab{display:flex;gap:10px;align-items:center;padding:12px 14px;cursor:pointer}
+.os-cab .n{font-family:var(--serif);font-size:20px;font-weight:700}
+.os-cab .quem{font-size:12.5px;color:var(--medio)}
+.os-corpo{padding:0 14px 14px;border-top:1px solid var(--linha)}
+.item{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--linha);align-items:center}
+.item:last-child{border-bottom:0}
+.item .q{font-family:var(--serif);font-size:22px;font-weight:700;min-width:30px;text-align:center}
+.cor{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid var(--linha-forte);vertical-align:-2px;margin-right:4px}
+.etapas{display:flex;gap:4px;margin:12px 0 10px}
+.etapas span{flex:1;height:6px;border-radius:3px;background:var(--linha)}
+.etapas span.on{background:var(--verde)}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;background:var(--vinho);color:#fff;font-size:15px}
+.btn.grande{width:100%;padding:15px;font-size:16px}
+.btn.sec{background:var(--carta);color:var(--vinho);border:1.5px solid var(--vinho)}
+.btn.leve{background:#f1ece8;color:var(--texto)}
+.btn:disabled{opacity:.45;cursor:default}
+.linha-btn{display:flex;gap:8px;flex-wrap:wrap}
+.onda-cab{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+.onda-cab h3{margin:0;flex:1}
+.grupo{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--linha)}
+.grupo .q{font-family:var(--serif);font-size:26px;font-weight:700;min-width:44px;text-align:center}
+.flutuante{position:fixed;right:16px;bottom:84px;z-index:11;border:0;border-radius:30px;padding:12px 16px;background:var(--rubro);color:#fff;font-weight:700;box-shadow:0 10px 24px -8px rgba(0,0,0,.4);cursor:pointer}
+@media (min-width:860px){ .flutuante{bottom:24px} }
+.guia h3{margin-top:6px}
+.guia ol{margin:0;padding-left:20px}
+.guia li{margin:6px 0}
+.vazio{text-align:center;padding:30px 10px;color:var(--medio)}
+.modal-fundo{position:fixed;inset:0;background:rgba(20,10,8,.5);z-index:50;display:grid;place-items:end center}
+.modal{background:var(--carta);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:18px 16px 24px;max-height:90vh;overflow:auto}
+@media (min-width:600px){ .modal-fundo{place-items:center} .modal{border-radius:18px} }
+label.campo{display:block;font-size:13px;font-weight:600;color:var(--medio);margin:10px 0 4px}
+select,textarea,input[type=text]{width:100%;padding:11px;border:1px solid var(--linha-forte);border-radius:10px;background:var(--carta)}
+textarea{min-height:90px}
+.toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+.lote{border-left:4px solid var(--ambar)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<section class="entrada" id="telaEntrada">
+  <div class="caixa">
+    <h1>Produção</h1>
+    <p>Use Arcanju. Digite o seu PIN.</p>
+    <div class="pinvis" id="pinvis"></div>
+    <div class="teclado" id="teclado"></div>
+    <div class="msg-erro" id="erroPin" role="alert"></div>
+  </div>
+</section>
+
+<div id="telaApp" hidden>
+  <header class="topo">
+    <div class="linha1">
+      <h1 id="titulo">Produção<small id="subtitulo"></small></h1>
+      <button class="btn-topo" id="btnAtualizar">Atualizar</button>
+      <button class="btn-topo" id="btnSair">Sair</button>
+    </div>
+    <div class="modos" id="modos" role="group" aria-label="Linha de produção"></div>
+  </header>
+  <nav class="abas" role="tablist" id="abas"></nav>
+  <main id="conteudo"></main>
+  <button class="flutuante" id="btnProblema">Avisar problema</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+var API = '/api/producao';
+var ETAPAS = ['separar','prensar','conferir','embalar','etiqueta','expedir'];
+var NOME_ETAPA = {separar:'Separar', prensar:'Prensar', conferir:'Conferir', embalar:'Embalar', etiqueta:'Etiqueta', expedir:'Levar à agência'};
+var FEITO_ETAPA = {separar:'Separado', prensar:'Prensado', conferir:'Conferido', embalar:'Embalado', etiqueta:'Etiquetado', expedir:'Postado'};
+var DIAS = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+var CORES = {OFF:'#f1e9dc', PRETO:'#1c1c1c', BRANCA:'#ffffff', AZUL:'#1f3a64'};
+
+var PADRAO = {
+  limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
+  prensa: {temp:120, tempo:10, pressao:'média'},
+  rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+    '08:10 | Recortar de uma vez todos os DTF do dia (lista na aba Prensa)',
+    '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
+    '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
+    '10:45 | Onda 1: conferir e embalar',
+    '12:00 | Almoço',
+    '13:00 | Onda 2: separar e prensar',
+    '14:15 | Onda 2: conferir e embalar',
+    '15:15 | Pagar todas as etiquetas no site, imprimir e colar',
+    '16:00 | Conferir o nome da etiqueta com a ordem e levar à agência',
+    '17:00 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
+    '17:40 | Limpeza e arrumação'].join('\n'),
+  rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
+    '08:10 | Recortar de uma vez todos os DTF do dia',
+    '08:40 | Onda 1: separar, prensar, conferir e embalar',
+    '11:00 | Onda 2: separar e prensar',
+    '12:00 | Almoço',
+    '13:00 | Onda 2: conferir e embalar',
+    '13:45 | Pagar todas as etiquetas, imprimir e colar',
+    '14:15 | Levar à agência (hoje o limite é 15:00)',
+    '15:15 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
+    '16:30 | Limpeza da semana',
+    '17:40 | Limpeza e arrumação'].join('\n'),
+  rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
+    '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
+    '10:45 | Pagar e colar as etiquetas',
+    '11:15 | Levar à agência (sábado o limite é 12:00)'].join('\n'),
+  limpezaDia: 'Tirar os recortes e filmes de DTF das mesas\nLimpar a base e o teflon da prensa, com ela fria\nVarrer o chão\nEsvaziar o lixo\nDevolver as cestas vazias ao lugar\nDesligar a prensa da tomada',
+  limpezaSemana: 'Limpar as prateleiras\nContar as camisetas lisas e anotar\nOrganizar as pastas de DTF por estampa\nRepor saquinhos, etiquetas e kits na mesa de embalagem',
+  guia: ['## Prensa',
+    'Ligar e esperar chegar a 120 °C',
+    'Pré-prensar a camiseta vazia por 2 segundos para tirar a umidade e as dobras',
+    'Alinhar a estampa pela marca da base (gola encostada na marca)',
+    'Prensar por 10 segundos, pressão média',
+    'Tirar o filme do jeito certo para o seu filme (quente ou frio)',
+    'Deixar a peça esfriar esticada antes de dobrar',
+    '## Conferência',
+    'Estampa centralizada e na altura certa',
+    'Sem bolha, falha, sujeira ou brilho de cola',
+    'Tamanho, cor e modelo iguais aos da ordem',
+    'Com defeito: separar a peça, pegar outra e avisar pelo botão Avisar problema',
+    '## Dobra com o gabarito',
+    'Camiseta de frente para baixo em cima do gabarito',
+    'Dobrar as laterais e as mangas sobre o gabarito',
+    'Dobrar a parte de baixo para cima e tirar o gabarito',
+    'A estampa fica visível de frente',
+    '## Embalagem',
+    'Colocar a camiseta dobrada (ou as camisetas) no saquinho transparente',
+    'Colocar os brindes: capelinha, sacolinha e uma borrifada de cheirinho',
+    'Fechar o zip do saquinho transparente',
+    'Colocar no saquinho preto de envio, tirar o plástico da cola e fechar',
+    'Colar a etiqueta de envio e a declaração ou nota fiscal',
+    'Conferir: o nome da etiqueta é o mesmo da ordem de serviço',
+    '## Etiquetas e postagem',
+    'Pagar todas as etiquetas do dia de uma vez no site',
+    'Imprimir tudo e colar na hora de embalar ou logo depois',
+    'Separar os pacotes por transportadora na caixa Sai hoje',
+    'Levar à agência antes do horário limite',
+    '## Recorte do DTF',
+    'Recortar de uma vez só, no começo do dia, tudo o que vai ser prensado',
+    'Usar guilhotina ou refiladora de papel, cortando várias estampas juntas',
+    'Guardar cada estampa recortada no envelope ou pasta dela',
+    '## Camisetas que chegam das costureiras',
+    'Contar e conferir com a ordem de corte',
+    'Dobrar com o gabarito na hora, em lote',
+    'Guardar na prateleira da cor, do modelo e do tamanho, as mais antigas na frente',
+    '## Organização da sala',
+    'A produção anda em uma direção: prateleira, separação, prensa, conferência, embalagem, saída',
+    'Cada pedido tem a sua cesta com a ordem de serviço dentro',
+    'Mesa de embalagem sempre com saquinhos, kits, cheirinho e fita',
+    'Caixa Sai hoje perto da porta',
+    'Nada no chão: o que não está sendo usado volta para o lugar'].join('\n')
+};
+
+var S = {token: localStorage.getItem('prod_token')||'', dados:null, modo: localStorage.getItem('prod_modo')||'arcanju', aba:'hoje', aberta:null, prensados:{}};
+var $ = function(s){ return document.querySelector(s); };
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(function(){ t.classList.remove('on'); },2600); }
+function cfg(){ var c=(S.dados&&S.dados.config)||{}; var o={}; Object.keys(PADRAO).forEach(function(k){ o[k] = (c[k]!==undefined && c[k]!=='' ) ? c[k] : PADRAO[k]; }); return o; }
+function dt(iso){ var p=iso.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+function br(iso){ if(!iso) return ''; var p=iso.split('-'); return p[2]+'/'+p[1]; }
+function hojeISO(){ return S.dados ? S.dados.hoje : new Date().toISOString().slice(0,10); }
+function diaSemana(){ return dt(hojeISO()).getDay(); }
+
+/* ---------- servidor ---------- */
+function api(acao, corpo){
+  var op = {method: corpo?'POST':'GET', headers:{'x-prod-token':S.token}};
+  if(corpo){ op.headers['content-type']='application/json'; op.body=JSON.stringify(corpo); }
+  return fetch(API+'?acao='+acao, op).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(j){
+      if(r.status===401 && acao!=='entrar'){ sair(true); throw new Error(j.erro||'Sessão expirada.'); }
+      if(!r.ok) throw new Error(j.erro||('Erro '+r.status));
+      return j;
+    });
+  });
+}
+function carregar(silencioso){
+  return api('dia').then(function(d){ S.dados=d; render(); })
+    .catch(function(e){ if(!silencioso) toast(e.message); });
+}
+
+/* ---------- entrada ---------- */
+var pin = '';
+function desenharPin(){
+  $('#pinvis').innerHTML = [0,1,2,3].map(function(i){ return '<i class="'+(i<pin.length?'on':'')+'"></i>'; }).join('') + (pin.length>4?'<i class="on"></i>'.repeat(pin.length-4):'');
+}
+function montarTeclado(){
+  var t = ['1','2','3','4','5','6','7','8','9','Apagar','0','Entrar'];
+  $('#teclado').innerHTML = t.map(function(k){ return '<button type="button" data-k="'+k+'" style="'+(k.length>1?'font-size:15px':'')+'">'+k+'</button>'; }).join('');
+  $('#teclado').onclick = function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var k = b.getAttribute('data-k');
+    if(k==='Apagar') pin = pin.slice(0,-1);
+    else if(k==='Entrar') entrar();
+    else if(pin.length<8) pin += k;
+    $('#erroPin').textContent=''; desenharPin();
+  };
+  document.addEventListener('keydown', function(e){
+    if(!$('#telaEntrada').hidden){
+      if(/^\d$/.test(e.key) && pin.length<8){ pin+=e.key; desenharPin(); }
+      else if(e.key==='Backspace'){ pin=pin.slice(0,-1); desenharPin(); }
+      else if(e.key==='Enter') entrar();
+    }
+  });
+}
+function entrar(){
+  if(pin.length<4){ $('#erroPin').textContent='O PIN tem pelo menos 4 números.'; return; }
+  api('entrar', {pin:pin}).then(function(r){
+    S.token = r.token; localStorage.setItem('prod_token', r.token); pin=''; desenharPin();
+    mostrarApp();
+  }).catch(function(e){ pin=''; desenharPin(); $('#erroPin').textContent=e.message; });
+}
+function sair(expirou){
+  if(!expirou && S.token) api('sair',{}).catch(function(){});
+  S.token=''; S.dados=null; localStorage.removeItem('prod_token');
+  $('#telaApp').hidden = true; $('#telaEntrada').hidden = false;
+  if(expirou) $('#erroPin').textContent='Sua sessão terminou. Entre de novo.';
+}
+function mostrarApp(){
+  $('#telaEntrada').hidden = true; $('#telaApp').hidden = false;
+  carregar();
+}
+
+/* ---------- plano do dia ---------- */
+function equipeHoje(){
+  var d = diaSemana();
+  return ((S.dados&&S.dados.equipe)||[]).filter(function(f){ return (f.dias||[]).indexOf(d)>=0; });
+}
+function proxima(o){ var e=o.etapas||{}; for(var i=0;i<ETAPAS.length;i++){ if(!e[ETAPAS[i]]) return ETAPAS[i]; } return null; }
+function feitasHoje(modo){
+  var h = hojeISO();
+  return ((S.dados&&S.dados.ordens[modo])||[]).filter(function(o){ return o.etapas && o.etapas.expedir && o.etapas.expedir.em && toLocalISO(o.etapas.expedir.em)===h; });
+}
+function toLocalISO(ts){ var d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function plano(modo){
+  var h = hojeISO();
+  var todas = ((S.dados&&S.dados.ordens[modo])||[]);
+  var abertas = todas.filter(function(o){ return proxima(o); });
+  var esperando = [];
+  if(modo==='lazarus'){
+    esperando = abertas.filter(function(o){ return o.liberadoEm && o.liberadoEm>h; });
+    abertas = abertas.filter(function(o){ return !o.liberadoEm || o.liberadoEm<=h; });
+  }
+  abertas.sort(function(a,b){ return (a.prazo||'9')<(b.prazo||'9')?-1:((a.prazo||'9')>(b.prazo||'9')?1:(String(a.numero)<String(b.numero)?-1:1)); });
+  var cap = equipeHoje().reduce(function(s,f){ return s+(Number(f.capacidade)||20); },0);
+  var iniciadas = abertas.filter(function(o){ return o.etapas && o.etapas.separar; });
+  var novas = abertas.filter(function(o){ return !(o.etapas && o.etapas.separar); });
+  var livre = Math.max(0, cap - feitasHoje(modo).length - iniciadas.length);
+  var hoje = iniciadas.concat(novas.slice(0, livre));
+  var depois = novas.slice(livre);
+  var meio = Math.ceil(hoje.length/2);
+  return {hoje:hoje, onda1:hoje.slice(0,meio), onda2:hoje.slice(meio), depois:depois, esperando:esperando, cap:cap,
+    atrasadas: abertas.filter(function(o){ return o.prazo && o.prazo<h; }), vencemHoje: abertas.filter(function(o){ return o.prazo===h; })};
+}
+function limiteHoje(){ return cfg().limites[String(diaSemana())] || ''; }
+function minutosAte(hhmm){
+  if(!hhmm) return null;
+  var p = hhmm.split(':'), n = new Date(), alvo = new Date(n.getFullYear(), n.getMonth(), n.getDate(), +p[0], +p[1]);
+  return Math.round((alvo - n)/60000);
+}
+function rotinaHoje(){
+  var d = diaSemana(), c = cfg();
+  var txt = d===5 ? c.rotinaSexta : (d===6 ? c.rotinaSabado : c.rotina);
+  return String(txt||'').split('\n').map(function(l){ var p=l.split('|'); return p.length>1 ? {hora:p[0].trim(), txt:p.slice(1).join('|').trim()} : {hora:'', txt:l.trim()}; }).filter(function(x){ return x.txt; });
+}
+function feito(chave){ return !!(S.dados && S.dados.feitos && S.dados.feitos[chave]); }
+
+/* ---------- render ---------- */
+var ICO = {
+  hoje:'M3 12l9-8 9 8M5 10v10h14V10',
+  pedidos:'M4 4h16v16H4zM8 9h8M8 13h8M8 17h5',
+  prensa:'M4 6h16v4H4zM7 10v8h10v-8M12 3v3',
+  envio:'M3 7h13v10H3zM16 10h4l1 3v4h-5M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  guia:'M5 4h10l4 4v12H5zM9 12h6M9 16h6'
+};
+var ABAS = [['hoje','Hoje'],['pedidos','Pedidos'],['prensa','Prensa'],['envio','Envio'],['guia','Guia']];
+function render(){
+  if(!S.dados) return;
+  var d = S.dados, lz = (d.ordens.lazarus||[]).length || (d.lotes||[]).length;
+  if(!lz && S.modo==='lazarus') S.modo = 'arcanju';
+  $('#titulo').innerHTML = 'Olá, '+esc(d.eu.nome)+'<small id="subtitulo">'+esc(DIAS[diaSemana()])+', '+br(d.hoje)+' · '+(S.modo==='lazarus'?'Projeto Lazarus':'Use Arcanju')+'</small>';
+  $('#modos').innerHTML = lz ? '<button data-modo="arcanju" aria-pressed="'+(S.modo==='arcanju')+'">Use Arcanju</button><button data-modo="lazarus" aria-pressed="'+(S.modo==='lazarus')+'">Projeto Lazarus</button>' : '';
+  $('#modos').style.display = lz ? '' : 'none';
+  $('#abas').innerHTML = ABAS.map(function(a){ return '<button role="tab" data-aba="'+a[0]+'" aria-selected="'+(S.aba===a[0])+'"><svg viewBox="0 0 24 24"><path d="'+ICO[a[0]]+'"/></svg>'+a[1]+'</button>'; }).join('');
+  var h = '';
+  if(S.aba==='pedidos') h = vPedidos();
+  else if(S.aba==='prensa') h = vPrensa();
+  else if(S.aba==='envio') h = vEnvio();
+  else if(S.aba==='guia') h = vGuia();
+  else h = vHoje();
+  $('#conteudo').innerHTML = h;
+}
+
+function vHoje(){
+  var p = plano(S.modo), c = cfg(), eq = equipeHoje();
+  var lim = limiteHoje(), falta = minutosAte(lim);
+  var feitas = feitasHoje(S.modo).length, meta = p.hoje.length + feitas;
+  var pct = meta ? Math.round(feitas/meta*100) : 0;
+  var h = '';
+  h += '<div class="cartao destaque">'+
+    '<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap"><div style="flex:1;min-width:180px">'+
+      '<div class="fraco pequeno">Pedidos para postar hoje</div><div class="relogio num">'+feitas+' de '+meta+'</div></div>'+
+      (lim ? '<div style="text-align:right"><div class="fraco pequeno">Agência até '+esc(lim)+'</div><div class="relogio num">'+(falta===null?'':(falta>0? Math.floor(falta/60)+'h'+String(falta%60).padStart(2,'0') : 'encerrado'))+'</div></div>' : '<div class="fraco pequeno">Hoje não tem postagem</div>')+
+    '</div><div class="barra"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="fraco pequeno">'+(eq.length ? 'Equipe hoje: '+eq.map(function(f){ return esc(f.nome); }).join(', ')+'. Capacidade de '+p.cap+' pedidos.' : 'Ninguém está escalado para hoje.')+
+      (p.depois.length ? ' '+p.depois.length+' pedido(s) ficam para amanhã.' : '')+'</div>'+
+  '</div>';
+  if(p.atrasadas.length) h += '<div class="cartao" style="border-color:var(--rubro)"><b style="color:var(--rubro)">'+p.atrasadas.length+' pedido(s) passaram do prazo.</b> <span class="medio">Eles estão no começo da onda 1. Faça esses primeiro.</span></div>';
+  h += '<div class="grade2" style="margin-bottom:12px">'+
+    '<div class="kpi"><b class="num">'+p.onda1.filter(proxima).length+'</b><span>na onda 1 (manhã)</span></div>'+
+    '<div class="kpi"><b class="num">'+p.onda2.filter(proxima).length+'</b><span>na onda 2 (tarde)</span></div></div>';
+
+  if(S.modo==='lazarus'){
+    var lotes = (S.dados.lotes||[]).filter(function(l){ return l.recebeEm===hojeISO(); });
+    lotes.forEach(function(l){
+      var k = 'lote:'+l.id+':receber';
+      h += '<div class="cartao lote"><div class="tarefa'+(feito(k)?' feita':'')+'"><button class="caixinha'+(feito(k)?' on':'')+'" data-tarefa="'+esc(k)+'" aria-label="Feito">'+(feito(k)?'✓':'')+'</button>'+
+        '<div class="txt"><b>Receber o '+esc(l.nome)+' das costureiras</b><div class="medio pequeno">Contar '+l.pecas+' camisetas, conferir com a ordem de corte, dobrar com o gabarito e separar por pedido ('+l.pedidos+' pedidos).</div></div></div></div>';
+    });
+    if(p.esperando.length) h += '<div class="cartao"><span class="medio">'+p.esperando.length+' pedido(s) do Lazarus ainda estão com as costureiras e entram no plano quando o lote chegar.</span></div>';
+  }
+
+  var rot = rotinaHoje(), agoraMin = new Date().getHours()*60+new Date().getMinutes();
+  var atual = -1;
+  rot.forEach(function(r,i){ if(r.hora){ var p2=r.hora.split(':'); if((+p2[0])*60+(+p2[1]) <= agoraMin) atual = i; } });
+  h += '<div class="cartao"><h3>Roteiro do dia</h3>'+
+    rot.map(function(r,i){
+      var k = 'rot:'+diaSemana()+':'+r.hora+':'+r.txt.slice(0,40);
+      var f = feito(k);
+      return '<div class="tarefa'+(f?' feita':'')+(i===atual&&!f?' agora':'')+'"><button class="caixinha'+(f?' on':'')+'" data-tarefa="'+esc(k)+'" aria-label="Feito">'+(f?'✓':'')+'</button>'+
+        '<div class="hora">'+esc(r.hora)+'</div><div class="txt">'+esc(r.txt)+'</div></div>';
+    }).join('')+'</div>';
+
+  var lista = function(txt, pref){ return String(txt||'').split('\n').filter(Boolean).map(function(t){
+    var k = pref+t.slice(0,50), f = feito(k);
+    return '<div class="tarefa'+(f?' feita':'')+'"><button class="caixinha'+(f?' on':'')+'" data-tarefa="'+esc(k)+'" aria-label="Feito">'+(f?'✓':'')+'</button><div class="txt">'+esc(t)+'</div></div>';
+  }).join(''); };
+  h += '<div class="cartao"><h3>Limpeza do fim do dia</h3>'+lista(c.limpezaDia,'limp:')+'</div>';
+  if(diaSemana()===5) h += '<div class="cartao"><h3>Limpeza da semana (sexta)</h3>'+lista(c.limpezaSemana,'sem:')+'</div>';
+  return h;
+}
+
+function itemHTML(i){
+  var cor = CORES[i.cor]||'#ccc';
+  return '<div class="item"><div class="q num">'+i.qty+'</div><div style="flex:1"><b>'+esc(i.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+cor+'"></span>'+esc(i.corNome||i.cor)+' · '+esc(i.mod)+' · <b style="color:var(--texto)">'+esc(i.tam)+'</b></div></div></div>';
+}
+function osHTML(o){
+  var px = proxima(o), h = hojeISO(), e = o.etapas||{};
+  var prazo = o.prazo ? (o.prazo<h ? '<span class="chip cr">atrasado '+br(o.prazo)+'</span>' : (o.prazo===h ? '<span class="chip at">sai hoje</span>' : '<span class="chip neu">até '+br(o.prazo)+'</span>')) : '';
+  var cam = (o.itens||[]).reduce(function(s,i){ return s+i.qty; },0);
+  var aberta = S.aberta===o.id;
+  var ult = null; ETAPAS.forEach(function(x){ if(e[x]) ult = x; });
+  var h = '<div class="os"><div class="os-cab" data-abrir="'+esc(o.id)+'"><div style="flex:1;min-width:0"><div class="n">#'+esc(o.numero)+'</div>'+
+    '<div class="quem">'+cam+' camiseta'+(cam!==1?'s':'')+(o.cliente?' · '+esc(o.cliente):'')+(o.uf?' · '+esc(o.uf):'')+(o.lote?' · '+esc(o.lote):'')+'</div></div>'+
+    '<div style="text-align:right">'+prazo+'<div class="pequeno medio" style="margin-top:4px">'+(px?'Próximo: '+NOME_ETAPA[px]:'Postado')+'</div></div></div>';
+  if(aberta){
+    h += '<div class="os-corpo"><div class="etapas">'+ETAPAS.map(function(x){ return '<span class="'+(e[x]?'on':'')+'" title="'+NOME_ETAPA[x]+'"></span>'; }).join('')+'</div>'+
+      (o.itens||[]).map(itemHTML).join('')+
+      (o.brindes!==false ? '<div class="pequeno medio" style="margin:8px 0">Brindes: 1 capelinha, 1 sacolinha e cheirinho.</div>' : '')+
+      (o.obs ? '<div class="pequeno" style="margin:8px 0"><b>Obs.:</b> '+esc(o.obs)+'</div>' : '')+
+      '<div class="linha-btn" style="margin-top:10px">'+
+        (px ? '<button class="btn grande" data-etapa="'+px+'" data-id="'+esc(o.id)+'">'+FEITO_ETAPA[px]+'</button>' : '')+
+        (ult ? '<button class="btn leve" data-desfazer="'+ult+'" data-id="'+esc(o.id)+'">Desfazer "'+FEITO_ETAPA[ult].toLowerCase()+'"</button>' : '')+
+        '<button class="btn leve" data-problema="'+esc(o.numero)+'">Problema neste pedido</button>'+
+      '</div></div>';
+  }
+  return h+'</div>';
+}
+function vPedidos(){
+  var p = plano(S.modo);
+  if(!p.hoje.length && !p.depois.length) return '<div class="vazio"><h2>Nenhum pedido para produzir</h2><p>Quando chegarem pedidos, eles aparecem aqui na ordem certa.</p></div>';
+  var onda = function(tit, lista, id){
+    var sep = lista.filter(function(o){ return proxima(o)==='separar'; });
+    return '<div class="onda-cab"><h3>'+tit+' <span class="medio" style="font-weight:500">('+lista.length+')</span></h3>'+
+      (sep.length>1 ? '<button class="btn sec" data-lote="separar" data-ids="'+esc(sep.map(function(o){ return o.id; }).join(','))+'">Separei os '+sep.length+'</button>' : '')+'</div>'+
+      (lista.length ? lista.map(osHTML).join('') : '<div class="medio pequeno">Nada nesta onda.</div>');
+  };
+  var h = '<p class="medio pequeno" style="margin-top:0">Na ordem de prioridade. Toque no pedido para ver as camisetas e marcar a etapa. Cada pedido tem a sua cesta com a ordem de serviço dentro.</p>';
+  h += onda('Onda 1, manhã', p.onda1) + onda('Onda 2, tarde', p.onda2);
+  if(p.depois.length) h += '<div class="onda-cab"><h3>Se sobrar tempo <span class="medio" style="font-weight:500">('+p.depois.length+')</span></h3></div>'+p.depois.map(osHTML).join('');
+  return h;
+}
+function gruposPrensa(p){
+  var g = {};
+  p.hoje.forEach(function(o){
+    if(o.etapas && o.etapas.prensar) return;
+    (o.itens||[]).forEach(function(i){
+      var k = i.estampa+'|'+i.cor;
+      if(!g[k]) g[k] = {estampa:i.estampa, cor:i.cor, corNome:i.corNome||i.cor, qty:0, os:{}, tams:{}};
+      g[k].qty += i.qty; g[k].os[o.numero]=1; g[k].tams[i.mod+' '+i.tam]=(g[k].tams[i.mod+' '+i.tam]||0)+i.qty;
+    });
+  });
+  return Object.keys(g).map(function(k){ g[k].k=k; return g[k]; }).sort(function(a,b){ return b.qty-a.qty; });
+}
+function vPrensa(){
+  var p = plano(S.modo), c = cfg(), g = gruposPrensa(p);
+  var h = '<div class="cartao destaque"><div class="grade2"><div><div class="fraco pequeno">Temperatura</div><div class="relogio">'+esc(c.prensa.temp)+' °C</div></div>'+
+    '<div><div class="fraco pequeno">Tempo e pressão</div><div class="relogio">'+esc(c.prensa.tempo)+' s</div><div class="fraco pequeno">pressão '+esc(c.prensa.pressao)+'</div></div></div></div>';
+  if(!g.length) return h + '<div class="vazio">Nada para prensar agora.</div>';
+  var total = g.reduce(function(s,x){ return s+x.qty; },0);
+  h += '<div class="cartao"><h3>1. Recortar primeiro ('+total+' estampas)</h3><p class="medio pequeno" style="margin-top:0">Recorte tudo de uma vez, na guilhotina, e deixe cada estampa em cima da sua pilha.</p>'+
+    g.map(function(x){ var k='recorte:'+x.k, f=feito(k);
+      return '<div class="grupo"><button class="caixinha'+(f?' on':'')+'" data-tarefa="'+esc(k)+'">'+(f?'✓':'')+'</button><div class="q num">'+x.qty+'</div><div style="flex:1"><b>'+esc(x.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+(CORES[x.cor]||'#ccc')+'"></span>para camiseta '+esc(x.corNome)+'</div></div></div>'; }).join('')+'</div>';
+  h += '<div class="cartao"><h3>2. Prensar agrupando pela estampa</h3><p class="medio pequeno" style="margin-top:0">Pegue das cestas todas as camisetas da mesma estampa, prense em sequência e devolva cada uma à sua cesta.</p>'+
+    g.map(function(x){ var k='prensa:'+x.k, f=feito(k);
+      return '<div class="grupo"><button class="caixinha'+(f?' on':'')+'" data-tarefa="'+esc(k)+'">'+(f?'✓':'')+'</button><div class="q num">'+x.qty+'</div><div style="flex:1"><b>'+esc(x.estampa)+'</b>'+
+        '<div class="medio pequeno">'+Object.keys(x.tams).map(function(t){ return x.tams[t]+'× '+esc(t); }).join(', ')+'</div>'+
+        '<div class="pequeno">Pedidos: '+Object.keys(x.os).map(function(n){ return '#'+esc(n); }).join(' ')+'</div></div></div>'; }).join('');
+  var prontas = p.hoje.filter(function(o){
+    if(proxima(o)!=='prensar') return false;
+    return (o.itens||[]).every(function(i){ return feito('prensa:'+i.estampa+'|'+i.cor); });
+  });
+  h += '<button class="btn grande" style="margin-top:12px" data-lote="prensar" data-ids="'+esc(prontas.map(function(o){ return o.id; }).join(','))+'"'+(prontas.length?'':' disabled')+'>Marcar '+prontas.length+' pedido(s) como prensados</button>'+
+    '<p class="medio pequeno">Só entram os pedidos separados com todas as estampas marcadas acima.</p></div>';
+  return h;
+}
+function vEnvio(){
+  var todas = ((S.dados&&S.dados.ordens[S.modo])||[]);
+  var paraEmbalar = todas.filter(function(o){ return proxima(o)==='conferir' || proxima(o)==='embalar'; });
+  var paraEtiqueta = todas.filter(function(o){ return proxima(o)==='etiqueta'; });
+  var paraPostar = todas.filter(function(o){ return proxima(o)==='expedir'; });
+  var lim = limiteHoje();
+  var h = '';
+  h += '<div class="cartao"><h3>Conferir e embalar ('+paraEmbalar.length+')</h3>'+
+    (paraEmbalar.length ? paraEmbalar.map(osHTML).join('') : '<div class="medio pequeno">Nada esperando embalagem.</div>')+'</div>';
+  h += '<div class="cartao"><h3>Etiquetas ('+paraEtiqueta.length+')</h3>'+
+    '<p class="medio pequeno" style="margin-top:0">Pague todas de uma vez no site, imprima e cole. Confira se o nome da etiqueta é o mesmo do pedido.</p>'+
+    (paraEtiqueta.length ? '<div class="pequeno" style="margin-bottom:10px">'+paraEtiqueta.map(function(o){ return '<span class="chip neu" style="margin:2px">#'+esc(o.numero)+(o.cliente?' '+esc(o.cliente):'')+'</span>'; }).join(' ')+'</div>'+
+      '<button class="btn grande" data-lote="etiqueta" data-ids="'+esc(paraEtiqueta.map(function(o){ return o.id; }).join(','))+'">Paguei e colei as '+paraEtiqueta.length+' etiquetas</button>' : '<div class="medio pequeno">Nenhum pacote esperando etiqueta.</div>')+'</div>';
+  h += '<div class="cartao"><h3>Levar à agência ('+paraPostar.length+' pacote'+(paraPostar.length!==1?'s':'')+')</h3>'+
+    '<p class="medio pequeno" style="margin-top:0">'+(lim ? 'Hoje a agência recebe até '+esc(lim)+'.' : 'Hoje não tem postagem.')+' Conte os pacotes antes de sair.</p>'+
+    (paraPostar.length ? '<div class="pequeno" style="margin-bottom:10px">'+paraPostar.map(function(o){ return '<span class="chip neu" style="margin:2px">#'+esc(o.numero)+'</span>'; }).join(' ')+'</div>'+
+      '<button class="btn grande" data-lote="expedir" data-ids="'+esc(paraPostar.map(function(o){ return o.id; }).join(','))+'">Entreguei os '+paraPostar.length+' na agência</button>' : '<div class="medio pequeno">Nada para levar.</div>')+'</div>';
+  var hoje = feitasHoje(S.modo);
+  if(hoje.length) h += '<div class="cartao"><h3>Postados hoje ('+hoje.length+')</h3><div class="pequeno">'+hoje.map(function(o){ return '<span class="chip ok" style="margin:2px">#'+esc(o.numero)+'</span>'; }).join(' ')+'</div></div>';
+  return h;
+}
+function vGuia(){
+  var c = cfg(), blocos = [], atual = null;
+  String(c.guia||'').split('\n').forEach(function(l){
+    l = l.trim(); if(!l) return;
+    if(l.indexOf('## ')===0){ atual = {t:l.slice(3), p:[]}; blocos.push(atual); }
+    else { if(!atual){ atual = {t:'Padrões', p:[]}; blocos.push(atual); } atual.p.push(l.replace(/^[-•]\s*/,'')); }
+  });
+  var lim = cfg().limites;
+  var h = '<div class="cartao"><h3>Horário limite da agência</h3><div class="pequeno">'+
+    [1,2,3,4,5,6].map(function(d){ return DIAS[d]+': '+(lim[String(d)]||'sem postagem'); }).join(' · ')+'</div></div>';
+  h += blocos.map(function(b){ return '<div class="cartao guia"><h3>'+esc(b.t)+'</h3><ol>'+b.p.map(function(x){ return '<li>'+esc(x)+'</li>'; }).join('')+'</ol></div>'; }).join('');
+  return h;
+}
+
+/* ---------- ações ---------- */
+function marcar(ids, etapa, feitoFlag){
+  ids = ids.filter(Boolean); if(!ids.length) return;
+  api('etapa', {modo:S.modo, ids:ids, etapa:etapa, feito:feitoFlag!==false}).then(function(r){
+    var lista = S.dados.ordens[S.modo];
+    (r.ordens||[]).forEach(function(o){ var i = lista.findIndex(function(x){ return x.id===o.id; }); if(i>=0) lista[i]=o; });
+    if(feitoFlag!==false) toast(ids.length>1 ? ids.length+' pedidos: '+FEITO_ETAPA[etapa].toLowerCase() : FEITO_ETAPA[etapa]);
+    render();
+  }).catch(function(e){ toast(e.message); });
+}
+function marcarTarefa(chave){
+  var f = !feito(chave);
+  S.dados.feitos = S.dados.feitos || {};
+  if(f) S.dados.feitos[chave] = {em:new Date().toISOString(), por:S.dados.eu.nome}; else delete S.dados.feitos[chave];
+  render();
+  api('tarefa', {chave:chave, feito:f}).catch(function(e){ toast(e.message); carregar(true); });
+}
+function abrirProblema(numero){
+  var p = plano(S.modo);
+  var fundo = document.createElement('div');
+  fundo.className = 'modal-fundo';
+  fundo.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Avisar problema"><h2>Avisar problema</h2>'+
+    '<label class="campo" for="pbTipo">O que aconteceu</label><select id="pbTipo">'+
+      ['Falta camiseta lisa','Estampa com defeito','Falta DTF','Falta brinde ou embalagem','Prensa com problema','Etiqueta com problema','Outro'].map(function(t){ return '<option>'+t+'</option>'; }).join('')+'</select>'+
+    '<label class="campo" for="pbOs">Pedido (se for de um pedido)</label><select id="pbOs"><option value="">Nenhum</option>'+
+      p.hoje.concat(p.depois).map(function(o){ return '<option'+(String(o.numero)===String(numero)?' selected':'')+'>'+esc(o.numero)+'</option>'; }).join('')+'</select>'+
+    '<label class="campo" for="pbTxt">Explique em poucas palavras</label><textarea id="pbTxt" placeholder="Ex.: a estampa saiu com bolha, peguei outra camiseta M"></textarea>'+
+    '<div class="linha-btn" style="margin-top:14px"><button class="btn leve" id="pbCancelar">Cancelar</button><button class="btn" id="pbEnviar" style="flex:1">Enviar aviso</button></div></div>';
+  document.body.appendChild(fundo);
+  var fechar = function(){ fundo.remove(); };
+  fundo.addEventListener('click', function(e){ if(e.target===fundo) fechar(); });
+  fundo.querySelector('#pbCancelar').onclick = fechar;
+  fundo.querySelector('#pbEnviar').onclick = function(){
+    api('problema', {modo:S.modo, os:fundo.querySelector('#pbOs').value, tipo:fundo.querySelector('#pbTipo').value, texto:fundo.querySelector('#pbTxt').value})
+      .then(function(){ fechar(); toast('Aviso enviado. O Mateus vai ver no painel.'); })
+      .catch(function(e){ toast(e.message); });
+  };
+}
+
+document.addEventListener('click', function(e){
+  var t;
+  if((t = e.target.closest('[data-aba]'))){ S.aba = t.getAttribute('data-aba'); render(); window.scrollTo(0,0); return; }
+  if((t = e.target.closest('[data-modo]'))){ S.modo = t.getAttribute('data-modo'); localStorage.setItem('prod_modo', S.modo); S.aberta=null; render(); return; }
+  if((t = e.target.closest('[data-abrir]'))){ var id = t.getAttribute('data-abrir'); S.aberta = S.aberta===id ? null : id; render(); return; }
+  if((t = e.target.closest('[data-etapa]'))){ marcar([t.getAttribute('data-id')], t.getAttribute('data-etapa')); return; }
+  if((t = e.target.closest('[data-desfazer]'))){ marcar([t.getAttribute('data-id')], t.getAttribute('data-desfazer'), false); return; }
+  if((t = e.target.closest('[data-lote]'))){ var ids = (t.getAttribute('data-ids')||'').split(',').filter(Boolean); if(ids.length) marcar(ids, t.getAttribute('data-lote')); return; }
+  if((t = e.target.closest('[data-tarefa]'))){ marcarTarefa(t.getAttribute('data-tarefa')); return; }
+  if((t = e.target.closest('[data-problema]'))){ abrirProblema(t.getAttribute('data-problema')); return; }
+});
+$('#btnProblema').onclick = function(){ abrirProblema(''); };
+$('#btnSair').onclick = function(){ sair(false); };
+$('#btnAtualizar').onclick = function(){ carregar().then(function(){ toast('Atualizado'); }); };
+setInterval(function(){ if(S.token && !$('#telaApp').hidden && document.visibilityState==='visible' && !document.querySelector('.modal-fundo')) carregar(true); }, 60000);
+
+montarTeclado(); desenharPin();
+if(S.token) mostrarApp();
+})();
+</script>
+</body>
+</html>

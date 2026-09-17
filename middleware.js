@@ -1,6 +1,8 @@
 // Proteção de verdade: a senha é conferida no servidor, antes de qualquer arquivo sair da Vercel.
 // Sem ela, ninguém vê nem o painel nem o conector.
-export const config = { matcher: ['/((?!_next|favicon.ico).*)'] };
+// O portal da produção (/producao e /api/producao) fica fora da senha do painel:
+// ele tem a própria entrada por PIN e só mostra as tarefas da produção.
+export const config = { matcher: ['/((?!_next|favicon.ico|producao|api/producao).*)'] };
 
 export default function middleware(req) {
   const usuario = process.env.PAINEL_USUARIO || 'arcanju';

@@ -19,6 +19,8 @@ Princípio: **você informa pouco, o sistema calcula, projeta, diagnostica e aju
 | `api/frete.js` | Custo real de envio por pedido, vindo da Nuvemshop. |
 | `api/expedicao.js` | Pedidos pagos com os itens, para a Logística separar e postar. |
 | `lazarus.html` | Projeto Lazarus. Roda separado, dentro do painel. |
+| `producao.html` | Portal da equipe de produção, com entrada por PIN. |
+| `api/producao.js` | Ordens de serviço, equipe, guia e avisos do portal (Upstash Redis). |
 | `api/_lib.js` | Funções compartilhadas pelas três rotas. |
 | `vercel.json` | Configuração da hospedagem. |
 | `.env.example` | Lista das variáveis de ambiente (os valores ficam só na Vercel). |
@@ -41,9 +43,11 @@ vercel.json
 .env.example
 .gitignore
 lazarus.html
+producao.html
 api/
   _lib.js
   expedicao.js
+  producao.js
   vendas.js
   ads.js
   frete.js
@@ -167,13 +171,16 @@ Fica no menu, em **Operação → Logística**. É para quando a Arcanju já tiv
 | Expedição | Pedidos da Nuvemshop (pelo conector ou pelo CSV de Vendas), com prazo de envio. Separar dá baixa em camiseta lisa, DTF e brindes. |
 | Estoque | Camisetas lisas nas 16 variações, DTF guardado, insumos e malha, com quantos dias cada um dura. |
 | Reposição | O que cortar, costurar e comprar para manter o estoque no alvo, respeitando a capacidade da oficina. "Criar as compras" gera tudo com datas. |
+| Agenda | Quando cada item acaba, até quando pedir e todos os pagamentos: compras feitas (valor exato), reposições previstas (valor estimado) e, se quiser, as contas do Financeiro. |
 | Compras | Pagar e receber. Receber soma ao estoque; o corte recebido tira a malha usada. |
+| Meta | Se a operação aguenta a meta de pedidos do Planejamento (ou uma meta simulada): oficina, cortador, malha, DTF, brindes, expedição e estoque alvo, com os ajustes necessários. |
 | Indicadores | Envio no prazo, tempo até o envio, falta de estoque, dinheiro parado e custo real contra o custo do Financeiro. |
 | Ajustes | Prazos, preços, capacidade, grade e feriados. |
 
 **Como conversa com o Financeiro**
 
-- Lê as vendas dos últimos 30 dias (ou a meta do mês) para saber o ritmo.
+- Lê as vendas dos últimos 30 dias e a meta de pedidos de cada mês (Planejamento) para prever o consumo.
+- Na aba Meta, dá para levar uma meta simulada para o Planejamento.
 - Os pagamentos das compras aparecem na **Agenda**. Pagar lá ou na Logística dá no mesmo.
 - Com custo das camisetas e dos brindes em modo automático, a compra paga **não** vira lançamento, porque o Financeiro já conta esse custo a cada venda. Em modo manual, ela vira lançamento.
 - Em Indicadores, o botão de custo cria uma vigência nova em Custos, valendo do mês atual em diante.
@@ -185,3 +192,35 @@ Depois de subir esta versão, **Buscar na Nuvemshop** usa a rota nova `api/exped
 Fica em **Missões → Projeto Lazarus**. Ele roda em um quadro separado (`lazarus.html`) e **não lê nem escreve nada** do Financeiro ou da Logística. Os dados dele ficam no navegador, em uma chave própria.
 
 Para trazer os dados do Lazarus que você já usa no Claude: lá, em **Ajustes → Cópia de segurança → Baixar cópia**. Aqui, no mesmo lugar, **Restaurar de um arquivo**.
+
+## Produção e portal da equipe
+
+**No painel:** Operação → Produção.
+
+| Aba | O que faz |
+|---|---|
+| Acompanhamento | Sincroniza com o portal: envia os pedidos em aberto da Logística como ordens de serviço e traz o andamento. Pedidos separados, embalados e postados no portal atualizam a Logística e o estoque. |
+| Ordens de serviço | Imprime as ordens, 4 por folha A4. |
+| Equipe | Pessoas, PIN, dias, horários e pedidos por dia. |
+| Guia e rotina | Prensa, horário limite da agência, roteiro do dia, limpeza e passo a passo que a equipe vê. |
+| Avisos | Problemas registrados pela equipe. |
+
+**Portal da equipe:** `seu-endereço/producao`. Fica fora da senha do painel (veja `middleware.js`) e tem entrada própria por PIN. A pessoa vê só:
+
+- **Hoje:** pedidos para postar, tempo até a agência, roteiro do dia e limpeza.
+- **Pedidos:** ordens na ordem de prioridade, em duas ondas, com um botão para cada etapa (separar, prensar, conferir, embalar, etiqueta, levar à agência).
+- **Prensa:** lista de recorte do DTF e prensagem agrupada por estampa.
+- **Envio:** embalar, pagar e colar etiquetas em lote, levar à agência.
+- **Guia:** padrões de trabalho.
+- **Avisar problema:** chega na aba Avisos do painel.
+
+Se houver lotes do Projeto Lazarus, o portal mostra uma segunda linha, "Projeto Lazarus", separada da Use Arcanju.
+
+**Para ligar:**
+
+1. Crie um banco no Upstash (ou use a integração Upstash da Vercel) e coloque `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` nas variáveis de ambiente.
+2. Confirme que a `APP_KEY` está preenchida na Vercel e em Integrações do painel. Sem ela, o portal não aceita pedidos do painel.
+3. No painel, em Produção → Equipe, cadastre a pessoa com um PIN e toque em **Salvar e enviar ao portal**.
+4. Toque em **Sincronizar agora** sempre que trouxer pedidos novos na Logística.
+
+**Projeto Lazarus e o portal:** no Lazarus (aberto pelo painel), em Ajustes, coloque a mesma chave de acesso. Em cada lote, **Enviar à produção** manda os pedidos do lote, e **Atualizar andamento** marca o lote como estampado e postado quando a equipe terminar. O Lazarus continua sem ler nem escrever nada do Financeiro ou da Logística.

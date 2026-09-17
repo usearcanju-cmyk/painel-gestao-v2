@@ -258,6 +258,7 @@ const DEFAULT_CONFIG = {
   lote: { fechaDias:[1,3,5], teto:36, malhaEmCasa:true, folga:2 },
   prazos: { corte:1, costura:1, dtf:1, kits:1, descanso:1 },
   missao: { meta:20000, meses:3, pedidosMes:0, adsDia:0, colchao:3000 },
+  producao: { chave:'' },
   contas: [
     { nome:'Custos operacionais (dividir em contas)', dia:10, valor:2691.90, tipo:'fixo' },
     { nome:'Pró-labore', dia:30, valor:5000, tipo:'prolabore' }
@@ -684,7 +685,8 @@ function lerNuvemshop(text){
   const head = rows[0].map(h=>h.trim().toLowerCase());
   const col = nm => head.indexOf(nm.toLowerCase());
   const I = {num:col('Número do Pedido'), data:col('Data'), status:col('Status do Pedido'), pag:col('Status do Pagamento'),
-    total:col('Total'), meio:col('Meio de pagamento'), prod:col('Nome do Produto'), qtd:col('Quantidade Comprada')};
+    total:col('Total'), meio:col('Meio de pagamento'), prod:col('Nome do Produto'), qtd:col('Quantidade Comprada'),
+    cli:col('Nome do comprador'), uf:col('Estado')};
   if (I.num<0 || I.data<0 || I.total<0) throw new Error('Esse arquivo não parece a exportação de vendas da Nuvemshop.');
   const pedidos = []; let cur = null;
   for (let r=1;r<rows.length;r++){
@@ -693,7 +695,8 @@ function lerNuvemshop(text){
       const m = row[I.data].match(/(\d{2})\/(\d{2})\/(\d{4})/);
       const status=(row[I.status]||'').toLowerCase(), pag=(row[I.pag]||'').toLowerCase();
       const valido = m && !/cancel/.test(status) && !/cancel|estorn|recus|pendente/.test(pag);
-      cur = valido ? {num:row[I.num], data:`${m[3]}-${m[2]}-${m[1]}`, total:n((row[I.total]||'').replace(',','.')), pix:/pix/i.test(row[I.meio]||''), itens:[]} : null;
+      cur = valido ? {num:row[I.num], data:`${m[3]}-${m[2]}-${m[1]}`, total:n((row[I.total]||'').replace(',','.')), pix:/pix/i.test(row[I.meio]||''), itens:[],
+        cliente: I.cli>=0 ? String(row[I.cli]||'').trim().split(' ')[0] : '', uf: I.uf>=0 ? String(row[I.uf]||'').trim() : ''} : null;
       if (cur) pedidos.push(cur);
     }
     if (!cur || I.prod<0) continue;
@@ -708,7 +711,8 @@ function itensDaJanela(pedidos, ini, fim){
   const acc = {};
   sel.forEach(p=>p.itens.forEach(i=>{ const k=[i.estampa,i.cor,i.mod,i.tam].join('|'); acc[k]=(acc[k]||0)+i.qty; }));
   const itens = Object.entries(acc).map(([k,q])=>{ const [estampa,cor,mod,tam]=k.split('|'); return {estampa,cor,mod,tam,qty:q}; });
-  return {pedidos:sel.length, receita:Math.round(sel.reduce((s,p)=>s+p.total,0)*100)/100, itens};
+  const ordens = sel.filter(p=>p.itens.length).map(p=>({num:p.num, data:p.data, cliente:p.cliente||'', uf:p.uf||'', itens:p.itens.map(i=>({...i}))}));
+  return {pedidos:sel.length, receita:Math.round(sel.reduce((s,p)=>s+p.total,0)*100)/100, itens, ordens};
 }
 function diasDosPedidos(pedidos){
   const dias={}; if (!pedidos.length) return dias;
@@ -1084,6 +1088,7 @@ function renderLoteBox(){
     </div>
   </div>
   <div id="loteOut"></div>
+  <div class="panel" style="margin-top:16px" id="prodBox"></div>
   <div class="row" style="margin-top:20px"><span class="spacer"></span><button class="btn danger small" id="delLote">Excluir este lote</button></div>`;
   const reopen=()=>{ const d=$('#loteBox details'); if(d) d.open=true; };
   $('#addItem').onclick=()=>{ L.itens=L.itens||[]; L.itens.push({estampa:'',cor:'OFF',mod:'Tradicional',tam:'M',qty:1}); persist('lote',L.id); renderLoteBox(); reopen(); };
@@ -1095,13 +1100,14 @@ function renderLoteBox(){
       const peds=lerNuvemshop(await lerArquivo(f)); csvCache=peds;
       const r=itensDaJanela(peds,j.ini,j.fim);
       if(!r.pedidos){ $('#csvMsg').innerHTML=`<span class="chip bad">Nenhum pedido pago entre ${fmtD(j.ini)} e ${fmtD(j.fim)}</span>`; return; }
-      L.itens=r.itens; L.pedidos=r.pedidos; L.receita=r.receita;
+      L.itens=r.itens; L.pedidos=r.pedidos; L.receita=r.receita; L.ordens=r.ordens;
       mesclarDias(peds);
       persist('lote',L.id); renderLoteBox();
       $('#csvMsg').innerHTML=`<span class="chip ok">${r.pedidos} pedidos</span> ${int(r.itens.reduce((a,i)=>a+i.qty,0))} camisetas, ${brl(r.receita)}. As vendas de cada dia também foram anotadas.`;
     }catch(e){ $('#csvMsg').innerHTML=`<span class="chip bad">Não importou</span> ${esc(e.message)}`; }
   };
   renderLoteOut();
+  renderProdBox();
 }
 async function lerArquivo(f){ const buf=await f.arrayBuffer(); try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ return new TextDecoder('windows-1252').decode(buf); } }
 function mesclarDias(peds){
@@ -1160,6 +1166,62 @@ function renderLoteOut(){
   $$('[data-etapa]').forEach(cb=>cb.onchange=()=>{ L.etapas=L.etapas||{}; L.etapas[cb.dataset.etapa]=cb.checked; persist('lote',L.id); renderLoteOut(); });
   const rg=$('#registrar'); if(rg) rg.onclick=()=>{ if(!confirm('Atualizar o estoque de DTF, etiquetas e cheirinho com este lote? Faça isso uma vez, no dia das compras.')) return;
     L.estAntes=clone(EST); EST=registrarNoEstoque(CFG,EST,calcLote(CFG,EST,L)); L.registrado=true; persist('est'); persist('lote',L.id); renderLoteOut(); toast('Estoque atualizado'); };
+}
+
+/* ================= PORTAL DA PRODUÇÃO ================= */
+const CORES_NOME = {OFF:'Off-white', PRETO:'Preto', BRANCA:'Branca', AZUL:'Azul'};
+async function prodChamar(acao, corpo, extra){
+  const chave = (CFG.producao||{}).chave||'';
+  if (!chave) throw new Error('Informe a chave do portal em Ajustes.');
+  const q = new URLSearchParams({acao, ...(extra||{})}).toString();
+  let r;
+  try{
+    r = await fetch('/api/producao?'+q, {method: corpo?'POST':'GET', headers: {'x-arcanju-key':chave, 'content-type':'application/json'}, body: corpo?JSON.stringify(corpo):undefined});
+  }catch(e){ throw new Error('O portal só funciona com o Lazarus aberto pelo Painel do Gestor.'); }
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(j.erro || ('O portal respondeu com erro '+r.status+'.'));
+  return j;
+}
+function renderProdBox(){
+  const box=$('#prodBox'); if(!box || !loteSel) return;
+  const L=LOTES[loteSel];
+  const ords=L.ordens||[];
+  const p=L.prod||null;
+  box.innerHTML = `<div class="row"><h3 style="margin:0">Portal da produção</h3><span class="spacer"></span>
+      <button class="btn small" id="prodEnviar" ${ords.length?'':'disabled'}>Enviar à produção</button>
+      <button class="btn ghost small" id="prodAtualizar" ${p?'':'disabled'}>Atualizar andamento</button></div>
+    <p class="small muted" style="margin:8px 0 0">${ords.length ? `Cada um dos ${ords.length} pedidos vira uma ordem de serviço no portal. Eles aparecem para a equipe no dia em que as costureiras devolvem o lote.` : 'Importe o CSV da Nuvemshop neste lote para ter os pedidos separados.'}</p>
+    ${p ? `<p class="small" style="margin:8px 0 0">Enviado em ${new Date(p.enviado).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}. ${p.total!=null?`Postados: <b>${p.postados} de ${p.total}</b>; embalados: ${p.embalados}.`:''}</p>`:''}
+    ${(p&&p.avisos&&p.avisos.length) ? `<div class="note bad" style="margin:10px 0 0">${p.avisos.map(a=>`<div><b>${esc(a.tipo)}</b>${a.os?' · pedido #'+esc(a.os):''}: ${esc(a.texto||'')} <span class="muted">(${esc(a.por)})</span></div>`).join('')}</div>`:''}
+    <div id="prodMsg" class="small" style="margin-top:6px"></div>`;
+  const msg = t => { const m=$('#prodMsg'); if(m) m.innerHTML=t; };
+  $('#prodEnviar').onclick = async ()=>{
+    try{
+      const r=calcLote(CFG, L.estAntes||EST, L), c=r.cr;
+      const nm=nomeLote(L);
+      const ordens=ords.map(o=>({id:L.id+':'+o.num, numero:o.num, cliente:o.cliente, uf:(o.uf||'').length===2?o.uf:'', prazo:fmtISO(c.prometido), liberadoEm:fmtISO(c.costVolta),
+        lote:nm, loteId:L.id, itens:o.itens.map(i=>({estampa:i.estampa, cor:i.cor, corNome:CORES_NOME[i.cor]||i.cor, mod:i.mod, tam:i.tam, qty:i.qty}))}));
+      const res=await prodChamar('publicar', {modo:'lazarus', ordens, lotes:[{id:L.id, nome:nm, pecas:r.pecas, pedidos:r.pedidos, recebeEm:fmtISO(c.costVolta), estamparEm:fmtISO(c.estampar), postarEm:fmtISO(c.postar)}]});
+      L.prod={...(L.prod||{}), enviado:new Date().toISOString()}; persist('lote',L.id); renderProdBox();
+      toast(`${res.enviadas} ordens enviadas à produção`);
+    }catch(e){ msg(`<span class="chip bad">Não enviou</span> ${esc(e.message)}`); }
+  };
+  $('#prodAtualizar').onclick = async ()=>{
+    try{
+      const res=await prodChamar('painel', null, {modo:'lazarus'});
+      const minhas=((res.ordens||{}).lazarus||[]).filter(o=>o.loteId===L.id);
+      const postados=minhas.filter(o=>o.etapas&&o.etapas.expedir).length;
+      const embalados=minhas.filter(o=>o.etapas&&o.etapas.embalar).length;
+      const nums=new Set(minhas.map(o=>String(o.numero)));
+      const avisos=(res.avisos||[]).filter(a=>!a.resolvido && (!a.os || nums.has(String(a.os))));
+      L.prod={...(L.prod||{}), total:minhas.length, postados, embalados, avisos, atualizado:new Date().toISOString()};
+      L.etapas=L.etapas||{};
+      if (minhas.length && embalados===minhas.length) L.etapas.estampar=true;
+      if (minhas.length && postados===minhas.length) L.etapas.postar=true;
+      persist('lote',L.id); renderLoteBox();
+      toast('Andamento atualizado');
+    }catch(e){ msg(`<span class="chip bad">Não atualizou</span> ${esc(e.message)}`); }
+  };
 }
 
 /* ================= DINHEIRO ================= */
@@ -1543,6 +1605,8 @@ function renderAjustes(){
     </div>
     <div class="panel"><h3>Grade de tamanhos</h3><p class="small muted" style="margin-top:-6px">Peso de cada variação. Usado para dividir as cores nas previsões.</p>
       <div class="tw"><table><thead><tr><th></th>${CFG.tamanhos.map(t=>`<th class="r">${t}</th>`).join('')}</tr></thead><tbody>${gradeT}</tbody></table></div></div>
+    <div class="panel"><h3>Portal da produção</h3><p class="small muted" style="margin-top:-6px">Com o Lazarus aberto pelo Painel do Gestor, cada lote pode ser enviado ao portal da equipe. Use a mesma chave de acesso do Painel (APP_KEY). O portal só recebe os pedidos e as camisetas; nada de dinheiro.</p>
+      <label class="f">Chave de acesso<input type="password" autocomplete="off" data-scope="cfg" data-path="producao.chave" value="${esc((CFG.producao||{}).chave||'')}"></label></div>
     <div class="panel"><h3>Cópia de segurança</h3><p class="small muted" style="margin-top:-6px">Guarda tudo do Lazarus em um arquivo: ajustes, lotes, vendas, contas e depósitos. Serve também para levar os dados para outro lugar onde o Lazarus estiver.</p>
       <div class="btnrow"><button class="btn small" id="bkExp">Baixar cópia</button><button class="btn ghost small" id="bkImp">Restaurar de um arquivo</button><input type="file" id="bkArq" accept=".json,application/json" hidden></div></div>
     <div class="panel"><h3>Feriados</h3><p class="small muted" style="margin-top:-6px">Uma data por linha (ano-mês-dia). Inclua os da sua cidade.</p>
