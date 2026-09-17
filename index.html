@@ -378,16 +378,19 @@ button.etq{cursor:pointer;border:none}
   body.imprimindo > *:not(#printArea){display:none!important}
   body.imprimindo{background:#fff}
   body.imprimindo #printArea{display:block}
-  .os-folha{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:136mm;gap:5mm;page-break-after:always;break-after:page}
-  .os-print{border:1.5px dashed #555;border-radius:3mm;padding:5mm;font-family:Arial,sans-serif;font-size:10.5pt;color:#000;display:flex;flex-direction:column;gap:3mm;overflow:hidden}
-  .os-top{display:flex;justify-content:space-between;gap:4mm;border-bottom:1.5px solid #000;padding-bottom:3mm}
-  .os-num{font-size:24pt;font-weight:800;line-height:1}
-  .os-prazo{font-size:16pt;font-weight:800}
+  .os-folha{height:277mm;display:grid;grid-template-rows:1fr 1fr;gap:4mm;page-break-after:always;break-after:page}
+  .os-print{border:1.5px dashed #444;border-radius:3mm;padding:5mm 6mm;font-family:Arial,sans-serif;font-size:10.5pt;color:#000;display:flex;flex-direction:column;gap:2.5mm;overflow:hidden}
+  .os-top{display:flex;justify-content:space-between;gap:4mm;border-bottom:1.5px solid #000;padding-bottom:2mm}
+  .os-num{font-size:26pt;font-weight:800;line-height:1}
+  .os-prazo{font-size:17pt;font-weight:800}
   .os-lab{font-size:8.5pt;color:#333}
+  .os-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:4mm}
+  .os-dest{border:1px solid #000;border-radius:2mm;padding:2.5mm 3mm;line-height:1.35}
+  .os-dest b{font-size:11.5pt}
   .os-tab{width:100%;border-collapse:collapse}
-  .os-tab th,.os-tab td{border-bottom:1px solid #999;padding:1.5mm;text-align:left;font-size:10pt;vertical-align:top}
-  .os-tab th{font-size:8.5pt}
-  .os-etapas{margin-top:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:2mm;font-size:10pt;border-top:1px solid #000;padding-top:3mm}
+  .os-tab th,.os-tab td{border-bottom:1px solid #999;padding:1.2mm 1.5mm;text-align:left;font-size:10pt;vertical-align:top}
+  .os-tab th{font-size:8pt}
+  .os-etapas{margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm 4mm;font-size:10pt;border-top:1px solid #000;padding-top:2mm}
 }
 
 </style>
@@ -6505,6 +6508,8 @@ var Log = {
       var a = lista[i];
       a.numero = p.numero || a.numero; a.cliente = p.cliente || a.cliente; a.uf = p.uf || a.uf;
       a.data = p.data || a.data;
+      if(p.destino && (p.destino.endereco || p.destino.nome)) a.destino = p.destino;
+      if(p.link) a.link = p.link;
       if(!a.baixa && p.itens && p.itens.length) a.itens = p.itens;
       if(p.enviadoLoja && a.status!=='enviado'){
         if(a.status==='novo') Log.consumir(a, true);
@@ -6514,7 +6519,8 @@ var Log = {
     }
     var n = {
       id:p.id, numero:p.numero||p.id, data:p.data, cliente:p.cliente||'', uf:p.uf||'',
-      itens:p.itens||[], status:'novo', criado:new Date().toISOString(), origem:p.origem||'manual'
+      itens:p.itens||[], status:'novo', criado:new Date().toISOString(), origem:p.origem||'manual',
+      destino:p.destino||null, link:p.link||'', outros:p.outros||[]
     };
     if(p.enviadoLoja){ n.status='enviado'; n.enviadoEm=p.enviadoEm||p.data; n.historico=true; }
     else if(p.prontoLoja){ n.status='pronto'; n.historico=true; }
@@ -6629,12 +6635,16 @@ var Log = {
     var col = function(n){ return head.indexOf(n.toLowerCase()); };
     var I = {num:col('Número do Pedido'), data:col('Data'), st:col('Status do Pedido'), pag:col('Status do Pagamento'),
       env:col('Status do Envio'), cli:col('Nome do comprador'), uf:col('Estado'), prod:col('Nome do Produto'),
-      qtd:col('Quantidade Comprada'), ide:col('Identificador do pedido'), denv:col('Data de envío')};
+      qtd:col('Quantidade Comprada'), ide:col('Identificador do pedido'), denv:col('Data de envío'),
+      nEnt:col('Nome para a entrega'), tEnt:col('Telefone para a entrega'), tel:col('Telefone'), end:col('Endereço'), num2:col('Número'),
+      comp:col('Complemento'), bai:col('Bairro'), cid:col('Cidade'), cep:col('Código postal'), forma:col('Forma de Entrega'),
+      nota:col('Anotações do Comprador'), link:col('Link do pedido'), rast:col('Código de rastreio do envio')};
     if(I.num<0 || I.data<0 || I.prod<0) throw new Error('Esse arquivo não parece a exportação de vendas da Nuvemshop.');
     var ufs = {'são paulo':'SP','minas gerais':'MG','rio de janeiro':'RJ','bahia':'BA','paraná':'PR','rio grande do sul':'RS','pernambuco':'PE','ceará':'CE','pará':'PA','santa catarina':'SC','goiás':'GO','maranhão':'MA','paraíba':'PB','amazonas':'AM','espírito santo':'ES','mato grosso':'MT','rio grande do norte':'RN','piauí':'PI','alagoas':'AL','distrito federal':'DF','mato grosso do sul':'MS','sergipe':'SE','rondônia':'RO','tocantins':'TO','acre':'AC','amapá':'AP','roraima':'RR'};
     var out = [], cur = null;
     for(var r=1;r<rows.length;r++){
       var L = rows[r]; if(L.length < head.length/2) continue;
+      var v = function(i){ return i>=0 ? String(L[i]||'').trim() : ''; };
       if(L[I.data]){
         var m = L[I.data].match(/(\d{2})\/(\d{2})\/(\d{4})/);
         var st = (L[I.st]||'').toLowerCase(), pg = (L[I.pag]||'').toLowerCase(), en = (L[I.env]||'').toLowerCase();
@@ -6646,7 +6656,11 @@ var Log = {
             cliente:(L[I.cli]||'').split(' ')[0], uf: ufTxt.length===2 ? ufTxt.toUpperCase() : (ufs[ufTxt.toLowerCase()]||''),
             itens:[], origem:'csv',
             enviadoLoja: /enviado|entregue/.test(en), prontoLoja: /pronto/.test(en),
-            enviadoEm: de ? de[3]+'-'+de[2]+'-'+de[1] : ''};
+            enviadoEm: de ? de[3]+'-'+de[2]+'-'+de[1] : '',
+            link: I.link>=0 ? (L[I.link]||'') : '',
+            destino: {nome: v(I.nEnt)||v(I.cli), telefone: v(I.tEnt)||v(I.tel), endereco: v(I.end), numero: v(I.num2), complemento: v(I.comp),
+              bairro: v(I.bai), cidade: v(I.cid), uf: ufTxt.length===2 ? ufTxt.toUpperCase() : (ufs[ufTxt.toLowerCase()]||ufTxt), cep: v(I.cep),
+              envio: v(I.forma), rastreio: v(I.rast), nota: v(I.nota)}};
           out.push(cur);
         } else cur = null;
       }
@@ -6683,7 +6697,7 @@ var Log = {
             if(pr) itens.push({estampa:pr.estampa, cor:pr.cor, mod:pr.mod, tam:pr.tam, qty:U.n(i.quantidade)});
           });
           return {id:String(x.id), numero:x.numero, data:x.data, cliente:x.cliente, uf:x.uf, itens:itens, origem:'api',
-            enviadoLoja: !!x.enviado, enviadoEm: x.enviadoEm||''};
+            enviadoLoja: !!x.enviado, enviadoEm: x.enviadoEm||'', destino: x.destino||null, link: x.link||''};
         });
         Log.importar(lista);
         App.render();
@@ -7449,6 +7463,7 @@ Log.eventos = function(){
     if(ac==='delPedido'){
       UI.confirmar('Excluir pedido da Logística?', 'O que ele tirou do estoque volta. No Financeiro nada muda.', function(){
         var p = Log.d().pedidos.find(function(x){ return x.id===id; }); if(p) Log.devolver(p);
+        Log.d().excluidos = (Log.d().excluidos||[]).concat([id]).slice(-300);
         Log.d().pedidos = Log.d().pedidos.filter(function(x){ return x.id!==id; });
         Log.salvar('Pedido excluído'); App.render();
       });
@@ -7888,6 +7903,9 @@ Views.lazarus = function(){
 ============================================================ */
 var Prod = {
   PADRAO: {
+    importar: 'auto',
+    envioUrl: '',
+    linkNuvemshop: 'https://usearcanju.lojavirtualnuvem.com.br/admin/orders/{id}',
     limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
     prensa: {temp:120, tempo:10, pressao:'média'},
     rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
@@ -7973,7 +7991,8 @@ var Prod = {
   /* pedido da Logística → ordem de serviço */
   paraOS: function(p){
     return {
-      id: p.id, numero: p.numero, cliente: p.cliente||'', uf: p.uf||'', prazo: Log.prazo(p),
+      id: p.id, pedidoId: p.id, numero: p.numero, data: p.data, cliente: p.cliente||'', uf: p.uf||'', prazo: Log.prazo(p),
+      destino: p.destino||null, link: p.link||'', outros: p.outros||[],
       itens: (p.itens||[]).map(function(i){ return {estampa:i.estampa, cor:i.cor, corNome:Log.nomeCor(i.cor), mod:i.mod, tam:i.tam, qty:i.qty}; }),
       brindes: true
     };
@@ -8002,17 +8021,38 @@ var Prod = {
         if(alvo==='enviado') p.enviadoEm = U.iso(new Date(o.etapas.expedir.em));
         mudou++;
       });
+      /* pedidos que o portal trouxe direto da loja entram na Logística */
+      var novos = 0;
+      remotas.forEach(function(o){
+        if(x.pedidos.some(function(y){ return y.id===o.id; })) return;
+        if((x.excluidos||[]).indexOf(o.id)>=0) return;
+        var u = Prod.ultimaEtapa(o);
+        Log.upsertPedido({id:o.id, numero:o.numero, data:o.data||U.hoje(), cliente:o.cliente, uf:o.uf, origem:'portal',
+          itens:(o.itens||[]).map(function(i){ return {estampa:i.estampa, cor:i.cor, mod:i.mod, tam:i.tam, qty:i.qty}; }),
+          destino:o.destino, link:o.link, outros:o.outros});
+        var p = x.pedidos.find(function(y){ return y.id===o.id; });
+        if(p && u){
+          Log.consumir(p, true);
+          p.status = u==='expedir' ? 'enviado' : ((u==='embalar'||u==='etiqueta') ? 'pronto' : 'separado');
+          if(u==='expedir') p.enviadoEm = U.iso(new Date(o.etapas.expedir.em));
+        }
+        novos++;
+      });
       var abertos = Log.pedidosAbertos();
-      var idsAbertos = {}; abertos.forEach(function(p){ idsAbertos[p.id]=1; });
-      var remover = remotas.filter(function(o){ return !idsAbertos[o.id] && !(o.etapas && o.etapas.expedir); }).map(function(o){ return o.id; });
+      var excl = x.excluidos||[];
+      var remover = remotas.filter(function(o){ return excl.indexOf(o.id)>=0 && !(o.etapas && o.etapas.separar); }).map(function(o){ return o.id; });
       var etapas = {};
       abertos.forEach(function(p){ if(p.status==='pronto') etapas[p.id]='embalar'; });
+      /* enviados aqui mas ainda abertos no portal: fecham lá também */
+      var enviados = x.pedidos.filter(function(p){ return p.status==='enviado' && !p.historico; });
+      var abertosRemotos = {}; remotas.forEach(function(o){ if(!(o.etapas && o.etapas.expedir)) abertosRemotos[o.id]=1; });
+      enviados.forEach(function(p){ if(abertosRemotos[p.id]){ etapas[p.id]='expedir'; abertos.push(p); } });
       var d = Prod.d();
       d.remoto = {ordens: remotas, avisos: r.avisos||[], feitos: r.feitos||{}, hoje: r.hoje};
       d.equipe = r.equipe || d.equipe;
       if(r.config && Object.keys(r.config).length && !d.configLocal) d.config = r.config;
       d.sincronizado = new Date().toISOString();
-      Log.salvar(mudou ? mudou+' pedido(s) atualizados pela produção' : undefined);
+      Log.salvar((mudou||novos) ? (mudou+novos)+' pedido(s) atualizados pela produção' : undefined);
       return Prod.chamar('publicar', {modo:'arcanju', ordens: abertos.map(Prod.paraOS), remover: remover, etapas: etapas}).then(function(res){
         return Prod.chamar('painel').then(function(r2){
           Prod.d().remoto.ordens = (r2.ordens && r2.ordens.arcanju) || [];
@@ -8022,6 +8062,16 @@ var Prod = {
         });
       });
     }).catch(function(e){ if(!silencioso) UI.toast(e.message); App.render(); });
+  },
+
+  trazerLoja: function(){
+    UI.toast('Buscando pedidos na Nuvemshop…');
+    return Prod.chamar('nuvemshop', null, {forcar:'1'}).then(function(r){
+      if(r.desligado){ UI.toast('A busca automática está desligada em Guia e rotina.'); return; }
+      if(r.lazarusAtivo){ UI.toast('O Projeto Lazarus está ativo, então os pedidos entram pelos lotes dele.'); return; }
+      UI.toast((r.novas||0)+' pedido(s) novo(s) no portal');
+      return Prod.sincronizar(true);
+    }).catch(function(e){ UI.toast(e.message); });
   },
 
   salvarEquipe: function(){
@@ -8035,6 +8085,7 @@ var Prod = {
   salvarConfig: function(){
     var d = Prod.d(); d.configLocal = true;
     var c = Prod.cfg();
+    c.prazoEnvio = U.n(Log.cfg().prazoEnvio,2); c.feriados = Log.cfg().feriados;
     Prod.chamar('config', {config:c}).then(function(){ Store.commit('Guia enviado ao portal'); App.render(); })
       .catch(function(e){ Store.salvar(); UI.toast(e.message); });
   },
@@ -8070,7 +8121,7 @@ Views.prodPainel = function(){
   h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
     '<div class="cartao-tit">Sincronizar com a produção</div><div class="cartao-sub" style="margin:0">Envia os pedidos em aberto da Logística como ordens de serviço e traz o que a equipe já fez: separado, embalado e postado atualizam o estoque e a expedição aqui.'+
     (d.sincronizado ? ' Última vez: '+new Date(d.sincronizado).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'.' : '')+'</div></div>'+
-    '<button class="btn" data-pd="sinc">Sincronizar agora</button></div></div>';
+    '<button class="btn sec" data-pd="loja">Trazer pedidos da loja</button><button class="btn" data-pd="sinc">Sincronizar agora</button></div></div>';
   if(!rem) return h + UI.vazio('Ainda sem dados do portal', 'Cadastre a equipe, configure o banco de dados na Vercel e toque em Sincronizar agora.');
   var ord = rem.ordens||[];
   var por = {}; Prod.ETAPAS.forEach(function(e){ por[e]=[]; });
@@ -8142,6 +8193,14 @@ Views.prodGuia = function(){
     '<div class="cartao-sub" style="margin-top:6px">Horário limite da agência (vazio = sem postagem)</div>'+
     '<div class="linha-campos lc3">'+[1,2,3,4,5,6].map(function(d){ return '<div class="campo"><label>'+dias[d]+'</label><input type="time" data-pdcfg="limites.'+d+'" value="'+U.esc(c.limites[String(d)]||'')+'"></div>'; }).join('')+'</div>'+
   '</div>';
+  h += '<div class="cartao"><div class="cartao-tit">Pedidos e etiquetas</div>'+
+    '<div class="campo"><label>Pedidos da loja entram no portal sozinhos</label><select data-pdcfg="importar">'+
+      [['auto','Sim, menos quando o Projeto Lazarus estiver ativo'],['sempre','Sim, sempre'],['nunca','Não, só pelo Sincronizar']].map(function(o){ return '<option value="'+o[0]+'"'+(c.importar===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'+
+      '<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">O portal busca na Nuvemshop sempre que a equipe abre ou atualiza (no máximo a cada 3 minutos) e todo dia às 7h.</div></div>'+
+    '<div class="campo"><label>Link do Envio Ecomm para achar a etiqueta</label><input type="text" data-pdcfg="envioUrl" value="'+U.esc(c.envioUrl)+'" placeholder="https://…{numero}…">'+
+      '<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">Use {numero} para o número do pedido, {id} para o código da Nuvemshop, {cep} e {nome}. O número também é copiado para colar na busca.</div></div>'+
+    '<div class="campo"><label>Link do pedido na Nuvemshop (para você)</label><input type="text" data-pdcfg="linkNuvemshop" value="'+U.esc(c.linkNuvemshop)+'"></div>'+
+  '</div>';
   h += '<div class="cartao"><div class="cartao-tit">Roteiro do dia</div>'+
     area('Segunda a quinta','rotina',9,'Uma linha por passo: horário | tarefa')+
     area('Sexta','rotinaSexta',7)+area('Sábado','rotinaSabado',4)+'</div>';
@@ -8173,22 +8232,32 @@ Prod.imprimir = function(){
   if(!sel.length) return;
   var area = document.getElementById('printArea');
   if(!area){ area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
-  var etapas = ['Separado','Prensado','Conferido','Embalado','Etiqueta','Postado'];
+  var etapas = ['Separado','Prensado','Conferido','Embalado','Etiqueta colada','Postado'];
   var folhas = [];
-  for(var i=0;i<sel.length;i+=4) folhas.push(sel.slice(i,i+4));
+  for(var i=0;i<sel.length;i+=2) folhas.push(sel.slice(i,i+2));
   area.innerHTML = folhas.map(function(f){
     return '<div class="os-folha">'+f.map(function(p){
-      var cam = Log.camisetasDoPedido(p);
-      return '<div class="os-print"><div class="os-top"><div><div class="os-num">#'+U.esc(p.numero)+'</div><div>'+U.esc(p.cliente||'')+(p.uf?' · '+U.esc(p.uf):'')+'</div></div>'+
-        '<div style="text-align:right"><div class="os-lab">Envio até</div><div class="os-prazo">'+U.dataBr(Log.prazo(p))+'</div><div class="os-lab">Compra '+U.dataBr(p.data)+'</div></div></div>'+
-        '<table class="os-tab"><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
+      var cam = Log.camisetasDoPedido(p), d = p.destino||{};
+      return '<div class="os-print"><div class="os-top"><div><div class="os-lab">USE ARCANJU · ORDEM DE SERVIÇO</div><div class="os-num">#'+U.esc(p.numero)+'</div>'+
+        '<div class="os-lab">Compra '+U.dataBr(p.data)+' · '+cam+' camiseta'+(cam!==1?'s':'')+'</div></div>'+
+        '<div style="text-align:right"><div class="os-lab">Enviar até</div><div class="os-prazo">'+U.dataBr(Log.prazo(p))+'</div>'+(d.envio?'<div class="os-lab" style="max-width:70mm">'+U.esc(d.envio)+'</div>':'')+'</div></div>'+
+        '<div class="os-grid"><div><table class="os-tab"><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
         (p.itens||[]).map(function(i){ return '<tr><td><b>'+i.qty+'</b></td><td>'+U.esc(i.estampa)+'</td><td>'+U.esc(Log.nomeCor(i.cor))+'</td><td>'+U.esc(i.mod)+'</td><td><b>'+U.esc(i.tam)+'</b></td></tr>'; }).join('')+
-        '</tbody></table><div class="os-lab">'+cam+' camiseta'+(cam!==1?'s':'')+' · brindes: capelinha, sacolinha e cheirinho</div>'+
+        (p.outros||[]).map(function(x){ return '<tr><td><b>'+x.qty+'</b></td><td colspan="4">'+U.esc(x.nome)+'</td></tr>'; }).join('')+
+        '</tbody></table><div class="os-lab" style="margin-top:2mm">Brindes: ☐ capelinha ☐ sacolinha ☐ cheirinho</div>'+
+        (d.nota?'<div style="margin-top:2mm"><b>Observação do cliente:</b> '+U.esc(d.nota)+'</div>':'')+'</div>'+
+        '<div class="os-dest"><div class="os-lab">Destinatário</div>'+
+        (d.nome ? '<b>'+U.esc(d.nome)+'</b><br>'+U.esc([d.endereco,d.numero].filter(Boolean).join(', '))+(d.complemento?'<br>'+U.esc(d.complemento):'')+'<br>'+U.esc(d.bairro||'')+'<br>'+U.esc(d.cidade||'')+(d.uf?' / '+U.esc(d.uf):'')+'<br>CEP <b>'+U.esc(d.cep||'')+'</b>'+(d.telefone?'<br>Tel. '+U.esc(d.telefone):'')
+          : '<b>'+U.esc(p.cliente||'')+'</b><br><span class="os-lab">Endereço não informado</span>')+
+        '</div></div>'+
         '<div class="os-etapas">'+etapas.map(function(e){ return '<span>☐ '+e+'</span>'; }).join('')+'</div></div>';
     }).join('')+'</div>';
   }).join('');
   document.body.classList.add('imprimindo');
-  setTimeout(function(){ window.print(); setTimeout(function(){ document.body.classList.remove('imprimindo'); }, 500); }, 60);
+  var tirar = function(){ document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', tirar); };
+  window.addEventListener('afterprint', tirar);
+  setTimeout(function(){ window.print(); setTimeout(tirar, 1500); }, 60);
+  Prod.chamar('impressa', {modo:'arcanju', ids: sel.map(function(p){ return p.id; })}).catch(function(){});
 };
 
 Views.prodAvisos = function(){
@@ -8212,6 +8281,7 @@ Views.prodAvisos = function(){
     var t = e.target.closest('[data-pd]'); if(!t) return;
     var ac = t.getAttribute('data-pd'), d = Prod.d();
     if(ac==='sinc'){ Prod.sincronizar(false); return; }
+    if(ac==='loja'){ Prod.trazerLoja(); return; }
     if(ac==='addPessoa'){ d.equipe.push({id:U.id(), nome:'', dias:[1,2,3,4,5], inicio:'08:00', fim:'18:00', capacidade:20, ativo:true}); App.render(); return; }
     if(ac==='delPessoa'){ d.equipe.splice(parseInt(t.getAttribute('data-i'),10),1); App.render(); return; }
     if(ac==='salvarEquipe'){ Prod.salvarEquipe(); return; }

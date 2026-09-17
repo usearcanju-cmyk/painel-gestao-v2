@@ -123,6 +123,32 @@ textarea{min-height:90px}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 .lote{border-left:4px solid var(--ambar)}
+.bloco{background:#f7f3ef;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.5}
+.bloco b.tit{display:block;font-size:12px;text-transform:none;color:var(--medio);font-weight:600;margin-bottom:2px}
+.os-acoes{display:flex;gap:6px;align-items:center}
+.icone{border:1px solid var(--linha-forte);background:var(--carta);border-radius:10px;padding:8px 10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.barra-imp{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px}
+#printArea{display:none}
+@page{size:A4;margin:8mm}
+@media print{
+  body.imprimindo > *:not(#printArea){display:none!important}
+  body.imprimindo{background:#fff}
+  body.imprimindo #printArea{display:block}
+  .folha{height:277mm;display:grid;grid-template-rows:1fr 1fr;gap:4mm;page-break-after:always;break-after:page}
+  .osp{border:1.5px dashed #444;border-radius:3mm;padding:5mm 6mm;font-family:Arial,sans-serif;color:#000;font-size:10.5pt;display:flex;flex-direction:column;gap:2.5mm;overflow:hidden}
+  .osp-top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid #000;padding-bottom:2mm}
+  .osp-marca{font-size:8.5pt;letter-spacing:.08em;text-transform:uppercase}
+  .osp-num{font-size:26pt;font-weight:800;line-height:1}
+  .osp-prazo{font-size:17pt;font-weight:800;text-align:right}
+  .osp-l{font-size:8.5pt;color:#333}
+  .osp-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:4mm}
+  .osp-dest{border:1px solid #000;border-radius:2mm;padding:2.5mm 3mm;line-height:1.35}
+  .osp-dest b{font-size:11.5pt}
+  .osp table{width:100%;border-collapse:collapse}
+  .osp th,.osp td{border-bottom:1px solid #999;padding:1.2mm 1.5mm;text-align:left;font-size:10pt;vertical-align:top}
+  .osp th{font-size:8pt}
+  .osp-check{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm 4mm;margin-top:auto;border-top:1px solid #000;padding-top:2mm;font-size:10pt}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -166,6 +192,7 @@ var CORES = {OFF:'#f1e9dc', PRETO:'#1c1c1c', BRANCA:'#ffffff', AZUL:'#1f3a64'};
 var PADRAO = {
   limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
   prensa: {temp:120, tempo:10, pressao:'média'},
+  envioUrl: '',
   rotina: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
     '08:10 | Recortar de uma vez todos os DTF do dia (lista na aba Prensa)',
     '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
@@ -263,7 +290,8 @@ function api(acao, corpo){
   });
 }
 function carregar(silencioso){
-  return api('dia').then(function(d){ S.dados=d; render(); })
+  var buscar = api('nuvemshop').catch(function(){ return null; });
+  return buscar.then(function(){ return api('dia'); }).then(function(d){ S.dados=d; render(); })
     .catch(function(e){ if(!silencioso) toast(e.message); });
 }
 
@@ -432,6 +460,20 @@ function itemHTML(i){
   var cor = CORES[i.cor]||'#ccc';
   return '<div class="item"><div class="q num">'+i.qty+'</div><div style="flex:1"><b>'+esc(i.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+cor+'"></span>'+esc(i.corNome||i.cor)+' · '+esc(i.mod)+' · <b style="color:var(--texto)">'+esc(i.tam)+'</b></div></div></div>';
 }
+function destinoHTML(o){
+  var d = o.destino;
+  if(!d || !(d.nome || d.endereco)) return '<div class="bloco"><b class="tit">Entrega</b><span class="medio">Endereço ainda não veio da loja. Toque em Atualizar.</span></div>';
+  var linha1 = [d.endereco, d.numero].filter(Boolean).join(', ');
+  return '<div class="bloco"><b class="tit">Entrega</b>'+
+    '<b>'+esc(d.nome)+'</b><br>'+
+    esc(linha1)+(d.complemento?' · '+esc(d.complemento):'')+'<br>'+
+    (d.bairro?esc(d.bairro)+' · ':'')+esc(d.cidade)+(d.uf?' / '+esc(d.uf):'')+'<br>'+
+    'CEP '+esc(d.cep)+(d.telefone?' · Tel. '+esc(d.telefone):'')+
+    (d.envio?'<br><span class="medio">Frete: '+esc(d.envio)+'</span>':'')+
+    (d.rastreio?'<br><span class="medio">Rastreio: '+esc(d.rastreio)+'</span>':'')+
+    (d.nota?'<br><b>Observação do cliente:</b> '+esc(d.nota):'')+
+  '</div>';
+}
 function osHTML(o){
   var px = proxima(o), h = hojeISO(), e = o.etapas||{};
   var prazo = o.prazo ? (o.prazo<h ? '<span class="chip cr">atrasado '+br(o.prazo)+'</span>' : (o.prazo===h ? '<span class="chip at">sai hoje</span>' : '<span class="chip neu">até '+br(o.prazo)+'</span>')) : '';
@@ -440,12 +482,19 @@ function osHTML(o){
   var ult = null; ETAPAS.forEach(function(x){ if(e[x]) ult = x; });
   var h = '<div class="os"><div class="os-cab" data-abrir="'+esc(o.id)+'"><div style="flex:1;min-width:0"><div class="n">#'+esc(o.numero)+'</div>'+
     '<div class="quem">'+cam+' camiseta'+(cam!==1?'s':'')+(o.cliente?' · '+esc(o.cliente):'')+(o.uf?' · '+esc(o.uf):'')+(o.lote?' · '+esc(o.lote):'')+'</div></div>'+
-    '<div style="text-align:right">'+prazo+'<div class="pequeno medio" style="margin-top:4px">'+(px?'Próximo: '+NOME_ETAPA[px]:'Postado')+'</div></div></div>';
+    '<div style="text-align:right">'+prazo+'<div class="pequeno medio" style="margin-top:4px">'+(px?'Próximo: '+NOME_ETAPA[px]:'Postado')+'</div>'+
+      '<div class="os-acoes" style="justify-content:flex-end;margin-top:6px">'+(o.impressaEm?'<span class="chip ok">OS impressa</span>':'')+'<button class="icone" data-imprimir="'+esc(o.id)+'" title="Imprimir a OS">Imprimir</button></div></div></div>';
   if(aberta){
     h += '<div class="os-corpo"><div class="etapas">'+ETAPAS.map(function(x){ return '<span class="'+(e[x]?'on':'')+'" title="'+NOME_ETAPA[x]+'"></span>'; }).join('')+'</div>'+
       (o.itens||[]).map(itemHTML).join('')+
+      ((o.outros||[]).length ? '<div class="bloco"><b class="tit">Outros produtos do pedido</b>'+o.outros.map(function(x){ return x.qty+'× '+esc(x.nome); }).join('<br>')+'</div>' : '')+
       (o.brindes!==false ? '<div class="pequeno medio" style="margin:8px 0">Brindes: 1 capelinha, 1 sacolinha e cheirinho.</div>' : '')+
+      destinoHTML(o)+
       (o.obs ? '<div class="pequeno" style="margin:8px 0"><b>Obs.:</b> '+esc(o.obs)+'</div>' : '')+
+      '<div class="linha-btn" style="margin-top:10px">'+
+        '<button class="btn sec" data-imprimir="'+esc(o.id)+'">Imprimir OS</button>'+
+        '<button class="btn sec" data-envio="'+esc(o.id)+'">Achar no Envio Ecomm</button>'+
+      '</div>'+
       '<div class="linha-btn" style="margin-top:10px">'+
         (px ? '<button class="btn grande" data-etapa="'+px+'" data-id="'+esc(o.id)+'">'+FEITO_ETAPA[px]+'</button>' : '')+
         (ult ? '<button class="btn leve" data-desfazer="'+ult+'" data-id="'+esc(o.id)+'">Desfazer "'+FEITO_ETAPA[ult].toLowerCase()+'"</button>' : '')+
@@ -463,7 +512,10 @@ function vPedidos(){
       (sep.length>1 ? '<button class="btn sec" data-lote="separar" data-ids="'+esc(sep.map(function(o){ return o.id; }).join(','))+'">Separei os '+sep.length+'</button>' : '')+'</div>'+
       (lista.length ? lista.map(osHTML).join('') : '<div class="medio pequeno">Nada nesta onda.</div>');
   };
-  var h = '<p class="medio pequeno" style="margin-top:0">Na ordem de prioridade. Toque no pedido para ver as camisetas e marcar a etapa. Cada pedido tem a sua cesta com a ordem de serviço dentro.</p>';
+  var faltam = p.hoje.filter(function(o){ return !o.impressaEm; });
+  var h = '<div class="barra-imp"><button class="btn" data-imprimir-dia="todas"'+(p.hoje.length?'':' disabled')+'>Imprimir todas as OS do dia ('+p.hoje.length+')</button>'+
+    (faltam.length && faltam.length!==p.hoje.length ? '<button class="btn sec" data-imprimir-dia="faltam">Só as que faltam ('+faltam.length+')</button>' : '')+'</div>';
+  h += '<p class="medio pequeno" style="margin-top:0">Na ordem de prioridade. Toque no pedido para ver as camisetas e marcar a etapa. Cada pedido tem a sua cesta com a ordem de serviço dentro.</p>';
   h += onda('Onda 1, manhã', p.onda1) + onda('Onda 2, tarde', p.onda2);
   if(p.depois.length) h += '<div class="onda-cab"><h3>Se sobrar tempo <span class="medio" style="font-weight:500">('+p.depois.length+')</span></h3></div>'+p.depois.map(osHTML).join('');
   return h;
@@ -537,6 +589,63 @@ function vGuia(){
   return h;
 }
 
+/* ---------- impressão e etiqueta ---------- */
+function acharOS(id){ return ((S.dados&&S.dados.ordens[S.modo])||[]).find(function(o){ return o.id===id; }); }
+function osPrint(o){
+  var d = o.destino || {};
+  var cam = (o.itens||[]).reduce(function(s,i){ return s+i.qty; },0);
+  return '<div class="osp">'+
+    '<div class="osp-top"><div><div class="osp-marca">'+(S.modo==='lazarus'?'Projeto Lazarus':'Use Arcanju')+' · Ordem de serviço</div><div class="osp-num">#'+esc(o.numero)+'</div>'+
+      '<div class="osp-l">'+(o.data?'Compra '+br(o.data)+' · ':'')+cam+' camiseta'+(cam!==1?'s':'')+(o.lote?' · '+esc(o.lote):'')+'</div></div>'+
+      '<div><div class="osp-l" style="text-align:right">Enviar até</div><div class="osp-prazo">'+(o.prazo?br(o.prazo)+'/'+o.prazo.slice(0,4):'')+'</div>'+
+      (d.envio?'<div class="osp-l" style="text-align:right;max-width:70mm">'+esc(d.envio)+'</div>':'')+'</div></div>'+
+    '<div class="osp-grid"><div>'+
+      '<table><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
+      (o.itens||[]).map(function(i){ return '<tr><td><b>'+i.qty+'</b></td><td>'+esc(i.estampa)+'</td><td>'+esc(i.corNome||i.cor)+'</td><td>'+esc(i.mod)+'</td><td><b>'+esc(i.tam)+'</b></td></tr>'; }).join('')+
+      (o.outros||[]).map(function(x){ return '<tr><td><b>'+x.qty+'</b></td><td colspan="4">'+esc(x.nome)+'</td></tr>'; }).join('')+
+      '</tbody></table>'+
+      (o.brindes!==false?'<div class="osp-l" style="margin-top:2mm">Brindes: ☐ capelinha ☐ sacolinha ☐ cheirinho</div>':'')+
+      (d.nota?'<div style="margin-top:2mm"><b>Observação do cliente:</b> '+esc(d.nota)+'</div>':'')+
+      (o.obs?'<div style="margin-top:2mm"><b>Obs.:</b> '+esc(o.obs)+'</div>':'')+
+    '</div><div class="osp-dest"><div class="osp-l">Destinatário</div>'+
+      (d.nome ? '<b>'+esc(d.nome)+'</b><br>'+esc([d.endereco,d.numero].filter(Boolean).join(', '))+(d.complemento?'<br>'+esc(d.complemento):'')+'<br>'+
+        esc(d.bairro||'')+'<br>'+esc(d.cidade||'')+(d.uf?' / '+esc(d.uf):'')+'<br>CEP <b>'+esc(d.cep||'')+'</b>'+(d.telefone?'<br>Tel. '+esc(d.telefone):'')
+        : (o.cliente?'<b>'+esc(o.cliente)+'</b>':'')+'<br><span class="osp-l">Endereço não informado</span>')+
+    '</div></div>'+
+    '<div class="osp-check">'+['Separado','Prensado','Conferido','Embalado','Etiqueta colada','Postado'].map(function(e){ return '<span>☐ '+e+'</span>'; }).join('')+'</div>'+
+  '</div>';
+}
+function imprimirOS(lista){
+  lista = lista.filter(Boolean);
+  if(!lista.length){ toast('Nenhuma OS para imprimir.'); return; }
+  var area = document.getElementById('printArea');
+  if(!area){ area = document.createElement('div'); area.id='printArea'; document.body.appendChild(area); }
+  var folhas = [];
+  for(var i=0;i<lista.length;i+=2) folhas.push('<div class="folha">'+lista.slice(i,i+2).map(osPrint).join('')+'</div>');
+  area.innerHTML = folhas.join('');
+  document.body.classList.add('imprimindo');
+  var tirar = function(){ document.body.classList.remove('imprimindo'); window.removeEventListener('afterprint', tirar); };
+  window.addEventListener('afterprint', tirar);
+  setTimeout(function(){ window.print(); setTimeout(tirar, 1500); }, 80);
+  api('impressa', {modo:S.modo, ids:lista.map(function(o){ return o.id; })}).then(function(){
+    var q = new Date().toISOString();
+    lista.forEach(function(o){ o.impressaEm = q; });
+    render();
+  }).catch(function(){});
+}
+function abrirEnvio(o){
+  if(!o) return;
+  var num = String(o.numero);
+  if(navigator.clipboard) navigator.clipboard.writeText(num).catch(function(){});
+  var modelo = cfg().envioUrl || '';
+  if(!modelo){ toast('Número #'+num+' copiado. O link do Envio Ecomm ainda não foi configurado no painel.'); return; }
+  var d = o.destino || {};
+  var url = modelo.replace(/\{numero\}/g, encodeURIComponent(num)).replace(/\{id\}/g, encodeURIComponent(o.pedidoId||o.id))
+    .replace(/\{cep\}/g, encodeURIComponent((d.cep||'').replace(/\D/g,''))).replace(/\{nome\}/g, encodeURIComponent(d.nome||o.cliente||''));
+  window.open(url, '_blank', 'noopener');
+  toast('Número #'+num+' copiado. Se precisar, cole na busca do Envio Ecomm.');
+}
+
 /* ---------- ações ---------- */
 function marcar(ids, etapa, feitoFlag){
   ids = ids.filter(Boolean); if(!ids.length) return;
@@ -580,6 +689,9 @@ document.addEventListener('click', function(e){
   var t;
   if((t = e.target.closest('[data-aba]'))){ S.aba = t.getAttribute('data-aba'); render(); window.scrollTo(0,0); return; }
   if((t = e.target.closest('[data-modo]'))){ S.modo = t.getAttribute('data-modo'); localStorage.setItem('prod_modo', S.modo); S.aberta=null; render(); return; }
+  if((t = e.target.closest('[data-imprimir]'))){ imprimirOS([acharOS(t.getAttribute('data-imprimir'))]); return; }
+  if((t = e.target.closest('[data-imprimir-dia]'))){ var pl = plano(S.modo); imprimirOS(t.getAttribute('data-imprimir-dia')==='faltam' ? pl.hoje.filter(function(o){ return !o.impressaEm; }) : pl.hoje); return; }
+  if((t = e.target.closest('[data-envio]'))){ abrirEnvio(acharOS(t.getAttribute('data-envio'))); return; }
   if((t = e.target.closest('[data-abrir]'))){ var id = t.getAttribute('data-abrir'); S.aberta = S.aberta===id ? null : id; render(); return; }
   if((t = e.target.closest('[data-etapa]'))){ marcar([t.getAttribute('data-id')], t.getAttribute('data-etapa')); return; }
   if((t = e.target.closest('[data-desfazer]'))){ marcar([t.getAttribute('data-id')], t.getAttribute('data-desfazer'), false); return; }

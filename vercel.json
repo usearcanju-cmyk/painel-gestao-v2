@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "crons": [
+    { "path": "/api/producao?acao=nuvemshop", "schedule": "0 10 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

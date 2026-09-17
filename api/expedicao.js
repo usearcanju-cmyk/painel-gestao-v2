@@ -27,6 +27,14 @@ export default async function handler(req, res) {
         uf: String(endereco.province || endereco.state || '').slice(0, 2).toUpperCase(),
         enviado: ENVIADO.includes(envio) || Boolean(enviadoEm),
         enviadoEm,
+        link: process.env.NUVEMSHOP_ADMIN_URL ? process.env.NUVEMSHOP_ADMIN_URL.replace('{id}', String(p.id)) : '',
+        destino: {
+          nome: String(endereco.name || cliente.name || ''), telefone: String(endereco.phone || p.contact_phone || cliente.phone || ''),
+          endereco: String(endereco.address || ''), numero: String(endereco.number || ''), complemento: String(endereco.floor || ''),
+          bairro: String(endereco.locality || ''), cidade: String(endereco.city || ''), uf: String(endereco.province || ''),
+          cep: String(endereco.zipcode || ''), envio: String(p.shipping_option || ''), rastreio: String(p.shipping_tracking_number || ''),
+          nota: String(p.note || '')
+        },
         itens: (Array.isArray(p.products) ? p.products : []).map((i) => ({
           nome: String(i.name || i.product_name || ''),
           variantes: Array.isArray(i.variant_values) ? i.variant_values.map(String) : [],

@@ -223,4 +223,12 @@ Se houver lotes do Projeto Lazarus, o portal mostra uma segunda linha, "Projeto 
 3. No painel, em Produção → Equipe, cadastre a pessoa com um PIN e toque em **Salvar e enviar ao portal**.
 4. Toque em **Sincronizar agora** sempre que trouxer pedidos novos na Logística.
 
+**Pedidos entram sozinhos:** o portal busca os pedidos pagos dos últimos 10 dias na Nuvemshop sempre que a equipe abre ou toca em Atualizar (no máximo a cada 3 minutos) e todo dia às 7h (Vercel Cron, em `vercel.json`). Pedidos já enviados na loja saem da fila. Durante o Projeto Lazarus, essa busca pausa sozinha para os pedidos entrarem pelos lotes (dá para mudar em Guia e rotina). No Painel, **Sincronizar** traz esses pedidos para a Logística.
+
+**Ordem de serviço:** cada pedido tem o botão **Imprimir**, e a aba Pedidos tem **Imprimir todas as OS do dia**. Sai uma folha A4 com duas OS, com itens, destinatário completo e caixas das etapas. Na janela de impressão, "Salvar como PDF" gera o arquivo.
+
+**Envio Ecomm:** o botão **Achar no Envio Ecomm** copia o número do pedido e abre o link configurado em Produção → Guia e rotina. No link, `{numero}`, `{id}`, `{cep}` e `{nome}` são trocados pelos dados do pedido.
+
+**Variável opcional:** `NUVEMSHOP_ADMIN_URL` (ex.: `https://usearcanju.lojavirtualnuvem.com.br/admin/orders/{id}`).
+
 **Projeto Lazarus e o portal:** no Lazarus (aberto pelo painel), em Ajustes, coloque a mesma chave de acesso. Em cada lote, **Enviar à produção** manda os pedidos do lote, e **Atualizar andamento** marca o lote como estampado e postado quando a equipe terminar. O Lazarus continua sem ler nem escrever nada do Financeiro ou da Logística.

@@ -686,7 +686,9 @@ function lerNuvemshop(text){
   const col = nm => head.indexOf(nm.toLowerCase());
   const I = {num:col('Número do Pedido'), data:col('Data'), status:col('Status do Pedido'), pag:col('Status do Pagamento'),
     total:col('Total'), meio:col('Meio de pagamento'), prod:col('Nome do Produto'), qtd:col('Quantidade Comprada'),
-    cli:col('Nome do comprador'), uf:col('Estado')};
+    cli:col('Nome do comprador'), uf:col('Estado'), ide:col('Identificador do pedido'),
+    nEnt:col('Nome para a entrega'), tEnt:col('Telefone para a entrega'), tel:col('Telefone'), end:col('Endereço'), num2:col('Número'),
+    comp:col('Complemento'), bai:col('Bairro'), cid:col('Cidade'), cep:col('Código postal'), forma:col('Forma de Entrega'), nota:col('Anotações do Comprador')};
   if (I.num<0 || I.data<0 || I.total<0) throw new Error('Esse arquivo não parece a exportação de vendas da Nuvemshop.');
   const pedidos = []; let cur = null;
   for (let r=1;r<rows.length;r++){
@@ -696,7 +698,9 @@ function lerNuvemshop(text){
       const status=(row[I.status]||'').toLowerCase(), pag=(row[I.pag]||'').toLowerCase();
       const valido = m && !/cancel/.test(status) && !/cancel|estorn|recus|pendente/.test(pag);
       cur = valido ? {num:row[I.num], data:`${m[3]}-${m[2]}-${m[1]}`, total:n((row[I.total]||'').replace(',','.')), pix:/pix/i.test(row[I.meio]||''), itens:[],
-        cliente: I.cli>=0 ? String(row[I.cli]||'').trim().split(' ')[0] : '', uf: I.uf>=0 ? String(row[I.uf]||'').trim() : ''} : null;
+        cliente: I.cli>=0 ? String(row[I.cli]||'').trim().split(' ')[0] : '', uf: I.uf>=0 ? String(row[I.uf]||'').trim() : '',
+        id: I.ide>=0 ? String(row[I.ide]||'') : '',
+        destino: (()=>{ const v=i=>i>=0?String(row[i]||'').trim():''; return {nome:v(I.nEnt)||v(I.cli), telefone:v(I.tEnt)||v(I.tel), endereco:v(I.end), numero:v(I.num2), complemento:v(I.comp), bairro:v(I.bai), cidade:v(I.cid), uf:v(I.uf), cep:v(I.cep), envio:v(I.forma), nota:v(I.nota)}; })()} : null;
       if (cur) pedidos.push(cur);
     }
     if (!cur || I.prod<0) continue;
@@ -711,7 +715,7 @@ function itensDaJanela(pedidos, ini, fim){
   const acc = {};
   sel.forEach(p=>p.itens.forEach(i=>{ const k=[i.estampa,i.cor,i.mod,i.tam].join('|'); acc[k]=(acc[k]||0)+i.qty; }));
   const itens = Object.entries(acc).map(([k,q])=>{ const [estampa,cor,mod,tam]=k.split('|'); return {estampa,cor,mod,tam,qty:q}; });
-  const ordens = sel.filter(p=>p.itens.length).map(p=>({num:p.num, data:p.data, cliente:p.cliente||'', uf:p.uf||'', itens:p.itens.map(i=>({...i}))}));
+  const ordens = sel.filter(p=>p.itens.length).map(p=>({num:p.num, id:p.id||'', data:p.data, cliente:p.cliente||'', uf:p.uf||'', destino:p.destino||null, itens:p.itens.map(i=>({...i}))}));
   return {pedidos:sel.length, receita:Math.round(sel.reduce((s,p)=>s+p.total,0)*100)/100, itens, ordens};
 }
 function diasDosPedidos(pedidos){
@@ -1199,7 +1203,7 @@ function renderProdBox(){
     try{
       const r=calcLote(CFG, L.estAntes||EST, L), c=r.cr;
       const nm=nomeLote(L);
-      const ordens=ords.map(o=>({id:L.id+':'+o.num, numero:o.num, cliente:o.cliente, uf:(o.uf||'').length===2?o.uf:'', prazo:fmtISO(c.prometido), liberadoEm:fmtISO(c.costVolta),
+      const ordens=ords.map(o=>({id:L.id+':'+o.num, pedidoId:o.id||'', data:o.data, destino:o.destino||null, numero:o.num, cliente:o.cliente, uf:(o.uf||'').length===2?o.uf:'', prazo:fmtISO(c.prometido), liberadoEm:fmtISO(c.costVolta),
         lote:nm, loteId:L.id, itens:o.itens.map(i=>({estampa:i.estampa, cor:i.cor, corNome:CORES_NOME[i.cor]||i.cor, mod:i.mod, tam:i.tam, qty:i.qty}))}));
       const res=await prodChamar('publicar', {modo:'lazarus', ordens, lotes:[{id:L.id, nome:nm, pecas:r.pecas, pedidos:r.pedidos, recebeEm:fmtISO(c.costVolta), estamparEm:fmtISO(c.estampar), postarEm:fmtISO(c.postar)}]});
       L.prod={...(L.prod||{}), enviado:new Date().toISOString()}; persist('lote',L.id); renderProdBox();
