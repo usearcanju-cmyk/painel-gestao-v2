@@ -84,6 +84,53 @@ function osDaNuvemshop(p, cfg) {
   };
 }
 
+async function nuvem(metodo, caminho, corpo, versao) {
+  const loja = process.env.NUVEMSHOP_STORE_ID, token = process.env.NUVEMSHOP_TOKEN;
+  if (!loja || !token) throw new Error('Nuvemshop não configurada na Vercel.');
+  const r = await fetch('https://api.tiendanube.com/' + (versao || '2025-03') + '/' + loja + caminho, {
+    method: metodo,
+    headers: {
+      Authentication: 'bearer ' + token, Authorization: 'Bearer ' + token,
+      'User-Agent': 'Painel do Gestor Use Arcanju (contato@usearcanju.com.br)', 'Content-Type': 'application/json'
+    },
+    body: corpo ? JSON.stringify(corpo) : undefined
+  });
+  const txt = await r.text();
+  let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) { j = null; }
+  if (!r.ok) {
+    const msg = (j && (j.message || j.description || j.error)) || txt.slice(0, 160);
+    const err = new Error('Nuvemshop ' + r.status + ': ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
+    err.status = r.status;
+    throw err;
+  }
+  return j;
+}
+/* muda o estado de envio do pedido na loja: PACKED (por enviar) ou DISPATCHED (enviado, com rastreio) */
+async function atualizarLoja(pedidoId, estado, link, avisar) {
+  if (!/^\d+$/.test(String(pedidoId || ''))) throw new Error('Pedido sem código da Nuvemshop.');
+  let fos = null;
+  try { fos = await nuvem('GET', '/orders/' + pedidoId + '/fulfillment-orders'); } catch (e) { if (e.status !== 404) throw e; }
+  if (Array.isArray(fos) && fos.length) {
+    for (const fo of fos) {
+      if (['DISPATCHED', 'DELIVERED'].includes(fo.status) && estado === 'PACKED') continue;
+      if (fo.status === 'DELIVERED') continue;
+      const corpo = { status: estado };
+      if (estado === 'DISPATCHED' && link) corpo.tracking_info = { code: link, url: link, notify_customer: avisar !== false };
+      await nuvem('PATCH', '/orders/' + pedidoId + '/fulfillment-orders/' + fo.id, corpo);
+    }
+    return 'ok';
+  }
+  /* lojas ainda sem ordens de envio: rotas antigas */
+  if (estado === 'PACKED') await nuvem('POST', '/orders/' + pedidoId + '/pack', {}, 'v1');
+  else await nuvem('POST', '/orders/' + pedidoId + '/fulfill', { shipping_tracking_number: link || null, shipping_tracking_url: link || null, notify_customer: avisar !== false }, 'v1');
+  return 'ok-v1';
+}
+async function emLotes(lista, n, fn) {
+  const out = [];
+  for (let i = 0; i < lista.length; i += n) out.push(...await Promise.all(lista.slice(i, i + n).map(fn)));
+  return out;
+}
+
 function headers(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'x-arcanju-key, x-prod-token, content-type');
@@ -199,13 +246,14 @@ export default async function handler(req, res) {
         ['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus'],
         ['HGETALL', 'prod:feito:' + hoje], ['HGETALL', 'prod:lotes:lazarus']
       ]);
-      const equipe = ler(r[1], []).filter((x) => x.ativo !== false).map((x) => ({ id: x.id, nome: x.nome, dias: x.dias, inicio: x.inicio, fim: x.fim, capacidade: x.capacidade }));
+      const equipe = ler(r[1], []).filter((x) => x.ativo !== false).map((x) => ({ id: x.id, nome: x.nome, dias: x.dias, inicio: x.inicio, fim: x.fim, capacidade: x.capacidade, jornada: x.jornada || 8, almocoMin: x.almocoMin || 60, almocoMax: x.almocoMax || 120 }));
+      const ponto = ler(await redis('HGET', 'prod:ponto:' + hoje.slice(0, 7), s.id + '|' + hoje), null);
       const ordens = {};
       MODOS.forEach((m, i) => { ordens[m] = Object.values(hashObj(r[2 + i])).map((v) => ler(v, null)).filter(Boolean); });
       const feitos = {};
       Object.entries(hashObj(r[4])).forEach(([k, v]) => { feitos[k] = ler(v, null); });
       const lotes = Object.values(hashObj(r[5])).map((v) => ler(v, null)).filter(Boolean);
-      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes });
+      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes, ponto });
     }
 
     if (acao === 'etapa' && req.method === 'POST') {
@@ -233,6 +281,19 @@ export default async function handler(req, res) {
         cmds.push(['HSET', 'prod:os:' + modo, id, JSON.stringify(o)]);
         saida.push(o);
       });
+      if (etapa === 'separar' && corpo.feito !== false) {
+        const cfgE = ler(await redis('GET', 'prod:config'), {});
+        if (cfgE.nuvemAtualizar !== false && process.env.NUVEMSHOP_TOKEN) {
+          const pend = saida.filter((o) => o.pedidoId && !(o.nuvem && (o.nuvem.embalado || o.nuvem.enviado)));
+          await emLotes(pend, 4, async (o) => {
+            o.nuvem = o.nuvem || {};
+            try { await atualizarLoja(o.pedidoId, 'PACKED'); o.nuvem.embalado = quando; delete o.nuvem.erro; }
+            catch (e) { o.nuvem.erro = e.message; }
+          });
+          cmds.length = 0;
+          saida.forEach((o) => cmds.push(['HSET', 'prod:os:' + modo, o.id, JSON.stringify(o)]));
+        }
+      }
       await pipeline(cmds);
       return res.status(200).json({ ordens: saida });
     }
@@ -259,6 +320,68 @@ export default async function handler(req, res) {
       };
       await redis('HSET', 'prod:avisos', id, JSON.stringify(aviso));
       return res.status(200).json({ ok: true });
+    }
+
+    if (acao === 'baixa' && req.method === 'POST') {
+      const s = await sessao(req);
+      if (!s) return falha(res, 401, 'Sessão expirada. Entre de novo com o PIN.');
+      const modo = MODOS.includes(corpo.modo) ? corpo.modo : null;
+      const itens = (Array.isArray(corpo.itens) ? corpo.itens : []).slice(0, 60)
+        .map((x) => ({ id: String(x.id || ''), link: String(x.link || '').trim().slice(0, 300) })).filter((x) => x.id);
+      if (!modo || !itens.length) return falha(res, 400, 'Nada para dar baixa.');
+      if (itens.some((x) => !/^https?:\/\//i.test(x.link))) return falha(res, 400, 'Cole o link de rastreio completo (começando com http) em todos os pedidos marcados.');
+      const cfgB = ler(await redis('GET', 'prod:config'), {});
+      const atuais = await redis('HMGET', 'prod:os:' + modo, ...itens.map((x) => x.id));
+      const quando = new Date().toISOString();
+      const resultado = await emLotes(itens, 3, async (x, i) => {
+        const o = ler(atuais[itens.indexOf(x)], null);
+        if (!o) return { id: x.id, erro: 'Pedido não encontrado.' };
+        o.nuvem = o.nuvem || {};
+        o.destino = o.destino || {};
+        o.destino.rastreio = x.link;
+        try {
+          await atualizarLoja(o.pedidoId, 'DISPATCHED', x.link, cfgB.avisarCliente !== false);
+          o.nuvem.enviado = quando; o.nuvem.link = x.link; o.nuvem.por = s.nome; delete o.nuvem.erro;
+          o.etapas = o.etapas || {};
+          ETAPAS.forEach((e) => { if (!o.etapas[e]) o.etapas[e] = { em: quando, por: s.nome }; });
+        } catch (e) { o.nuvem.erro = e.message; }
+        await redis('HSET', 'prod:os:' + modo, o.id, JSON.stringify(o));
+        return { id: o.id, ok: !o.nuvem.erro, erro: o.nuvem.erro || '', ordem: o };
+      });
+      return res.status(200).json({ resultado });
+    }
+
+    if (acao === 'ponto') {
+      const s = await sessao(req);
+      if (!s) return falha(res, 401, 'Sessão expirada. Entre de novo com o PIN.');
+      const hoje = hojeBR();
+      const chave = 'prod:ponto:' + hoje.slice(0, 7);
+      const campo = s.id + '|' + hoje;
+      const reg = ler(await redis('HGET', chave, campo), null) || { id: s.id, nome: s.nome, data: hoje, historico: [] };
+      if (req.method === 'POST') {
+        const tipo = String(corpo.tipo || '');
+        const agora = new Date().toISOString();
+        const ordem = ['entrada', 'almoco', 'volta', 'saida'];
+        if (tipo === 'desfazer') {
+          const ult = [...ordem].reverse().find((t) => reg[t]);
+          if (!ult) return falha(res, 400, 'Nada para desfazer.');
+          if (Date.now() - new Date(reg[ult]).getTime() > 15 * 60 * 1000) return falha(res, 400, 'Só dá para desfazer nos primeiros 15 minutos. Peça o ajuste ao Mateus.');
+          delete reg[ult];
+          reg.historico.push({ tipo: 'desfez ' + ult, em: agora });
+        } else {
+          if (!ordem.includes(tipo)) return falha(res, 400, 'Marcação inválida.');
+          if (reg[tipo]) return falha(res, 400, 'Essa marcação já foi feita hoje.');
+          if (tipo !== 'entrada' && !reg.entrada) return falha(res, 400, 'Marque a entrada primeiro.');
+          if (tipo === 'volta' && !reg.almoco) return falha(res, 400, 'Marque a saída para o almoço primeiro.');
+          if (tipo === 'almoco' && reg.saida) return falha(res, 400, 'O dia já foi encerrado.');
+          if (tipo === 'saida' && reg.almoco && !reg.volta) return falha(res, 400, 'Marque a volta do almoço antes da saída.');
+          reg[tipo] = agora;
+          reg.historico.push({ tipo, em: agora });
+        }
+        reg.nome = s.nome;
+        await redis('HSET', chave, campo, JSON.stringify(reg));
+      }
+      return res.status(200).json({ ponto: reg });
     }
 
     if (acao === 'impressa' && req.method === 'POST') {
@@ -426,6 +549,9 @@ export default async function handler(req, res) {
           dias: (Array.isArray(f.dias) ? f.dias : []).map(Number).filter((d) => d >= 0 && d <= 6),
           inicio: String(f.inicio || '08:00').slice(0, 5), fim: String(f.fim || '18:00').slice(0, 5),
           capacidade: Math.max(1, Math.min(200, Number(f.capacidade) || 20)), ativo: f.ativo !== false,
+          jornada: Math.max(1, Math.min(12, Number(f.jornada) || 8)),
+          almocoMin: Math.max(0, Math.min(240, Number(f.almocoMin) || 60)),
+          almocoMax: Math.max(0, Math.min(300, Number(f.almocoMax) || 120)),
           pinHash: pin ? hashPin(pin) : (velho ? velho.pinHash : '')
         };
       });
@@ -441,6 +567,29 @@ export default async function handler(req, res) {
       if (txt.length > 60000) return falha(res, 400, 'Guia grande demais.');
       await redis('SET', 'prod:config', txt);
       return res.status(200).json({ ok: true });
+    }
+
+    if (acao === 'pontos' && req.method === 'GET') {
+      const mes = /^\d{4}-\d{2}$/.test(String(req.query.mes || '')) ? req.query.mes : hojeBR().slice(0, 7);
+      const lista = Object.values(hashObj(await redis('HGETALL', 'prod:ponto:' + mes))).map((v) => ler(v, null)).filter(Boolean);
+      return res.status(200).json({ mes, registros: lista });
+    }
+
+    if (acao === 'pontoAjuste' && req.method === 'POST') {
+      const data = String(corpo.data || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !corpo.id) return falha(res, 400, 'Dia ou pessoa inválidos.');
+      const chave = 'prod:ponto:' + data.slice(0, 7), campo = String(corpo.id) + '|' + data;
+      const reg = ler(await redis('HGET', chave, campo), null) || { id: String(corpo.id), nome: String(corpo.nome || ''), data, historico: [] };
+      ['entrada', 'almoco', 'volta', 'saida'].forEach((t) => {
+        if (corpo[t] === undefined) return;
+        const v = String(corpo[t] || '');
+        if (!v) delete reg[t];
+        else if (/^\d{2}:\d{2}$/.test(v)) reg[t] = new Date(data + 'T' + v + ':00-03:00').toISOString();
+      });
+      reg.historico = reg.historico || [];
+      reg.historico.push({ tipo: 'ajuste', em: new Date().toISOString(), por: 'Painel', motivo: String(corpo.motivo || '').slice(0, 200) });
+      await redis('HSET', chave, campo, JSON.stringify(reg));
+      return res.status(200).json({ ok: true, ponto: reg });
     }
 
     if (acao === 'aviso' && req.method === 'POST') {

@@ -123,6 +123,13 @@ textarea{min-height:90px}
 .toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 .lote{border-left:4px solid var(--ambar)}
+.ponto{border:1px solid var(--linha);background:var(--carta);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.ponto-marcas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.ponto-marcas div{background:#f7f3ef;border-radius:10px;padding:8px;text-align:center}
+.ponto-marcas b{display:block;font-family:var(--serif);font-size:20px}
+.ponto-marcas span{font-size:11.5px;color:var(--medio)}
+.baixa{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap}
+.baixa input[type=text]{flex:1;min-width:200px}
 .bloco{background:#f7f3ef;border-radius:10px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.5}
 .bloco b.tit{display:block;font-size:12px;text-transform:none;color:var(--medio);font-weight:600;margin-bottom:2px}
 .os-acoes{display:flex;gap:6px;align-items:center}
@@ -198,28 +205,31 @@ var PADRAO = {
     '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
     '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
     '10:45 | Onda 1: conferir e embalar',
-    '12:00 | Almoço',
+    '12:00 | Almoço (de 1 a 2 horas, marque no ponto)',
     '13:00 | Onda 2: separar e prensar',
     '14:15 | Onda 2: conferir e embalar',
     '15:15 | Pagar todas as etiquetas no site, imprimir e colar',
     '16:00 | Conferir o nome da etiqueta com a ordem e levar à agência',
-    '17:00 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
+    '17:00 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
+    '17:15 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
     '17:40 | Limpeza e arrumação'].join('\n'),
   rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
     '08:10 | Recortar de uma vez todos os DTF do dia',
     '08:40 | Onda 1: separar, prensar, conferir e embalar',
     '11:00 | Onda 2: separar e prensar',
-    '12:00 | Almoço',
+    '12:00 | Almoço (de 1 a 2 horas, marque no ponto)',
     '13:00 | Onda 2: conferir e embalar',
     '13:45 | Pagar todas as etiquetas, imprimir e colar',
     '14:15 | Levar à agência (hoje o limite é 15:00)',
-    '15:15 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
+    '15:15 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
+    '15:30 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
     '16:30 | Limpeza da semana',
     '17:40 | Limpeza e arrumação'].join('\n'),
   rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
     '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
     '10:45 | Pagar e colar as etiquetas',
-    '11:15 | Levar à agência (sábado o limite é 12:00)'].join('\n'),
+    '11:15 | Levar à agência (sábado o limite é 12:00)',
+    '12:15 | Dar baixa na Nuvemshop dos pedidos postados (aba Envio)'].join('\n'),
   limpezaDia: 'Tirar os recortes e filmes de DTF das mesas\nLimpar a base e o teflon da prensa, com ela fria\nVarrer o chão\nEsvaziar o lixo\nDevolver as cestas vazias ao lugar\nDesligar a prensa da tomada',
   limpezaSemana: 'Limpar as prateleiras\nContar as camisetas lisas e anotar\nOrganizar as pastas de DTF por estampa\nRepor saquinhos, etiquetas e kits na mesa de embalagem',
   guia: ['## Prensa',
@@ -267,7 +277,7 @@ var PADRAO = {
     'Nada no chão: o que não está sendo usado volta para o lugar'].join('\n')
 };
 
-var S = {token: localStorage.getItem('prod_token')||'', dados:null, modo: localStorage.getItem('prod_modo')||'arcanju', aba:'hoje', aberta:null, prensados:{}};
+var S = {links:{}, bxSel:{}, token: localStorage.getItem('prod_token')||'', dados:null, modo: localStorage.getItem('prod_modo')||'arcanju', aba:'hoje', aberta:null, prensados:{}};
 var $ = function(s){ return document.querySelector(s); };
 var esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
 function toast(m){ var t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(function(){ t.classList.remove('on'); },2600); }
@@ -381,6 +391,59 @@ function rotinaHoje(){
 }
 function feito(chave){ return !!(S.dados && S.dados.feitos && S.dados.feitos[chave]); }
 
+/* ---------- ponto ---------- */
+function hm(iso){ if(!iso) return '—'; return new Date(iso).toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit'}); }
+function soma(iso, min){ return new Date(new Date(iso).getTime()+min*60000).toISOString(); }
+function durTxt(min){ min=Math.max(0,Math.round(min)); return Math.floor(min/60)+'h'+String(min%60).padStart(2,'0'); }
+function euNaEquipe(){
+  var id = S.dados && S.dados.eu && S.dados.eu.id;
+  return ((S.dados&&S.dados.equipe)||[]).find(function(f){ return f.id===id; }) || {jornada:8, almocoMin:60, almocoMax:120};
+}
+function calcPonto(){
+  var p = (S.dados&&S.dados.ponto)||{}, f = euNaEquipe(), agora = new Date().toISOString();
+  var jornada = (Number(f.jornada)||8)*60, aMin = Number(f.almocoMin)||60, aMax = Number(f.almocoMax)||120;
+  var min = function(a,b){ return (new Date(b)-new Date(a))/60000; };
+  var trab = 0, almoco = null;
+  if(p.entrada){
+    if(p.almoco){ trab += min(p.entrada, p.almoco); if(p.volta){ almoco = min(p.almoco, p.volta); trab += min(p.volta, p.saida||agora); } else almoco = min(p.almoco, agora); }
+    else trab += min(p.entrada, p.saida||agora);
+  }
+  var prev = null, prevCurta = null, prevLonga = null;
+  if(p.entrada && !p.saida){
+    if(p.volta) prev = soma(p.volta, jornada - min(p.entrada, p.almoco) + Math.max(0, aMin - almoco));
+    else if(p.almoco){ prevCurta = soma(p.almoco, aMin + jornada - min(p.entrada, p.almoco)); prevLonga = soma(p.almoco, aMax + jornada - min(p.entrada, p.almoco)); }
+    else { prevCurta = soma(p.entrada, jornada + aMin); prevLonga = soma(p.entrada, jornada + aMax); }
+  }
+  return {p:p, trab:trab, almoco:almoco, jornada:jornada, aMin:aMin, aMax:aMax, prev:prev, prevCurta:prevCurta, prevLonga:prevLonga, saldo: trab - jornada};
+}
+function vPonto(){
+  var c = calcPonto(), p = c.p;
+  var prox = !p.entrada ? ['entrada','Registrar entrada'] : (p.saida ? null : (!p.almoco ? ['almoco','Sair para o almoço'] : (!p.volta ? ['volta','Voltar do almoço'] : ['saida','Encerrar o dia'])));
+  var h = '<div class="ponto"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">Ponto de hoje</h3>'+
+    (p.entrada ? '<span class="chip neu">'+durTxt(c.trab)+' trabalhadas</span>' : '')+'</div>'+
+    '<div class="ponto-marcas"><div><b class="num">'+hm(p.entrada)+'</b><span>Entrada</span></div><div><b class="num">'+hm(p.almoco)+'</b><span>Almoço</span></div>'+
+    '<div><b class="num">'+hm(p.volta)+'</b><span>Volta</span></div><div><b class="num">'+hm(p.saida)+'</b><span>Saída</span></div></div>';
+  if(c.almoco!==null){
+    var aviso = p.volta ? (c.almoco < c.aMin-1 ? ' <span class="chip at">menos que '+durTxt(c.aMin)+'</span>' : (c.almoco > c.aMax+1 ? ' <span class="chip at">mais que '+durTxt(c.aMax)+'</span>' : '')) : '';
+    h += '<div class="pequeno medio">Almoço: '+durTxt(c.almoco)+(p.volta?'':' até agora')+aviso+'</div>';
+  }
+  if(c.prev) h += '<div class="pequeno" style="margin-top:4px">Saída prevista: <b>'+hm(c.prev)+'</b></div>';
+  else if(c.prevCurta){
+    h += '<div class="pequeno" style="margin-top:4px">'+(p.almoco ? 'Voltando entre <b>'+hm(soma(p.almoco,c.aMin))+'</b> e <b>'+hm(soma(p.almoco,c.aMax))+'</b>, a saída fica entre ' : 'Saída prevista: ')+
+      '<b>'+hm(c.prevCurta)+'</b> (almoço de '+durTxt(c.aMin)+') e <b>'+hm(c.prevLonga)+'</b> (almoço de '+durTxt(c.aMax)+').</div>';
+  }
+  if(p.saida) h += '<div class="pequeno" style="margin-top:4px">Dia encerrado. '+(Math.abs(c.saldo)<5 ? 'Jornada completa.' : (c.saldo>0 ? durTxt(c.saldo)+' a mais que a jornada.' : durTxt(-c.saldo)+' a menos que a jornada.'))+'</div>';
+  h += '<div class="linha-btn" style="margin-top:10px">'+(prox ? '<button class="btn" style="flex:1" data-ponto="'+prox[0]+'">'+prox[1]+'</button>' : '')+
+    (p.entrada ? '<button class="btn leve" data-ponto="desfazer">Desfazer última</button>' : '')+'</div>'+
+    '<div class="pequeno fraco" style="margin-top:8px">O almoço pode ter de '+durTxt(c.aMin)+' a '+durTxt(c.aMax)+'. Chegou mais tarde ou quer sair mais cedo? Ajuste o almoço: a saída prevista acompanha.</div></div>';
+  return h;
+}
+function marcarPonto(tipo){
+  var nomes = {entrada:'Entrada registrada', almoco:'Bom almoço!', volta:'Volta registrada', saida:'Dia encerrado. Até amanhã!', desfazer:'Última marcação desfeita'};
+  api('ponto', {tipo:tipo}).then(function(r){ S.dados.ponto = r.ponto; toast(nomes[tipo]||'Registrado'); render(); })
+    .catch(function(e){ toast(e.message); });
+}
+
 /* ---------- render ---------- */
 var ICO = {
   hoje:'M3 12l9-8 9 8M5 10v10h14V10',
@@ -409,6 +472,7 @@ function render(){
 
 function vHoje(){
   var p = plano(S.modo), c = cfg(), eq = equipeHoje();
+  var ponto = vPonto();
   var lim = limiteHoje(), falta = minutosAte(lim);
   var feitas = feitasHoje(S.modo).length, meta = p.hoje.length + feitas;
   var pct = meta ? Math.round(feitas/meta*100) : 0;
@@ -421,6 +485,7 @@ function vHoje(){
     '<div class="fraco pequeno">'+(eq.length ? 'Equipe hoje: '+eq.map(function(f){ return esc(f.nome); }).join(', ')+'. Capacidade de '+p.cap+' pedidos.' : 'Ninguém está escalado para hoje.')+
       (p.depois.length ? ' '+p.depois.length+' pedido(s) ficam para amanhã.' : '')+'</div>'+
   '</div>';
+  h = ponto + h;
   if(p.atrasadas.length) h += '<div class="cartao" style="border-color:var(--rubro)"><b style="color:var(--rubro)">'+p.atrasadas.length+' pedido(s) passaram do prazo.</b> <span class="medio">Eles estão no começo da onda 1. Faça esses primeiro.</span></div>';
   h += '<div class="grade2" style="margin-bottom:12px">'+
     '<div class="kpi"><b class="num">'+p.onda1.filter(proxima).length+'</b><span>na onda 1 (manhã)</span></div>'+
@@ -460,6 +525,13 @@ function itemHTML(i){
   var cor = CORES[i.cor]||'#ccc';
   return '<div class="item"><div class="q num">'+i.qty+'</div><div style="flex:1"><b>'+esc(i.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+cor+'"></span>'+esc(i.corNome||i.cor)+' · '+esc(i.mod)+' · <b style="color:var(--texto)">'+esc(i.tam)+'</b></div></div></div>';
 }
+function lojaChip(o){
+  var n = o.nuvem||{};
+  if(n.erro) return '<span class="chip cr" title="'+esc(n.erro)+'">loja: erro</span>';
+  if(n.enviado) return '<span class="chip ok">loja: enviado</span>';
+  if(n.embalado) return '<span class="chip neu">loja: por enviar</span>';
+  return '';
+}
 function destinoHTML(o){
   var d = o.destino;
   if(!d || !(d.nome || d.endereco)) return '<div class="bloco"><b class="tit">Entrega</b><span class="medio">Endereço ainda não veio da loja. Toque em Atualizar.</span></div>';
@@ -483,7 +555,7 @@ function osHTML(o){
   var h = '<div class="os"><div class="os-cab" data-abrir="'+esc(o.id)+'"><div style="flex:1;min-width:0"><div class="n">#'+esc(o.numero)+'</div>'+
     '<div class="quem">'+cam+' camiseta'+(cam!==1?'s':'')+(o.cliente?' · '+esc(o.cliente):'')+(o.uf?' · '+esc(o.uf):'')+(o.lote?' · '+esc(o.lote):'')+'</div></div>'+
     '<div style="text-align:right">'+prazo+'<div class="pequeno medio" style="margin-top:4px">'+(px?'Próximo: '+NOME_ETAPA[px]:'Postado')+'</div>'+
-      '<div class="os-acoes" style="justify-content:flex-end;margin-top:6px">'+(o.impressaEm?'<span class="chip ok">OS impressa</span>':'')+'<button class="icone" data-imprimir="'+esc(o.id)+'" title="Imprimir a OS">Imprimir</button></div></div></div>';
+      '<div class="os-acoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap">'+lojaChip(o)+(o.impressaEm?'<span class="chip ok">OS impressa</span>':'')+'<button class="icone" data-imprimir="'+esc(o.id)+'" title="Imprimir a OS">Imprimir</button></div></div></div>';
   if(aberta){
     h += '<div class="os-corpo"><div class="etapas">'+ETAPAS.map(function(x){ return '<span class="'+(e[x]?'on':'')+'" title="'+NOME_ETAPA[x]+'"></span>'; }).join('')+'</div>'+
       (o.itens||[]).map(itemHTML).join('')+
@@ -491,6 +563,7 @@ function osHTML(o){
       (o.brindes!==false ? '<div class="pequeno medio" style="margin:8px 0">Brindes: 1 capelinha, 1 sacolinha e cheirinho.</div>' : '')+
       destinoHTML(o)+
       (o.obs ? '<div class="pequeno" style="margin:8px 0"><b>Obs.:</b> '+esc(o.obs)+'</div>' : '')+
+      ((o.nuvem&&o.nuvem.erro) ? '<div class="bloco" style="background:var(--rubro-fundo);color:var(--rubro)"><b class="tit" style="color:var(--rubro)">A loja não aceitou a última atualização</b>'+esc(o.nuvem.erro)+'</div>' : '')+
       '<div class="linha-btn" style="margin-top:10px">'+
         '<button class="btn sec" data-imprimir="'+esc(o.id)+'">Imprimir OS</button>'+
         '<button class="btn sec" data-envio="'+esc(o.id)+'">Achar no Envio Ecomm</button>'+
@@ -571,6 +644,18 @@ function vEnvio(){
     '<p class="medio pequeno" style="margin-top:0">'+(lim ? 'Hoje a agência recebe até '+esc(lim)+'.' : 'Hoje não tem postagem.')+' Conte os pacotes antes de sair.</p>'+
     (paraPostar.length ? '<div class="pequeno" style="margin-bottom:10px">'+paraPostar.map(function(o){ return '<span class="chip neu" style="margin:2px">#'+esc(o.numero)+'</span>'; }).join(' ')+'</div>'+
       '<button class="btn grande" data-lote="expedir" data-ids="'+esc(paraPostar.map(function(o){ return o.id; }).join(','))+'">Entreguei os '+paraPostar.length+' na agência</button>' : '<div class="medio pequeno">Nada para levar.</div>')+'</div>';
+  var baixa = todas.filter(function(o){ return (o.etapas&&(o.etapas.etiqueta||o.etapas.expedir)) && o.pedidoId && !(o.nuvem&&o.nuvem.enviado); });
+  h += '<div class="cartao"><h3>Dar baixa na Nuvemshop ('+baixa.length+')</h3>'+
+    '<p class="medio pequeno" style="margin-top:0">No fim do dia. Cole o <b>link completo</b> de rastreio de cada pedido. Ao confirmar, o pedido fica como enviado na loja, com o link no código e no link de rastreio, e o cliente recebe o aviso.</p>'+
+    (baixa.length ? baixa.map(function(o){
+      var d = o.destino||{}, err = o.nuvem&&o.nuvem.erro;
+      var lk = S.links[o.id]!==undefined ? S.links[o.id] : (/^https?:/i.test(d.rastreio||'')?d.rastreio:'');
+      var sel = S.bxSel[o.id]!==undefined ? S.bxSel[o.id] : /^https?:\/\//i.test(lk);
+      return '<div class="baixa"><label style="display:flex;align-items:center;gap:8px;min-width:120px"><input type="checkbox" data-bx-sel="'+esc(o.id)+'" '+(sel?'checked':'')+'> <b>#'+esc(o.numero)+'</b>'+(o.cliente?' <span class="medio">'+esc(o.cliente)+'</span>':'')+'</label>'+
+        '<input type="text" inputmode="url" placeholder="https://… link de rastreio" data-bx-link="'+esc(o.id)+'" value="'+esc(lk)+'">'+
+        (err ? '<div class="pequeno" style="color:var(--rubro);width:100%">'+esc(err)+'</div>' : '')+'</div>';
+    }).join('')+'<button class="btn grande" style="margin-top:12px" data-baixa="1">Dar baixa nos marcados</button>'
+    : '<div class="medio pequeno">Nenhum pedido esperando baixa.</div>')+'</div>';
   var hoje = feitasHoje(S.modo);
   if(hoje.length) h += '<div class="cartao"><h3>Postados hoje ('+hoje.length+')</h3><div class="pequeno">'+hoje.map(function(o){ return '<span class="chip ok" style="margin:2px">#'+esc(o.numero)+'</span>'; }).join(' ')+'</div></div>';
   return h;
@@ -646,6 +731,40 @@ function abrirEnvio(o){
   toast('Número #'+num+' copiado. Se precisar, cole na busca do Envio Ecomm.');
 }
 
+function darBaixa(btn){
+  var itens = [];
+  document.querySelectorAll('[data-bx-sel]').forEach(function(c){
+    if(!c.checked) return;
+    var id = c.getAttribute('data-bx-sel');
+    var inp = document.querySelector('[data-bx-link="'+id.replace(/"/g,'\\"')+'"]');
+    itens.push({id:id, link: inp ? inp.value.trim() : ''});
+  });
+  if(!itens.length){ toast('Marque os pedidos e cole os links.'); return; }
+  if(itens.some(function(x){ return !/^https?:\/\//i.test(x.link); })){ toast('Falta o link completo (começando com http) em algum pedido marcado.'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando para a Nuvemshop…';
+  api('baixa', {modo:S.modo, itens:itens}).then(function(r){
+    var ok = 0, erros = 0, lista = S.dados.ordens[S.modo];
+    (r.resultado||[]).forEach(function(x){
+      if(x.ok) ok++; else erros++;
+      if(x.ordem){ var i = lista.findIndex(function(o){ return o.id===x.id; }); if(i>=0) lista[i] = x.ordem; }
+    });
+    (r.resultado||[]).forEach(function(x){ if(x.ok){ delete S.links[x.id]; delete S.bxSel[x.id]; } });
+    toast(ok+' pedido(s) com baixa na loja'+(erros?', '+erros+' com erro':''));
+    render();
+  }).catch(function(e){ toast(e.message); btn.disabled=false; btn.textContent='Dar baixa nos marcados'; });
+}
+document.addEventListener('input', function(e){
+  var id = e.target.getAttribute && e.target.getAttribute('data-bx-link');
+  if(!id) return;
+  S.links[id] = e.target.value;
+  var c = document.querySelector('[data-bx-sel="'+id.replace(/"/g,'\\"')+'"]');
+  if(c){ c.checked = /^https?:\/\//i.test(e.target.value.trim()); S.bxSel[id] = c.checked; }
+});
+document.addEventListener('change', function(e){
+  var id = e.target.getAttribute && e.target.getAttribute('data-bx-sel');
+  if(id) S.bxSel[id] = e.target.checked;
+});
+
 /* ---------- ações ---------- */
 function marcar(ids, etapa, feitoFlag){
   ids = ids.filter(Boolean); if(!ids.length) return;
@@ -689,6 +808,8 @@ document.addEventListener('click', function(e){
   var t;
   if((t = e.target.closest('[data-aba]'))){ S.aba = t.getAttribute('data-aba'); render(); window.scrollTo(0,0); return; }
   if((t = e.target.closest('[data-modo]'))){ S.modo = t.getAttribute('data-modo'); localStorage.setItem('prod_modo', S.modo); S.aberta=null; render(); return; }
+  if((t = e.target.closest('[data-ponto]'))){ var tp = t.getAttribute('data-ponto'); if(tp==='saida' && !confirm('Encerrar o dia agora?')) return; marcarPonto(tp); return; }
+  if((t = e.target.closest('[data-baixa]'))){ darBaixa(t); return; }
   if((t = e.target.closest('[data-imprimir]'))){ imprimirOS([acharOS(t.getAttribute('data-imprimir'))]); return; }
   if((t = e.target.closest('[data-imprimir-dia]'))){ var pl = plano(S.modo); imprimirOS(t.getAttribute('data-imprimir-dia')==='faltam' ? pl.hoje.filter(function(o){ return !o.impressaEm; }) : pl.hoje); return; }
   if((t = e.target.closest('[data-envio]'))){ abrirEnvio(acharOS(t.getAttribute('data-envio'))); return; }
@@ -702,7 +823,7 @@ document.addEventListener('click', function(e){
 $('#btnProblema').onclick = function(){ abrirProblema(''); };
 $('#btnSair').onclick = function(){ sair(false); };
 $('#btnAtualizar').onclick = function(){ carregar().then(function(){ toast('Atualizado'); }); };
-setInterval(function(){ if(S.token && !$('#telaApp').hidden && document.visibilityState==='visible' && !document.querySelector('.modal-fundo')) carregar(true); }, 60000);
+setInterval(function(){ var a=document.activeElement; if(S.token && !$('#telaApp').hidden && document.visibilityState==='visible' && !document.querySelector('.modal-fundo') && !(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName))) carregar(true); }, 60000);
 
 montarTeclado(); desenharPin();
 if(S.token) mostrarApp();

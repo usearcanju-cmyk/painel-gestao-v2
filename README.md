@@ -231,4 +231,8 @@ Se houver lotes do Projeto Lazarus, o portal mostra uma segunda linha, "Projeto 
 
 **Variável opcional:** `NUVEMSHOP_ADMIN_URL` (ex.: `https://usearcanju.lojavirtualnuvem.com.br/admin/orders/{id}`).
 
+**Ponto:** na tela Hoje do portal, a pessoa marca entrada, saída e volta do almoço e saída. O almoço pode ficar entre o mínimo e o máximo cadastrados em Equipe (padrão de 1h a 2h), e o portal mostra a saída prevista para cada caso. O horário é o do servidor. No painel, Produção → Ponto mostra o mês, o saldo de horas, permite ajustar um dia (o ajuste fica registrado) e baixar a planilha.
+
+**Estado do pedido na Nuvemshop:** ao marcar **Separado** no portal, o pedido passa para **Por enviar** na loja. No fim do dia, na aba Envio, **Dar baixa na Nuvemshop** marca o pedido como **Enviado** e grava o link completo de rastreio no código e no link de rastreio, avisando o cliente (opções em Guia e rotina). Isso usa as ordens de envio da API da Nuvemshop (`/orders/{id}/fulfillment-orders`): o aplicativo do `NUVEMSHOP_TOKEN` precisa da permissão **write_fulfillment_orders** (ou de escrita de pedidos, nas lojas antigas).
+
 **Projeto Lazarus e o portal:** no Lazarus (aberto pelo painel), em Ajustes, coloque a mesma chave de acesso. Em cada lote, **Enviar à produção** manda os pedidos do lote, e **Atualizar andamento** marca o lote como estampado e postado quando a equipe terminar. O Lazarus continua sem ler nem escrever nada do Financeiro ou da Logística.

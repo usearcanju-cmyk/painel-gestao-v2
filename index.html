@@ -2095,6 +2095,7 @@ var ABAS = {
   producao: [
     {id:'painel', nome:'Acompanhamento'},
     {id:'imprimir', nome:'Ordens de serviço'},
+    {id:'ponto', nome:'Ponto'},
     {id:'equipe', nome:'Equipe'},
     {id:'guia', nome:'Guia e rotina'},
     {id:'avisos', nome:'Avisos'}
@@ -5627,7 +5628,7 @@ var App = {
     });
     var semPeriodo = ['custos','integracoes','config','lazarus','producao'];
     var abaLog = UI.tela==='logistica' ? (UI.aba||'expedicao') : '';
-    var semMes = semPeriodo.indexOf(UI.tela)>=0 || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta');
+    var semMes = (semPeriodo.indexOf(UI.tela)>=0 && !(UI.tela==='producao' && UI.aba==='ponto')) || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta');
     document.getElementById('periodoCtrl').style.display = semMes ? 'none' : '';
     document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus'||UI.tela==='producao') ? 'none' : '';
     alvo.classList.toggle('cheio', UI.tela==='lazarus');
@@ -7904,6 +7905,8 @@ Views.lazarus = function(){
 var Prod = {
   PADRAO: {
     importar: 'auto',
+    nuvemAtualizar: true,
+    avisarCliente: true,
     envioUrl: '',
     linkNuvemshop: 'https://usearcanju.lojavirtualnuvem.com.br/admin/orders/{id}',
     limites: {'1':'17:00','2':'17:00','3':'17:00','4':'17:00','5':'15:00','6':'12:00'},
@@ -7913,28 +7916,31 @@ var Prod = {
       '08:40 | Onda 1: separar as camisetas de cada pedido na sua cesta',
       '09:30 | Onda 1: prensar, agrupando pela mesma estampa',
       '10:45 | Onda 1: conferir e embalar',
-      '12:00 | Almoço',
+      '12:00 | Almoço (de 1 a 2 horas, marque no ponto)',
       '13:00 | Onda 2: separar e prensar',
       '14:15 | Onda 2: conferir e embalar',
       '15:15 | Pagar todas as etiquetas no site, imprimir e colar',
       '16:00 | Conferir o nome da etiqueta com a ordem e levar à agência',
-      '17:00 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
+      '17:00 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
+      '17:15 | Apoio: montar kits de brinde, guardar camisetas que chegaram e repor as mesas',
       '17:40 | Limpeza e arrumação'].join('\n'),
     rotinaSexta: ['08:00 | Ligar a prensa em 120 °C, abrir o portal e ver o plano do dia',
       '08:10 | Recortar de uma vez todos os DTF do dia',
       '08:40 | Onda 1: separar, prensar, conferir e embalar',
       '11:00 | Onda 2: separar e prensar',
-      '12:00 | Almoço',
+      '12:00 | Almoço (de 1 a 2 horas, marque no ponto)',
       '13:00 | Onda 2: conferir e embalar',
       '13:45 | Pagar todas as etiquetas, imprimir e colar',
       '14:15 | Levar à agência (hoje o limite é 15:00)',
-      '15:15 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
+      '15:15 | Dar baixa na Nuvemshop dos pedidos postados, com o link de rastreio (aba Envio)',
+      '15:30 | Apoio: kits de brinde, camisetas que chegaram, recorte dos DTF de segunda',
       '16:30 | Limpeza da semana',
       '17:40 | Limpeza e arrumação'].join('\n'),
     rotinaSabado: ['08:00 | Ligar a prensa e ver o plano',
       '08:10 | Separar, prensar, conferir e embalar os pedidos que vencem',
       '10:45 | Pagar e colar as etiquetas',
-      '11:15 | Levar à agência (sábado o limite é 12:00)'].join('\n'),
+      '11:15 | Levar à agência (sábado o limite é 12:00)',
+      '12:15 | Dar baixa na Nuvemshop dos pedidos postados (aba Envio)'].join('\n'),
     limpezaDia: 'Tirar os recortes e filmes de DTF das mesas\nLimpar a base e o teflon da prensa, com ela fria\nVarrer o chão\nEsvaziar o lixo\nDevolver as cestas vazias ao lugar\nDesligar a prensa da tomada',
     limpezaSemana: 'Limpar as prateleiras\nContar as camisetas lisas e anotar\nOrganizar as pastas de DTF por estampa\nRepor saquinhos, etiquetas e kits na mesa de embalagem',
     guia: ''
@@ -8076,7 +8082,7 @@ var Prod = {
 
   salvarEquipe: function(){
     var d = Prod.d();
-    var lista = d.equipe.map(function(f){ return {id:f.id, nome:f.nome, pin:Prod.pins[f.id]||'', dias:f.dias, inicio:f.inicio, fim:f.fim, capacidade:f.capacidade, ativo:f.ativo!==false}; });
+    var lista = d.equipe.map(function(f){ return {id:f.id, nome:f.nome, pin:Prod.pins[f.id]||'', dias:f.dias, inicio:f.inicio, fim:f.fim, capacidade:f.capacidade, jornada:f.jornada||8, almocoMin:f.almocoMin||60, almocoMax:f.almocoMax||120, ativo:f.ativo!==false}; });
     if(lista.some(function(f){ return !f.nome; })){ UI.toast('Toda pessoa precisa de um nome.'); return; }
     Prod.chamar('equipe', {equipe:lista}).then(function(r){
       d.equipe = r.equipe; Prod.pins = {}; Store.commit('Equipe enviada ao portal'); App.render();
@@ -8086,6 +8092,8 @@ var Prod = {
     var d = Prod.d(); d.configLocal = true;
     var c = Prod.cfg();
     c.prazoEnvio = U.n(Log.cfg().prazoEnvio,2); c.feriados = Log.cfg().feriados;
+    c.nuvemAtualizar = !(c.nuvemAtualizar===false || c.nuvemAtualizar==='nao');
+    c.avisarCliente = !(c.avisarCliente===false || c.avisarCliente==='nao');
     Prod.chamar('config', {config:c}).then(function(){ Store.commit('Guia enviado ao portal'); App.render(); })
       .catch(function(e){ Store.salvar(); UI.toast(e.message); });
   },
@@ -8102,6 +8110,7 @@ Views.producao = function(){
   else if(a==='guia') h += Views.prodGuia();
   else if(a==='imprimir') h += Views.prodImprimir();
   else if(a==='avisos') h += Views.prodAvisos();
+  else if(a==='ponto') h += Views.prodPonto();
   else h += Views.prodPainel();
   return h+'</div>';
 };
@@ -8142,7 +8151,7 @@ Views.prodPainel = function(){
   if(avisos.length) h += '<div class="aviso">'+avisos.length+' aviso(s) da produção sem resposta. Veja na aba Avisos.</div>';
   var abertas = ord.filter(function(o){ return !(o.etapas && o.etapas.expedir); })
     .sort(function(a,b){ return (a.prazo||'')<(b.prazo||'')?-1:1; });
-  h += '<div class="tabela-env"><table><thead><tr><th>Pedido</th><th class="c">Envio até</th><th>Etapa</th><th>Último registro</th></tr></thead><tbody>'+
+  h += '<div class="tabela-env"><table><thead><tr><th>Pedido</th><th class="c">Envio até</th><th>Etapa</th><th class="c">Loja</th><th>Último registro</th></tr></thead><tbody>'+
     (abertas.length ? abertas.map(function(o){
       var u = Prod.ultimaEtapa(o), prox = u ? Prod.ETAPAS[Prod.ETAPAS.indexOf(u)+1] : 'separar';
       var reg = u ? o.etapas[u] : null;
@@ -8150,8 +8159,9 @@ Views.prodPainel = function(){
       return '<tr><td><b>#'+U.esc(o.numero)+'</b> <span style="color:var(--texto-fraco)">'+(o.itens||[]).reduce(function(s,i){ return s+i.qty; },0)+' cam.</span></td>'+
         '<td class="c"><span class="etq '+cls+'">'+U.dataBr(o.prazo).slice(0,5)+'</span></td>'+
         '<td>'+Prod.NOME[prox]+'</td>'+
+        '<td class="c">'+(o.nuvem&&o.nuvem.erro ? '<span class="etq fal" title="'+U.esc(o.nuvem.erro)+'">erro</span>' : (o.nuvem&&o.nuvem.enviado ? '<span class="etq rec">enviado</span>' : (o.nuvem&&o.nuvem.embalado ? '<span class="etq pen">por enviar</span>' : '<span class="etq pag">por embalar</span>')))+'</td>'+
         '<td style="color:var(--texto-medio);font-size:12.5px">'+(reg ? U.esc(reg.por)+', '+new Date(reg.em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—')+'</td></tr>';
-    }).join('') : '<tr><td colspan="4" style="color:var(--texto-fraco)">Nenhuma ordem em aberto no portal.</td></tr>')+
+    }).join('') : '<tr><td colspan="5" style="color:var(--texto-fraco)">Nenhuma ordem em aberto no portal.</td></tr>')+
   '</tbody></table></div>';
   var feitos = rem.feitos||{}, rot = Object.keys(feitos).filter(function(k){ return k.indexOf('rot:')===0; }).length;
   var limp = Object.keys(feitos).filter(function(k){ return k.indexOf('limp:')===0; }).length;
@@ -8162,14 +8172,16 @@ Views.prodPainel = function(){
 Views.prodEquipe = function(){
   var d = Prod.d(), dias = ['dom','seg','ter','qua','qui','sex','sáb'];
   var h = '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Equipe da produção</div>'+
-    '<div class="cartao-sub">Cada pessoa entra no portal com o próprio PIN (4 a 8 números). O PIN não fica guardado aqui: depois de enviado, só dá para trocar. A capacidade é quantos pedidos a pessoa termina por dia, do começo ao fim.</div>'+
-    '<div class="tabela-env"><table><thead><tr><th>Nome</th><th>PIN</th><th>Dias</th><th class="c">Início</th><th class="c">Fim</th><th class="c">Pedidos/dia</th><th class="c">Ativo</th><th></th></tr></thead><tbody>'+
+    '<div class="cartao-sub">Horas/dia é a jornada sem o almoço. O almoço pode variar entre o mínimo e o máximo, e o portal ajusta a saída prevista. Cada pessoa entra no portal com o próprio PIN (4 a 8 números). O PIN não fica guardado aqui: depois de enviado, só dá para trocar. A capacidade é quantos pedidos a pessoa termina por dia, do começo ao fim.</div>'+
+    '<div class="tabela-env"><table><thead><tr><th>Nome</th><th>PIN</th><th>Dias</th><th class="c">Início</th><th class="c">Fim</th><th class="c">Horas/dia</th><th class="c">Almoço (min)</th><th class="c">Pedidos/dia</th><th class="c">Ativo</th><th></th></tr></thead><tbody>'+
     (d.equipe.length ? d.equipe.map(function(f,i){
       return '<tr><td><input type="text" data-pdeq="'+i+'.nome" value="'+U.esc(f.nome)+'" style="min-width:110px"></td>'+
         '<td><input type="password" inputmode="numeric" autocomplete="new-password" data-pdeq="'+i+'._pin" placeholder="'+(f.temPin?'••• trocar':'novo PIN')+'" value="'+U.esc(Prod.pins[f.id]||'')+'" style="width:100px"></td>'+
         '<td style="white-space:nowrap">'+dias.map(function(n,di){ return '<label style="font-size:11.5px;margin-right:4px"><input type="checkbox" data-pddia="'+i+'.'+di+'" '+((f.dias||[]).indexOf(di)>=0?'checked':'')+'> '+n+'</label>'; }).join('')+'</td>'+
         '<td class="c"><input type="time" data-pdeq="'+i+'.inicio" value="'+U.esc(f.inicio||'08:00')+'"></td>'+
         '<td class="c"><input type="time" data-pdeq="'+i+'.fim" value="'+U.esc(f.fim||'18:00')+'"></td>'+
+        '<td class="c"><input type="number" min="1" step="0.5" data-pdeq="'+i+'.jornada" value="'+U.n(f.jornada,8)+'" style="width:60px"></td>'+
+        '<td class="c" style="white-space:nowrap"><input type="number" min="0" step="15" data-pdeq="'+i+'.almocoMin" value="'+U.n(f.almocoMin,60)+'" style="width:58px" title="mínimo"> a <input type="number" min="0" step="15" data-pdeq="'+i+'.almocoMax" value="'+U.n(f.almocoMax,120)+'" style="width:58px" title="máximo"></td>'+
         '<td class="c"><input type="number" min="1" step="1" data-pdeq="'+i+'.capacidade" value="'+U.n(f.capacidade,20)+'" style="width:70px"></td>'+
         '<td class="c"><input type="checkbox" data-pdeq="'+i+'.ativo" '+(f.ativo!==false?'checked':'')+'></td>'+
         '<td class="c"><button class="btn-icone" data-pd="delPessoa" data-i="'+i+'">✕</button></td></tr>';
@@ -8197,6 +8209,8 @@ Views.prodGuia = function(){
     '<div class="campo"><label>Pedidos da loja entram no portal sozinhos</label><select data-pdcfg="importar">'+
       [['auto','Sim, menos quando o Projeto Lazarus estiver ativo'],['sempre','Sim, sempre'],['nunca','Não, só pelo Sincronizar']].map(function(o){ return '<option value="'+o[0]+'"'+(c.importar===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select>'+
       '<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">O portal busca na Nuvemshop sempre que a equipe abre ou atualiza (no máximo a cada 3 minutos) e todo dia às 7h.</div></div>'+
+    '<div class="campo"><label>Atualizar a Nuvemshop pelo portal</label><select data-pdcfg="nuvemAtualizar"><option value="sim"'+(c.nuvemAtualizar!==false&&c.nuvemAtualizar!=='nao'?' selected':'')+'>Sim: separar vira "por enviar"; a baixa vira "enviado" com o rastreio</option><option value="nao"'+(c.nuvemAtualizar===false||c.nuvemAtualizar==='nao'?' selected':'')+'>Não, eu atualizo a loja</option></select></div>'+
+    '<div class="campo"><label>Avisar o cliente quando o pedido for enviado</label><select data-pdcfg="avisarCliente"><option value="sim"'+(c.avisarCliente!==false&&c.avisarCliente!=='nao'?' selected':'')+'>Sim, a Nuvemshop manda o e-mail com o rastreio</option><option value="nao"'+(c.avisarCliente===false||c.avisarCliente==='nao'?' selected':'')+'>Não</option></select></div>'+
     '<div class="campo"><label>Link do Envio Ecomm para achar a etiqueta</label><input type="text" data-pdcfg="envioUrl" value="'+U.esc(c.envioUrl)+'" placeholder="https://…{numero}…">'+
       '<div style="font-size:11.5px;color:var(--texto-fraco);margin-top:3px">Use {numero} para o número do pedido, {id} para o código da Nuvemshop, {cep} e {nome}. O número também é copiado para colar na busca.</div></div>'+
     '<div class="campo"><label>Link do pedido na Nuvemshop (para você)</label><input type="text" data-pdcfg="linkNuvemshop" value="'+U.esc(c.linkNuvemshop)+'"></div>'+
@@ -8260,6 +8274,96 @@ Prod.imprimir = function(){
   Prod.chamar('impressa', {modo:'arcanju', ids: sel.map(function(p){ return p.id; })}).catch(function(){});
 };
 
+/* ---------- ponto ---------- */
+Prod.pontos = {};
+Prod.carregarPontos = function(mes){
+  Prod.pontos[mes] = {carregando:true};
+  Prod.chamar('pontos', null, {mes:mes}).then(function(r){ Prod.pontos[mes] = {lista:r.registros||[]}; App.render(); })
+    .catch(function(e){ Prod.pontos[mes] = {erro:e.message}; App.render(); });
+};
+Prod.hm = function(iso){ if(!iso) return ''; return new Date(iso).toLocaleTimeString('pt-BR',{timeZone:'America/Sao_Paulo', hour:'2-digit', minute:'2-digit'}); };
+Prod.calcDia = function(r, f){
+  var m = function(a,b){ return (new Date(b)-new Date(a))/60000; };
+  var trab = null, almoco = null;
+  if(r.entrada && r.saida){
+    if(r.almoco && r.volta){ almoco = m(r.almoco, r.volta); trab = m(r.entrada, r.almoco) + m(r.volta, r.saida); }
+    else trab = m(r.entrada, r.saida);
+  }
+  var jornada = U.n((f||{}).jornada, 8)*60;
+  return {trab:trab, almoco:almoco, saldo: trab===null ? null : trab - jornada};
+};
+Prod.dur = function(min){ if(min===null||min===undefined) return '—'; var s = min<0?'−':''; min=Math.abs(Math.round(min)); return s+Math.floor(min/60)+'h'+String(min%60).padStart(2,'0'); };
+Views.prodPonto = function(){
+  var mes = UI.ym, st = Prod.pontos[mes];
+  if(!st){ Prod.carregarPontos(mes); st = {carregando:true}; }
+  var h = '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px">'+
+    '<div class="cartao-tit">Ponto de '+U.nomeMes(mes)+'</div><div class="cartao-sub" style="margin:0">Marcado pela equipe no portal com o horário do servidor. Toque em Ajustar para corrigir um dia; o ajuste fica registrado.</div></div>'+
+    '<button class="btn sec sm" data-pd="pontoAtualizar">Atualizar</button><button class="btn sec sm" data-pd="pontoCsv"'+(st.lista&&st.lista.length?'':' disabled')+'>Baixar planilha (CSV)</button></div></div>';
+  if(st.carregando) return h + '<div class="info">Carregando…</div>';
+  if(st.erro) return h + '<div class="aviso">'+U.esc(st.erro)+'</div>';
+  var equipe = Prod.d().equipe;
+  if(!equipe.length) return h + UI.vazio('Sem equipe', 'Cadastre a equipe para ver o ponto.');
+  equipe.forEach(function(f){
+    var regs = st.lista.filter(function(r){ return r.id===f.id; }).sort(function(a,b){ return a.data<b.data?-1:1; });
+    var tot = 0, saldo = 0, dias = 0;
+    regs.forEach(function(r){ var c = Prod.calcDia(r, f); if(c.trab!==null){ tot += c.trab; saldo += c.saldo; dias++; } });
+    h += '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><div class="cartao-tit" style="flex:1">'+U.esc(f.nome)+'</div>'+
+      '<span style="font-size:13px;color:var(--texto-medio)">'+dias+' dia(s) completos · '+Prod.dur(tot)+' trabalhadas · saldo <b style="color:'+(saldo<-5?'var(--rubro)':'inherit')+'">'+Prod.dur(saldo)+'</b></span>'+
+      '<button class="btn sec sm" data-pd="pontoNovo" data-f="'+U.esc(f.id)+'">Lançar dia</button></div>'+
+      '<div class="tabela-env" style="margin-top:8px"><table><thead><tr><th>Dia</th><th class="c">Entrada</th><th class="c">Almoço</th><th class="c">Volta</th><th class="c">Saída</th><th class="c">Almoço</th><th class="c">Trabalhado</th><th class="c">Saldo</th><th></th></tr></thead><tbody>'+
+      (regs.length ? regs.map(function(r){
+        var c = Prod.calcDia(r, f);
+        var fora = c.almoco!==null && (c.almoco < U.n(f.almocoMin,60)-1 || c.almoco > U.n(f.almocoMax,120)+1);
+        var ajustado = (r.historico||[]).some(function(x){ return x.tipo==='ajuste'; });
+        return '<tr><td style="white-space:nowrap">'+U.dataBr(r.data).slice(0,5)+' '+U.diaSemana(r.data)+(ajustado?' <span class="etq pag">ajustado</span>':'')+'</td>'+
+          ['entrada','almoco','volta','saida'].map(function(k){ return '<td class="c">'+(Prod.hm(r[k])||'<span style="color:var(--texto-fraco)">—</span>')+'</td>'; }).join('')+
+          '<td class="c">'+(c.almoco===null?'—':'<span'+(fora?' style="color:var(--rubro);font-weight:600"':'')+'>'+Prod.dur(c.almoco)+'</span>')+'</td>'+
+          '<td class="c">'+Prod.dur(c.trab)+'</td><td class="c">'+(c.saldo===null?'<span class="etq pen">aberto</span>':Prod.dur(c.saldo))+'</td>'+
+          '<td class="c"><button class="btn-icone" title="Ajustar" data-pd="pontoAjustar" data-f="'+U.esc(f.id)+'" data-dia="'+r.data+'">✎</button></td></tr>';
+      }).join('') : '<tr><td colspan="9" style="color:var(--texto-fraco)">Nenhuma marcação neste mês.</td></tr>')+
+      '</tbody></table></div></div>';
+  });
+  return h;
+};
+Prod.ajustarPonto = function(fid, dia){
+  var mes = UI.ym, st = Prod.pontos[mes]||{}, f = Prod.d().equipe.find(function(x){ return x.id===fid; })||{};
+  var r = ((st.lista)||[]).find(function(x){ return x.id===fid && x.data===dia; }) || {};
+  var campo = function(k, rot){ return '<div class="campo"><label>'+rot+'</label><input type="time" id="pa_'+k+'" value="'+Prod.hm(r[k])+'"></div>'; };
+  UI.modal({
+    titulo: dia ? 'Ajustar ponto de '+U.dataBr(dia) : 'Lançar dia de '+U.esc(f.nome||''),
+    corpo: (dia ? '' : '<div class="campo"><label>Dia</label><input type="date" id="pa_dia" value="'+U.hoje()+'"></div>')+
+      '<div class="linha-campos lc2">'+campo('entrada','Entrada')+campo('almoco','Saída para o almoço')+'</div>'+
+      '<div class="linha-campos lc2">'+campo('volta','Volta do almoço')+campo('saida','Saída')+'</div>'+
+      '<div class="campo"><label>Motivo do ajuste</label><input type="text" id="pa_motivo" placeholder="Ex.: esqueceu de marcar a volta"></div>',
+    rodape:'<button class="btn sec" data-fechar>Cancelar</button><button class="btn" id="pa_ok">Salvar</button>',
+    aoAbrir: function(el, fechar){
+      el.querySelector('#pa_ok').addEventListener('click', function(){
+        var d = dia || el.querySelector('#pa_dia').value;
+        var corpo = {id:fid, nome:f.nome, data:d, motivo:el.querySelector('#pa_motivo').value};
+        ['entrada','almoco','volta','saida'].forEach(function(k){ corpo[k] = el.querySelector('#pa_'+k).value; });
+        Prod.chamar('pontoAjuste', corpo).then(function(){ fechar(); Prod.carregarPontos(d.slice(0,7)); UI.toast('Ponto ajustado'); })
+          .catch(function(e){ UI.toast(e.message); });
+      });
+    }
+  });
+};
+Prod.csvPontos = function(){
+  var mes = UI.ym, st = Prod.pontos[mes]; if(!st || !st.lista) return;
+  var eq = Prod.d().equipe;
+  var linhas = [['Pessoa','Dia','Entrada','Saída almoço','Volta almoço','Saída','Almoço (min)','Trabalhado (min)','Saldo (min)','Ajustes']];
+  st.lista.slice().sort(function(a,b){ return (a.nome+a.data)<(b.nome+b.data)?-1:1; }).forEach(function(r){
+    var f = eq.find(function(x){ return x.id===r.id; }), c = Prod.calcDia(r, f);
+    var aj = (r.historico||[]).filter(function(x){ return x.tipo==='ajuste'; }).map(function(x){ return x.motivo||'ajuste'; }).join(' | ');
+    linhas.push([r.nome||(f&&f.nome)||'', r.data, Prod.hm(r.entrada), Prod.hm(r.almoco), Prod.hm(r.volta), Prod.hm(r.saida),
+      c.almoco===null?'':Math.round(c.almoco), c.trab===null?'':Math.round(c.trab), c.saldo===null?'':Math.round(c.saldo), aj]);
+  });
+  var csv = '\ufeff'+linhas.map(function(l){ return l.map(function(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'ponto-'+mes+'.csv'; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+};
+
 Views.prodAvisos = function(){
   var rem = Prod.d().remoto;
   var h = '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="cartao-tit">Avisos da produção</div>'+
@@ -8282,7 +8386,11 @@ Views.prodAvisos = function(){
     var ac = t.getAttribute('data-pd'), d = Prod.d();
     if(ac==='sinc'){ Prod.sincronizar(false); return; }
     if(ac==='loja'){ Prod.trazerLoja(); return; }
-    if(ac==='addPessoa'){ d.equipe.push({id:U.id(), nome:'', dias:[1,2,3,4,5], inicio:'08:00', fim:'18:00', capacidade:20, ativo:true}); App.render(); return; }
+    if(ac==='pontoAtualizar'){ Prod.carregarPontos(UI.ym); App.render(); return; }
+    if(ac==='pontoCsv'){ Prod.csvPontos(); return; }
+    if(ac==='pontoAjustar'){ Prod.ajustarPonto(t.getAttribute('data-f'), t.getAttribute('data-dia')); return; }
+    if(ac==='pontoNovo'){ Prod.ajustarPonto(t.getAttribute('data-f'), null); return; }
+    if(ac==='addPessoa'){ d.equipe.push({id:U.id(), nome:'', dias:[1,2,3,4,5], inicio:'08:00', fim:'18:00', capacidade:20, jornada:8, almocoMin:60, almocoMax:120, ativo:true}); App.render(); return; }
     if(ac==='delPessoa'){ d.equipe.splice(parseInt(t.getAttribute('data-i'),10),1); App.render(); return; }
     if(ac==='salvarEquipe'){ Prod.salvarEquipe(); return; }
     if(ac==='salvarGuia'){ Prod.salvarConfig(); return; }
