@@ -390,6 +390,7 @@ button.etq{cursor:pointer;border:none}
   .os-tab{width:100%;border-collapse:collapse}
   .os-tab th,.os-tab td{border-bottom:1px solid #999;padding:1.2mm 1.5mm;text-align:left;font-size:10pt;vertical-align:top}
   .os-tab th{font-size:8pt}
+  .os-foto{width:15mm;height:15mm;object-fit:contain;border:1px solid #ccc;border-radius:1mm;background:#f7f3ef;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .os-etapas{margin-top:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm 4mm;font-size:10pt;border-top:1px solid #000;padding-top:2mm}
 }
 
@@ -8056,6 +8057,7 @@ var Prod = {
       var abertosRemotos = {}; remotas.forEach(function(o){ if(!(o.etapas && o.etapas.expedir)) abertosRemotos[o.id]=1; });
       enviados.forEach(function(p){ if(abertosRemotos[p.id]){ etapas[p.id]='expedir'; abertos.push(p); } });
       var d = Prod.d();
+      if(r.galeria && Object.keys(r.galeria).length) d.galeria = r.galeria;
       d.remoto = {ordens: remotas, avisos: r.avisos||[], feitos: r.feitos||{}, hoje: r.hoje, nuvemStatus: r.nuvemStatus||null};
       d.equipe = r.equipe || d.equipe;
       if(r.config && Object.keys(r.config).length && !d.configLocal) d.config = r.config;
@@ -8256,6 +8258,8 @@ Prod.imprimir = function(){
   var area = document.getElementById('printArea');
   if(!area){ area = document.createElement('div'); area.id = 'printArea'; document.body.appendChild(area); }
   var etapas = ['Separado','Prensado','Conferido','Embalado','Etiqueta colada','Postado'];
+  var gal = Prod.d().galeria||{};
+  var foto = function(it){ return gal[(it.estampa+'|'+it.cor).toUpperCase()]||null; };
   var folhas = [];
   for(var i=0;i<sel.length;i+=2) folhas.push(sel.slice(i,i+2));
   area.innerHTML = folhas.map(function(f){
@@ -8264,10 +8268,10 @@ Prod.imprimir = function(){
       return '<div class="os-print"><div class="os-top"><div><div class="os-lab">USE ARCANJU · ORDEM DE SERVIÇO</div><div class="os-num">#'+U.esc(p.numero)+'</div>'+
         '<div class="os-lab">Compra '+U.dataBr(p.data)+' · '+cam+' camiseta'+(cam!==1?'s':'')+'</div></div>'+
         '<div style="text-align:right"><div class="os-lab">Enviar até</div><div class="os-prazo">'+U.dataBr(Log.prazo(p))+'</div>'+(d.envio?'<div class="os-lab" style="max-width:70mm">'+U.esc(d.envio)+'</div>':'')+'</div></div>'+
-        '<div class="os-grid"><div><table class="os-tab"><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
-        (p.itens||[]).map(function(i){ return '<tr><td><b>'+i.qty+'</b></td><td>'+U.esc(i.estampa)+'</td><td>'+U.esc(Log.nomeCor(i.cor))+'</td><td>'+U.esc(i.mod)+'</td><td><b>'+U.esc(i.tam)+'</b></td></tr>'; }).join('')+
+        '<div class="os-grid"><div>'+(function(){ var cf=(p.itens||[]).some(foto); return '<table class="os-tab"><thead><tr>'+(cf?'<th></th>':'')+'<th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
+        (p.itens||[]).map(function(i){ var g=foto(i); var fc=cf?'<td>'+(g&&g.frente?'<img class="os-foto" src="'+U.esc(g.frente)+'">':'')+(g&&g.costas?' <img class="os-foto" src="'+U.esc(g.costas)+'">':'')+'</td>':''; return '<tr>'+fc+'<td><b>'+i.qty+'</b></td><td>'+U.esc(i.estampa)+'</td><td>'+U.esc(Log.nomeCor(i.cor))+'</td><td>'+U.esc(i.mod)+'</td><td><b>'+U.esc(i.tam)+'</b></td></tr>'; }).join('')+
         (p.outros||[]).map(function(x){ return '<tr><td><b>'+x.qty+'</b></td><td colspan="4">'+U.esc(x.nome)+'</td></tr>'; }).join('')+
-        '</tbody></table><div class="os-lab" style="margin-top:2mm">Brindes: ☐ capelinha ☐ sacolinha ☐ cheirinho</div>'+
+        '</tbody></table>'; })()+'<div class="os-lab" style="margin-top:2mm">Brindes: ☐ capelinha ☐ sacolinha ☐ cheirinho</div>'+
         (d.nota?'<div style="margin-top:2mm"><b>Observação do cliente:</b> '+U.esc(d.nota)+'</div>':'')+'</div>'+
         '<div class="os-dest"><div class="os-lab">Destinatário</div>'+
         (d.nome ? '<b>'+U.esc(d.nome)+'</b><br>'+U.esc([d.endereco,d.numero].filter(Boolean).join(', '))+(d.complemento?'<br>'+U.esc(d.complemento):'')+'<br>'+U.esc(d.bairro||'')+'<br>'+U.esc(d.cidade||'')+(d.uf?' / '+U.esc(d.uf):'')+'<br>CEP <b>'+U.esc(d.cep||'')+'</b>'+(d.telefone?'<br>Tel. '+U.esc(d.telefone):'')

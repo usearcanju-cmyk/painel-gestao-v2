@@ -225,6 +225,8 @@ Se houver lotes do Projeto Lazarus, o portal mostra uma segunda linha, "Projeto 
 
 **Pedidos entram sozinhos:** o portal busca na Nuvemshop todos os pedidos pagos e em aberto que ainda não foram enviados, sem limite de data, sempre que a equipe abre ou toca em Atualizar (no máximo a cada 3 minutos) e todo dia às 7h (Vercel Cron, em `vercel.json`). Pedidos já enviados na loja saem da fila. Durante o Projeto Lazarus, essa busca pausa sozinha para os pedidos entrarem pelos lotes (dá para mudar em Guia e rotina). No Painel, **Sincronizar** traz esses pedidos para a Logística.
 
+**Fotos das camisetas:** o portal lê a foto de frente (1ª imagem do produto) e de costas (2ª) de cada camiseta direto da Nuvemshop e as mostra na tela e na OS impressa (colorida). Estampa nova entra sozinha na primeira vez que aparece num pedido, sem cadastro manual.
+
 **Ordem de serviço:** cada pedido tem o botão **Imprimir**, e a aba Pedidos tem **Imprimir todas as OS do dia**. Sai uma folha A4 com duas OS, com itens, destinatário completo e caixas das etapas. Na janela de impressão, "Salvar como PDF" gera o arquivo.
 
 **Envio Ecomm:** o botão **Achar no Envio Ecomm** copia o número do pedido e abre o link configurado em Produção → Guia e rotina. No link, `{numero}`, `{id}`, `{cep}` e `{nome}` são trocados pelos dados do pedido.

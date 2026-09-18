@@ -94,6 +94,10 @@ h3{font-size:15px;font-weight:700;margin:0 0 8px}
 .item{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--linha);align-items:center}
 .item:last-child{border-bottom:0}
 .item .q{font-family:var(--serif);font-size:22px;font-weight:700;min-width:30px;text-align:center}
+.fotos{display:flex;gap:6px;margin-left:auto}
+.fotos figure{margin:0;text-align:center}
+.fotos img{width:64px;height:64px;object-fit:contain;background:#f2ede8;border-radius:8px;border:1px solid var(--linha)}
+.fotos figcaption{font-size:10px;color:var(--fraco);margin-top:2px}
 .cor{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid var(--linha-forte);vertical-align:-2px;margin-right:4px}
 .etapas{display:flex;gap:4px;margin:12px 0 10px}
 .etapas span{flex:1;height:6px;border-radius:3px;background:var(--linha)}
@@ -153,6 +157,7 @@ textarea{min-height:90px}
   .osp-dest b{font-size:11.5pt}
   .osp table{width:100%;border-collapse:collapse}
   .osp th,.osp td{border-bottom:1px solid #999;padding:1.2mm 1.5mm;text-align:left;font-size:10pt;vertical-align:top}
+  .osp-foto{width:15mm;height:15mm;object-fit:contain;border:1px solid #ccc;border-radius:1mm;background:#f7f3ef;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .osp th{font-size:8pt}
   .osp-check{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5mm 4mm;margin-top:auto;border-top:1px solid #000;padding-top:2mm;font-size:10pt}
 }
@@ -536,9 +541,11 @@ function vHoje(){
   return h;
 }
 
-function itemHTML(i){
+function fotosDe(o, i){ var g = (o.fotos&&o.fotos[(i.estampa+'|'+i.cor).toUpperCase()]) || (S.dados&&S.dados.galeria&&S.dados.galeria[(i.estampa+'|'+i.cor).toUpperCase()]); return g||null; }
+function fotosHTML(g){ if(!g||!g.frente) return ''; return '<div class="fotos">'+(g.frente?'<figure><img loading="lazy" src="'+esc(g.frente)+'" alt="frente"><figcaption>frente</figcaption></figure>':'')+(g.costas?'<figure><img loading="lazy" src="'+esc(g.costas)+'" alt="costas"><figcaption>costas</figcaption></figure>':'')+'</div>'; }
+function itemHTML(i, o){
   var cor = CORES[i.cor]||'#ccc';
-  return '<div class="item"><div class="q num">'+i.qty+'</div><div style="flex:1"><b>'+esc(i.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+cor+'"></span>'+esc(i.corNome||i.cor)+' · '+esc(i.mod)+' · <b style="color:var(--texto)">'+esc(i.tam)+'</b></div></div></div>';
+  return '<div class="item"><div class="q num">'+i.qty+'</div><div style="flex:1;min-width:0"><b>'+esc(i.estampa)+'</b><div class="medio pequeno"><span class="cor" style="background:'+cor+'"></span>'+esc(i.corNome||i.cor)+' · '+esc(i.mod)+' · <b style="color:var(--texto)">'+esc(i.tam)+'</b></div></div>'+fotosHTML(fotosDe(o,i))+'</div>';
 }
 function lojaChip(o){
   var n = o.nuvem||{};
@@ -573,7 +580,7 @@ function osHTML(o){
       '<div class="os-acoes" style="justify-content:flex-end;margin-top:6px;flex-wrap:wrap">'+lojaChip(o)+(o.impressaEm?'<span class="chip ok">OS impressa</span>':'')+'<button class="icone" data-imprimir="'+esc(o.id)+'" title="Imprimir a OS">Imprimir</button></div></div></div>';
   if(aberta){
     h += '<div class="os-corpo"><div class="etapas">'+ETAPAS.map(function(x){ return '<span class="'+(e[x]?'on':'')+'" title="'+NOME_ETAPA[x]+'"></span>'; }).join('')+'</div>'+
-      (o.itens||[]).map(itemHTML).join('')+
+      (o.itens||[]).map(function(i){ return itemHTML(i, o); }).join('')+
       ((o.outros||[]).length ? '<div class="bloco"><b class="tit">Outros produtos do pedido</b>'+o.outros.map(function(x){ return x.qty+'× '+esc(x.nome); }).join('<br>')+'</div>' : '')+
       (o.brindes!==false ? '<div class="pequeno medio" style="margin:8px 0">Brindes: 1 capelinha, 1 sacolinha e cheirinho.</div>' : '')+
       destinoHTML(o)+
@@ -696,14 +703,15 @@ function acharOS(id){ return ((S.dados&&S.dados.ordens[S.modo])||[]).find(functi
 function osPrint(o){
   var d = o.destino || {};
   var cam = (o.itens||[]).reduce(function(s,i){ return s+i.qty; },0);
+  var comFoto = (o.itens||[]).some(function(i){ return fotosDe(o,i); });
   return '<div class="osp">'+
     '<div class="osp-top"><div><div class="osp-marca">'+(S.modo==='lazarus'?'Projeto Lazarus':'Use Arcanju')+' · Ordem de serviço</div><div class="osp-num">#'+esc(o.numero)+'</div>'+
       '<div class="osp-l">'+(o.data?'Compra '+br(o.data)+' · ':'')+cam+' camiseta'+(cam!==1?'s':'')+(o.lote?' · '+esc(o.lote):'')+'</div></div>'+
       '<div><div class="osp-l" style="text-align:right">Enviar até</div><div class="osp-prazo">'+(o.prazo?br(o.prazo)+'/'+o.prazo.slice(0,4):'')+'</div>'+
       (d.envio?'<div class="osp-l" style="text-align:right;max-width:70mm">'+esc(d.envio)+'</div>':'')+'</div></div>'+
     '<div class="osp-grid"><div>'+
-      '<table><thead><tr><th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
-      (o.itens||[]).map(function(i){ return '<tr><td><b>'+i.qty+'</b></td><td>'+esc(i.estampa)+'</td><td>'+esc(i.corNome||i.cor)+'</td><td>'+esc(i.mod)+'</td><td><b>'+esc(i.tam)+'</b></td></tr>'; }).join('')+
+      '<table><thead><tr>'+(comFoto?'<th></th>':'')+'<th>Qtd</th><th>Estampa</th><th>Cor</th><th>Modelo</th><th>Tam.</th></tr></thead><tbody>'+
+      (o.itens||[]).map(function(i){ var g=fotosDe(o,i); var f=comFoto?'<td>'+(g&&g.frente?'<img class="osp-foto" src="'+esc(g.frente)+'">':'')+(g&&g.costas?' <img class="osp-foto" src="'+esc(g.costas)+'">':'')+'</td>':''; return '<tr>'+f+'<td><b>'+i.qty+'</b></td><td>'+esc(i.estampa)+'</td><td>'+esc(i.corNome||i.cor)+'</td><td>'+esc(i.mod)+'</td><td><b>'+esc(i.tam)+'</b></td></tr>'; }).join('')+
       (o.outros||[]).map(function(x){ return '<tr><td><b>'+x.qty+'</b></td><td colspan="4">'+esc(x.nome)+'</td></tr>'; }).join('')+
       '</tbody></table>'+
       (o.brindes!==false?'<div class="osp-l" style="margin-top:2mm">Brindes: ☐ capelinha ☐ sacolinha ☐ cheirinho</div>':'')+

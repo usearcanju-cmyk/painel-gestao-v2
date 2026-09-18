@@ -51,6 +51,27 @@ function dataBR(ts) {
   if (!ts) return '';
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(ts));
 }
+function fotoMenor(url) {
+  // pega uma versão menor da imagem da Nuvemshop, boa para a OS e o portal
+  return String(url || '').replace(/(-\d+)?(-\d+)?\.(webp|jpe?g|png)(\?.*)?$/i, '-320-0.$3$4');
+}
+function chaveEstampa(pr) { return (pr.estampa + '|' + pr.cor).toUpperCase(); }
+function fotosDoProduto(p) {
+  var imgs = Array.isArray(p.images) ? p.images.slice().sort(function (a, b) { return (a.position || 0) - (b.position || 0); }) : [];
+  var url = function (i) { return imgs[i] ? fotoMenor(imgs[i].src) : ''; };
+  return { frente: url(0), costas: url(1) };
+}
+function fotosPorItem(p, itens) {
+  const geral = fotosDoProduto(p);
+  const porProduto = {};
+  (Array.isArray(p.products) ? p.products : []).forEach(function (i, idx) { porProduto[String(i.product_id || idx)] = i; });
+  const out = {};
+  (Array.isArray(p.products) ? p.products : []).forEach(function (i) {
+    const pr = lerProduto(i.name, Array.isArray(i.variant_values) ? i.variant_values.map(String) : []);
+    if (pr) out[chaveEstampa(pr)] = geral;
+  });
+  return out;
+}
 function osDaNuvemshop(p, cfg) {
   const e = p.shipping_address || {};
   const c = p.customer || {};
@@ -71,6 +92,7 @@ function osDaNuvemshop(p, cfg) {
     uf: sigla(e.province),
     prazo: data ? somaUteis(data, Number(cfg.prazoEnvio) || 2, new Set(String(cfg.feriados || '').match(/\d{4}-\d{2}-\d{2}/g) || [])) : '',
     itens, outros, origem: 'nuvemshop',
+    fotos: fotosPorItem(p, itens),
     link: loja ? loja.replace('{id}', String(p.id)) : '',
     destino: {
       nome: String(e.name || c.name || p.contact_name || ''),
@@ -213,6 +235,7 @@ function limparOS(o, modo) {
       cep: txt(d.cep, 12), envio: txt(d.envio, 160), rastreio: txt(d.rastreio, 300), nota: txt(d.nota, 500)
     } : null,
     outros: (Array.isArray(o.outros) ? o.outros : []).slice(0, 20).map((x) => ({ nome: txt(x.nome, 120), qty: Math.max(0, Math.min(99, Number(x.qty) || 0)) })),
+    fotos: (o.fotos && typeof o.fotos === 'object') ? Object.fromEntries(Object.entries(o.fotos).slice(0, 40).map(([k, v]) => [String(k).slice(0, 120), { frente: txt(v && v.frente, 300), costas: txt(v && v.costas, 300) }])) : {},
     id: txt(o.id, 60), modo, numero: txt(o.numero, 30), cliente: txt(o.cliente, 40), uf: sigla(o.uf).slice(0, 2),
     prazo: txt(o.prazo, 10), liberadoEm: txt(o.liberadoEm, 10), lote: txt(o.lote, 60), loteId: txt(o.loteId, 60),
     obs: txt(o.obs, 200),
@@ -262,7 +285,7 @@ export default async function handler(req, res) {
       const r = await pipeline([
         ['GET', 'prod:config'], ['GET', 'prod:equipe'],
         ['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus'],
-        ['HGETALL', 'prod:feito:' + hoje], ['HGETALL', 'prod:lotes:lazarus'], ['GET', 'prod:nuvem:status']
+        ['HGETALL', 'prod:feito:' + hoje], ['HGETALL', 'prod:lotes:lazarus'], ['GET', 'prod:nuvem:status'], ['GET', 'prod:galeria']
       ]);
       const equipe = ler(r[1], []).filter((x) => x.ativo !== false).map((x) => ({ id: x.id, nome: x.nome, dias: x.dias, inicio: x.inicio, fim: x.fim, capacidade: x.capacidade, jornada: x.jornada || 8, almocoMin: x.almocoMin || 60, almocoMax: x.almocoMax || 120 }));
       const ponto = ler(await redis('HGET', 'prod:ponto:' + hoje.slice(0, 7), s.id + '|' + hoje), null);
@@ -271,7 +294,7 @@ export default async function handler(req, res) {
       const feitos = {};
       Object.entries(hashObj(r[4])).forEach(([k, v]) => { feitos[k] = ler(v, null); });
       const lotes = Object.values(hashObj(r[5])).map((v) => ler(v, null)).filter(Boolean);
-      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes, ponto, nuvemStatus: ler(r[6], null) });
+      return res.status(200).json({ hoje, agora: agoraBR(), eu: s, config: ler(r[0], {}), equipe, ordens, feitos, lotes, ponto, nuvemStatus: ler(r[6], null), galeria: ler(r[7], {}) });
     }
 
     if (acao === 'etapa' && req.method === 'POST') {
@@ -445,11 +468,14 @@ export default async function handler(req, res) {
         const r = await pipeline([['HGETALL', 'prod:os:arcanju'], ['HGETALL', 'prod:os:lazarus']]);
         const atuais = hashObj(r[0]);
         const doLazarus = new Set(Object.values(hashObj(r[1])).map((v) => (ler(v, {}) || {}).pedidoId).filter(Boolean));
+        const galeria = ler(await redis('GET', 'prod:galeria'), {});
+        let galMudou = false;
         const cmds = [];
         let novas = 0, atualizadas = 0, enviadas = 0, porEmbalar = 0;
         const quando = new Date().toISOString();
         pedidos.forEach((p) => {
           const n = osDaNuvemshop(p, cfg);
+          Object.entries(n.fotos || {}).forEach(([k, v]) => { if (v && v.frente && (!galeria[k] || galeria[k].frente !== v.frente || galeria[k].costas !== v.costas)) { galeria[k] = v; galMudou = true; } });
           if (doLazarus.has(n.pedidoId)) return;
           if (!n.enviado) porEmbalar++;
           const antes = ler(atuais[n.id], null);
@@ -475,8 +501,9 @@ export default async function handler(req, res) {
           cmds.push(['HSET', 'prod:os:arcanju', o.id, JSON.stringify(o)]);
           novas++;
         });
+        if (galMudou) cmds.push(['SET', 'prod:galeria', JSON.stringify(galeria)]);
         await pipeline(cmds);
-        const status = await guardar({ ok: true, lidos: pedidos.length, porEmbalar, novas, atualizadas, enviadas });
+        const status = await guardar({ ok: true, lidos: pedidos.length, porEmbalar, novas, atualizadas, enviadas, estampas: Object.keys(galeria).length });
         return res.status(200).json({ ok: true, novas, atualizadas, enviadas, lidos: pedidos.length, status });
       } catch (e) {
         const status = await guardar({ erro: e.message });
@@ -532,6 +559,7 @@ export default async function handler(req, res) {
           if (!o.outros.length && antes.outros) o.outros = antes.outros;
           ['link', 'origem', 'pedidoId', 'data'].forEach((k) => { if (!o[k] && antes[k]) o[k] = antes[k]; });
           if (antes.impressaEm) o.impressaEm = antes.impressaEm;
+          if ((!o.fotos || !Object.keys(o.fotos).length) && antes.fotos) o.fotos = antes.fotos;
         }
         if (corpo.etapas && corpo.etapas[o.id]) {
           /* o painel já sabe que este pedido avançou (por exemplo, marcado como enviado lá) */
