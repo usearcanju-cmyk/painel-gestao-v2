@@ -8532,6 +8532,108 @@ var Mk = {
   decidir: function(texto){ Mk.d().decisoes.unshift({id:U.id(), data:U.hoje(), texto:texto}); }
 };
 
+
+/* ---------- criativos direto da Meta ---------- */
+Mk.etapaDe = function(campanha){
+  var n = String(campanha||'').toLowerCase();
+  var e = Mk.d().estrutura.find(function(x){ var f=String(x.filtro||'').toLowerCase().trim(); return f && n.indexOf(f)>=0; });
+  if(e) return {etapa:e.etapa, teste:e.teste};
+  if(/topo|engaj|thru|alcance|publica/.test(n)) return {etapa:'topo', teste:false};
+  if(/qualif|carrinho/.test(n)) return {etapa:'meio', teste:false};
+  return {etapa:'fundo', teste:false};
+};
+Mk.puxarMeta = function(dias){
+  var c = Store.dados.integracoes, ate = U.hoje(), de = Mk.somaDias(ate, -(dias-1));
+  var u = Integra.url('criativos', {de:de, ate:ate});
+  if(!u){ UI.toast('Configure o conector em Integrações.'); return; }
+  UI.toast('Buscando criativos na Meta…');
+  fetch(u, {headers: c.chave ? {'x-arcanju-key': c.chave} : {}})
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.erro||('Erro '+r.status)); return j; }); })
+    .then(function(j){
+      var d = Mk.d();
+      d.meta = {ultima:new Date().toISOString(), de:j.de, ate:j.ate, dias:dias, conta:j.conta, ads:j.dados||[]};
+      /* atualiza métricas dos criativos já salvos na biblioteca */
+      d.meta.ads.forEach(function(a){
+        var cr = d.criativos.find(function(x){ return x.metaId===a.id; }); if(!cr) return;
+        var m = Mk.metricas(a); cr.ctr = m.ctr.toFixed(2); cr.cpa = a.compras?m.cpa.toFixed(2):''; cr.roas = a.gasto&&a.receita?m.roas.toFixed(2):'';
+      });
+      Mk.salvar(d.meta.ads.length+' anúncios trazidos da Meta'); App.render();
+    })
+    .catch(function(e){ UI.toast('Não consegui buscar: '+e.message); });
+};
+Mk.metricas = function(a){
+  return { ctr:U.div(a.cliques,a.impressoes)*100, cpa:U.div(a.gasto,a.compras), roas:U.div(a.receita,a.gasto),
+    hook:U.div(a.views3s,a.impressoes)*100, custoThru:U.div(a.gasto,a.thruplay), custoCarr:U.div(a.gasto,a.carrinho) };
+};
+/* regras: fundo pelo ROAS/CPA contra o teto; topo e meio pelo desempenho relativo dentro da etapa */
+Mk.classificar = function(ads){
+  var rg = Mk.regua(), dc = Mk.num(Mk.d().config.diasCiclo)||90, hoje = U.hoje();
+  var med = {topo:{}, meio:{}};
+  ['topo','meio'].forEach(function(k){
+    var l = ads.filter(function(a){ return a._et.etapa===k && a.impressoes>=1000; });
+    var imp = l.reduce(function(s,a){ return s+a.impressoes; },0);
+    med[k].ctr = U.div(l.reduce(function(s,a){ return s+a.cliques; },0), imp)*100;
+    med[k].hook = U.div(l.reduce(function(s,a){ return s+a.views3s; },0), imp)*100;
+  });
+  ads.forEach(function(a){
+    var m = a._m = Mk.metricas(a), k = a._et.etapa, v;
+    var idade = a.criado ? Mk.diasEntre(a.criado, hoje) : 0;
+    if(k==='fundo'){
+      if(a.gasto < rg.cpaMax*1.5 && !a.compras) v = 'dados';
+      else if(a.compras>=2 && m.roas>=rg.roasMin) v = 'vencedor';
+      else if(a.gasto >= rg.cpaMax*2 && (m.roas < rg.roasMin*0.8 || !a.compras)) v = 'cortar';
+      else v = 'observar';
+    } else {
+      if(a.impressoes < 1000) v = 'dados';
+      else {
+        var base = med[k], ind = (k==='topo' && base.hook) ? U.div(m.hook, base.hook) : U.div(m.ctr, base.ctr);
+        v = ind>=1.2 ? 'vencedor' : (ind<0.7 ? 'cortar' : 'observar');
+      }
+    }
+    if(v!=='dados' && v!=='cortar' && (a.frequencia>=3.5 || idade>=dc)) v = v==='vencedor' ? 'vencedor-fadiga' : 'fadiga';
+    a._v = v; a._idade = idade;
+  });
+  return ads;
+};
+Views.mkMeta = function(){
+  var d = Mk.d(), mt = d.meta, dias = (mt&&mt.dias)||30;
+  var h = '<div class="cartao" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">'+
+    '<div><div class="cartao-tit">Criativos na Meta</div><div class="cartao-sub">'+(mt? 'Período '+U.dataBr(mt.de)+' a '+U.dataBr(mt.ate)+' · atualizado '+new Date(mt.ultima).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : 'Traga o desempenho de cada anúncio direto do Gerenciador.')+'</div></div>'+
+    '<div style="display:flex;gap:6px;align-items:center"><select id="mkDias">'+[7,14,30,60,90].map(function(n){ return '<option value="'+n+'"'+(n===dias?' selected':'')+'>Últimos '+n+' dias</option>'; }).join('')+'</select>'+
+    '<button class="btn" data-mk="puxarMeta">Puxar da Meta</button></div></div>';
+  if(!mt || !mt.ads.length) return h + '</div>';
+  var ads = Mk.classificar(mt.ads.map(function(a){ return Object.assign({}, a, {_et:Mk.etapaDe(a.campanha)}); }));
+  var ROT = {vencedor:['vencedor','rec'], 'vencedor-fadiga':['vencedor · cansando','pen'], fadiga:['fadiga','fal'], cortar:['cortar','fal'], observar:['observar','pag'], dados:['poucos dados','pag']};
+  var salvos = {}; d.criativos.forEach(function(x){ if(x.metaId) salvos[x.metaId]=1; });
+  ['fundo','meio','topo'].forEach(function(k){
+    var l = ads.filter(function(a){ return a._et.etapa===k; });
+    if(!l.length) return;
+    l.sort(function(x,y){
+      var o = ['vencedor','vencedor-fadiga','observar','fadiga','dados','cortar'];
+      return (o.indexOf(x._v)-o.indexOf(y._v)) || (k==='fundo' ? y._m.roas-x._m.roas : (k==='topo' ? y._m.hook-x._m.hook : y._m.ctr-x._m.ctr));
+    });
+    h += '<div style="font-weight:600;margin:14px 0 6px">'+Mk.ETAPAS[k]+' de funil <span style="font-weight:400;color:var(--texto-fraco);font-size:12px">· '+l.length+' anúncios</span></div>'+
+      '<div class="tabela-env"><table><thead><tr><th></th><th>Anúncio</th><th class="r">Gasto</th>'+
+      (k==='fundo' ? '<th class="r">Compras</th><th class="r">CPA</th><th class="r">ROAS</th>' : (k==='meio' ? '<th class="r">Carrinhos</th><th class="r">Custo/carr.</th><th class="r">Compras</th>' : '<th class="r">Hook</th><th class="r">Custo/ThruPlay</th><th class="r">CPM</th>'))+
+      '<th class="r">CTR</th><th class="r">Freq.</th><th class="r">No ar</th><th class="c">Veredito</th><th></th></tr></thead><tbody>';
+    l.forEach(function(a){
+      var m = a._m, r = ROT[a._v];
+      h += '<tr><td style="width:52px">'+(a.miniatura?'<img src="'+U.esc(a.miniatura)+'" alt="" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:6px;display:block">':'')+'</td>'+
+        '<td style="max-width:260px"><div style="font-weight:500">'+U.esc(a.nome)+(a._et.teste?' <span class="etq pen">teste</span>':'')+'</div><div style="font-size:11.5px;color:var(--texto-fraco)">'+U.esc(a.campanha)+(a.status&&a.status!=='ACTIVE'?' · '+U.esc(a.status.toLowerCase()):'')+'</div></td>'+
+        '<td class="r">'+U.brl(a.gasto,0)+'</td>'+
+        (k==='fundo' ? '<td class="r">'+U.num(a.compras)+'</td><td class="r">'+(a.compras?U.brl(m.cpa,0):'—')+'</td><td class="r" style="font-weight:600">'+(a.receita?U.num(m.roas,2):'—')+'</td>'
+          : (k==='meio' ? '<td class="r">'+U.num(a.carrinho)+'</td><td class="r">'+(a.carrinho?U.brl(m.custoCarr,2):'—')+'</td><td class="r">'+U.num(a.compras)+'</td>'
+          : '<td class="r" style="font-weight:600">'+(a.views3s?U.pct(m.hook,1):'—')+'</td><td class="r">'+(a.thruplay?U.brl(m.custoThru,2):'—')+'</td><td class="r">'+U.brl(a.cpm,2)+'</td>'))+
+        '<td class="r">'+U.pct(m.ctr,2)+'</td><td class="r"'+(a.frequencia>=3.5?' style="color:var(--rubro);font-weight:600"':'')+'>'+U.num(a.frequencia,2)+'</td>'+
+        '<td class="r">'+(a.criado?a._idade+'d':'—')+'</td><td class="c"><span class="etq '+r[1]+'">'+r[0]+'</span></td>'+
+        '<td class="c">'+(salvos[a.id]?'<span style="font-size:11.5px;color:var(--verde)">na biblioteca</span>':'<button class="btn sm sec" data-mk="salvarMeta" data-id="'+a.id+'">Salvar</button>')+'</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  });
+  h += '<div class="info" style="margin-top:12px">Fundo: vencedor com 2+ compras e ROAS acima de '+U.num(Mk.regua().roasMin,2)+' (seu teto); cortar quando gastou 2 CPAs máximos sem resultado. Topo: comparado pelo hook (visualizações de 3s ÷ impressões) com a média da etapa. Meio: pelo CTR contra a média. Frequência acima de 3,5 ou mais de '+(Mk.num(d.config.diasCiclo)||90)+' dias no ar indica fadiga. Números com a atribuição da Meta.</div></div>';
+  return h;
+};
+
 /* ---------------- TELA ---------------- */
 Views.marketing = function(){
   var a = UI.aba || 'termometro';
@@ -8711,7 +8813,7 @@ Views.mkCriativos = function(){
   var cr = Mk.d().criativos, hoje = U.hoje(), dc = Mk.num(Mk.d().config.diasCiclo)||90;
   var venc = cr.filter(function(x){ return x.status==='vencedor'; });
   var f = Views._mkFiltro || '';
-  var h = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn" data-mk="novoCri">+ Criativo</button>'+
+  var h = Views.mkMeta() + '<div class="cartao-tit" style="margin:18px 0 8px">Biblioteca</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn" data-mk="novoCri">+ Criativo</button>'+
     ['','topo','meio','fundo'].map(function(k){ return '<button class="btn sm '+(f===k?'':'sec')+'" data-mk="filtro" data-v="'+k+'">'+(k?Mk.ETAPAS[k]:'Todos')+'</button>'; }).join('')+'</div>';
   if(venc.length){
     h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Mural dos vencedores</div><div class="cartao-sub">Referência para a próxima rodada: o que funcionou e por quê.</div><div class="grade g3" style="margin-top:10px">'+
@@ -8851,6 +8953,15 @@ Mk.formCri = function(id){
         Views._mkAlvo = null; Mk.salvar('Estrutura atualizada'); App.render();
       }, 'Aplicar');
       return;
+    }
+    if(ac==='puxarMeta'){ Mk.puxarMeta(+document.getElementById('mkDias').value||30); return; }
+    if(ac==='salvarMeta'){
+      var a = ((d.meta||{}).ads||[]).find(function(x){ return x.id===id; }); if(!a) return;
+      var cl = Mk.classificar([Object.assign({}, a, {_et:Mk.etapaDe(a.campanha)})])[0], m = cl._m;
+      var st = {vencedor:'vencedor','vencedor-fadiga':'fadiga',fadiga:'fadiga',cortar:'pausado'}[cl._v] || 'teste';
+      d.criativos.unshift({id:U.id(), metaId:a.id, nome:a.nome, etapa:cl._et.etapa, status:st, subida:a.criado||'', formato:a.views3s?'Vídeo':'Imagem', campanha:a.campanha, angulo:'',
+        ctr:m.ctr.toFixed(2), cpa:a.compras?m.cpa.toFixed(2):'', roas:a.receita?m.roas.toFixed(2):'', link:'https://adsmanager.facebook.com/adsmanager/manage/ads?act='+(d.meta.conta||'')+'&selected_ad_ids='+a.id, motivo:''});
+      Mk.salvar('Salvo na biblioteca'); App.render(); return;
     }
     if(ac==='filtro'){ Views._mkFiltro = t.getAttribute('data-v'); App.render(); return; }
     if(ac==='novoCri'){ Mk.formCri(); return; }
