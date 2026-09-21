@@ -2058,7 +2058,8 @@ var NAV = [
   ]},
   {g:'Operação', itens:[
     {id:'logistica', nome:'Logística', ico:'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM18.5 21a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'},
-    {id:'producao', nome:'Produção', ico:'M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z'}
+    {id:'producao', nome:'Produção', ico:'M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z'},
+    {id:'marketing', nome:'Marketing', ico:'M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 8.5a5 5 0 0 1 0 7M18 5.5a9 9 0 0 1 0 13'}
   ]},
   {g:'Missões', itens:[
     {id:'lazarus', nome:'Projeto Lazarus', ico:'M12 2l3 7h7l-5.5 4.5 2 7.5L12 17l-6.5 4 2-7.5L2 9h7z'}
@@ -2100,6 +2101,15 @@ var ABAS = {
     {id:'equipe', nome:'Equipe'},
     {id:'guia', nome:'Guia e rotina'},
     {id:'avisos', nome:'Avisos'}
+  ],
+  marketing: [
+    {id:'termometro', nome:'Termômetro'},
+    {id:'diario', nome:'Diário'},
+    {id:'estrutura', nome:'Campanhas e escala'},
+    {id:'criativos', nome:'Criativos'},
+    {id:'ciclo', nome:'Ciclo trimestral'},
+    {id:'decisoes', nome:'Decisões'},
+    {id:'organico', nome:'Orgânico'}
   ],
   caixa: [
     {id:'saldo', nome:'Caixa e contas'},
@@ -5629,9 +5639,9 @@ var App = {
     });
     var semPeriodo = ['custos','integracoes','config','lazarus','producao'];
     var abaLog = UI.tela==='logistica' ? (UI.aba||'expedicao') : '';
-    var semMes = (semPeriodo.indexOf(UI.tela)>=0 && !(UI.tela==='producao' && UI.aba==='ponto')) || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta');
+    var semMes = (semPeriodo.indexOf(UI.tela)>=0 && !(UI.tela==='producao' && UI.aba==='ponto')) || (UI.tela==='logistica' && abaLog!=='indicadores' && abaLog!=='meta') || (UI.tela==='marketing' && ['termometro','diario','estrutura'].indexOf(UI.aba||'termometro')<0);
     document.getElementById('periodoCtrl').style.display = semMes ? 'none' : '';
-    document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus'||UI.tela==='producao') ? 'none' : '';
+    document.getElementById('btnNovo').style.display = (UI.tela==='logistica'||UI.tela==='lazarus'||UI.tela==='producao'||UI.tela==='marketing') ? 'none' : '';
     alvo.classList.toggle('cheio', UI.tela==='lazarus');
 
     var h = '';
@@ -5655,6 +5665,7 @@ var App = {
     else if(UI.tela==='logistica') h += Views.logistica();
     else if(UI.tela==='lazarus') h += Views.lazarus();
     else if(UI.tela==='producao') h += Views.producao();
+    else if(UI.tela==='marketing') h += Views.marketing();
     else h += Views.hoje();
 
     alvo.innerHTML = h;
@@ -8440,6 +8451,434 @@ Views.prodAvisos = function(){
       Store.salvar(); return;
     }
     if((v = el.getAttribute && el.getAttribute('data-pdsel'))){ Views._prodSel[v] = el.checked; App.render(); return; }
+  });
+})();
+
+
+/* ============================================================
+   MARKETING — tráfego pago é o coração da empresa.
+   Dados em Store.dados.marketing. Lê do Financeiro (vendas e gasto
+   de marketing já lançados/sincronizados) e das campanhas da Meta.
+============================================================ */
+var Mk = {
+  ETAPAS: {topo:'Topo', meio:'Meio', fundo:'Fundo'},
+  STATUS: {teste:'Em teste', vencedor:'Vencedor', fadiga:'Em fadiga', pausado:'Pausado'},
+  CHECK: ['Roteiros e ângulos definidos','Gravação','Edição','Subida dos anúncios','Teste (7 dias)','Escolha dos vencedores'],
+  padrao: function(){
+    return {
+      config: { teto:29, ticket:249.90, degrau:20, diasCiclo:90, storiesDia:3 },
+      estrutura: [
+        {id:'e1', nome:'Post viral turbinado (Instagram)', etapa:'topo',  valor:23,  filtro:'Publicação', teste:false, ativa:true},
+        {id:'e2', nome:'Engajamento ThruPlay — topo de funil', etapa:'topo',  valor:52,  filtro:'TOPO DE FUNIL', teste:false, ativa:true},
+        {id:'e3', nome:'Adição ao carrinho — qualificação', etapa:'meio',  valor:40,  filtro:'QUALIFICA', teste:false, ativa:true},
+        {id:'e4', nome:'Vendas normal + lookalike (principal)', etapa:'fundo', valor:187, filtro:'NORMAL E LOOKALIKE', teste:false, ativa:true},
+        {id:'e5', nome:'Vendas — produto vencedor (TESTE)', etapa:'fundo', valor:187, filtro:'PRODUTO VENCEDOR', teste:true, ativa:true}
+      ],
+      criativos: [], decisoes: [], posts: [],
+      ciclos: { topo:{ultima:'', check:{}}, meio:{ultima:'', check:{}}, fundo:{ultima:'', check:{}} }
+    };
+  },
+  d: function(){
+    var b = Mk.padrao(), d = Store.dados.marketing;
+    if(!d || typeof d!=='object'){ Store.dados.marketing = b; return b; }
+    d.config = Object.assign({}, b.config, d.config||{});
+    ['estrutura','criativos','decisoes','posts'].forEach(function(k){ if(!Array.isArray(d[k])) d[k] = b[k]; });
+    d.ciclos = Object.assign({}, b.ciclos, d.ciclos||{});
+    return d;
+  },
+  num: function(v){ var x = parseFloat(String(v===undefined||v===null?'':v).replace(',','.')); return isNaN(x)?0:x; },
+  salvar: function(msg){ Store.salvar(); if(msg) UI.toast(msg); },
+  somaDias: function(iso, n){ var p=iso.split('-'); var d=new Date(+p[0], +p[1]-1, +p[2]+n); return U.iso(d); },
+  diasEntre: function(a, b){ var pa=a.split('-'), pb=b.split('-'); return Math.round((new Date(+pb[0],+pb[1]-1,+pb[2]) - new Date(+pa[0],+pa[1]-1,+pa[2]))/86400000); },
+
+  /* régua: teto em % do faturamento → ROAS mínimo e CPA máximo */
+  regua: function(ticket){
+    var c = Mk.d().config, t = Mk.num(c.teto);
+    var tk = ticket || Mk.num(c.ticket);
+    return { teto:t, roasMin: t>0 ? 100/t : 0, cpaMax: tk*t/100, ticket:tk };
+  },
+  nivel: function(pct, teto){ if(!pct) return 'nu'; if(pct<=teto*0.85) return 'ok'; if(pct<=teto) return 'at'; return 'cr'; },
+
+  /* estrutura */
+  base: function(){ return Mk.d().estrutura.filter(function(e){ return e.ativa && !e.teste; }); },
+  testes: function(){ return Mk.d().estrutura.filter(function(e){ return e.ativa && e.teste; }); },
+  total: function(lista){ return lista.reduce(function(s,e){ return s+Mk.num(e.valor); },0); },
+
+  /* desempenho real por item da estrutura (casando pelo filtro no nome da campanha da Meta) */
+  real: function(ym){
+    var camps = (Store.dados.campanhas||[]).filter(function(c){ return c.ym===ym; });
+    return Mk.d().estrutura.map(function(e){
+      var f = String(e.filtro||'').toLowerCase().trim();
+      var r = {id:e.id, gasto:0, compras:0, receita:0, cliques:0, impressoes:0};
+      if(f) camps.forEach(function(c){
+        if(String(c.campanha||'').toLowerCase().indexOf(f)>=0){
+          r.gasto+=U.n(c.gasto); r.compras+=U.n(c.compras); r.receita+=U.n(c.receita); r.cliques+=U.n(c.cliques); r.impressoes+=U.n(c.impressoes);
+        }
+      });
+      r.cpa = U.div(r.gasto, r.compras); r.roas = U.div(r.receita, r.gasto);
+      r.ctr = U.div(r.cliques, r.impressoes)*100; r.cpm = U.div(r.gasto, r.impressoes)*1000;
+      return r;
+    });
+  },
+  metaDia: function(ym){
+    var m = {};
+    (Store.dados.campanhas||[]).forEach(function(c){
+      if(c.ym!==ym) return;
+      var x = m[c.data] || (m[c.data] = {cliques:0, impressoes:0, gasto:0});
+      x.cliques+=U.n(c.cliques); x.impressoes+=U.n(c.impressoes); x.gasto+=U.n(c.gasto);
+    });
+    return m;
+  },
+  decidir: function(texto){ Mk.d().decisoes.unshift({id:U.id(), data:U.hoje(), texto:texto}); }
+};
+
+/* ---------------- TELA ---------------- */
+Views.marketing = function(){
+  var a = UI.aba || 'termometro';
+  if(a==='termometro') return Views.mkTermometro();
+  if(a==='diario') return Views.mkDiario();
+  if(a==='estrutura') return Views.mkEstrutura();
+  if(a==='criativos') return Views.mkCriativos();
+  if(a==='ciclo') return Views.mkCiclo();
+  if(a==='decisoes') return Views.mkDecisoes();
+  if(a==='organico') return Views.mkOrganico();
+  return Views.mkTermometro();
+};
+
+Views.mkTermometro = function(){
+  var ym = UI.ym, c = Mk.d().config;
+  var serie = Calc.serieDiaria(ym);
+  var fat=0, mkt=0, ped=0, diasCom=0;
+  serie.forEach(function(d){ fat+=d.fat; mkt+=d.mkt; ped+=d.pedidos; if(d.fat||d.mkt) diasCom++; });
+  var ticketReal = U.div(fat, ped);
+  var rg = Mk.regua(ticketReal || 0);
+  var pct = U.div(mkt, fat)*100, roas = U.div(fat, mkt), cpa = U.div(mkt, ped);
+  var nv = Mk.nivel(pct, rg.teto);
+  var folga = fat*rg.teto/100 - mkt;
+  var hoje = U.hoje(), ontem = Mk.somaDias(hoje,-1);
+  var dHoje = serie.find(function(d){ return d.data===hoje; }), dOntem = serie.find(function(d){ return d.data===ontem; });
+  var orc = Mk.total(Mk.base()), orcT = orc + Mk.total(Mk.testes());
+  var fatNec = rg.teto>0 ? orc/(rg.teto/100) : 0, fatNecT = rg.teto>0 ? orcT/(rg.teto/100) : 0;
+  var tk = rg.ticket || Mk.num(c.ticket);
+
+  var frase = !fat && !mkt ? 'Sem vendas nem investimento lançados em '+U.nomeMes(ym)+'.'
+    : nv==='ok' ? 'O marketing está dentro do teto.'
+    : nv==='at' ? 'O marketing está encostando no teto.'
+    : 'O marketing passou do teto.';
+  var h = '<div class="veredito '+(nv==='cr'?'critico':(nv==='at'?'atencao':(nv==='nu'?'neutro':'')))+'" style="margin-bottom:16px">'+
+    '<div class="veredito-frase">'+frase+'</div>'+
+    '<div class="veredito-apoio">No mês, '+U.pct(pct,1)+' do faturamento foi para marketing, contra o teto de '+U.pct(rg.teto,1)+'. '+
+      (folga>=0 ? 'Ainda cabem <b>'+U.brl(folga,0)+'</b> de anúncios sem estourar o teto com o que já foi vendido.'
+                : 'O mês está <b>'+U.brl(-folga,0)+'</b> acima do teto.')+'</div>'+
+    '<div class="veredito-linha" style="align-items:flex-end">'+
+      '<div class="campo" style="margin:0"><label>Teto de marketing (% do faturamento) '+UI.ajuda('Quanto do faturamento pode ir para anúncios. Mude quando quiser: ROAS mínimo, CPA máximo e as cores da página se recalculam.')+'</label>'+
+        '<input type="number" step="0.5" min="1" max="100" data-mkset="config.teto" value="'+c.teto+'" style="width:110px"></div>'+
+      '<div class="campo" style="margin:0"><label>Ticket de referência '+UI.ajuda('Usado quando o mês ainda não tem vendas. Com vendas, vale o ticket real.')+'</label>'+
+        '<input type="number" step="0.01" min="0" data-mkset="config.ticket" value="'+c.ticket+'" style="width:120px"></div>'+
+    '</div></div>';
+
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'% do faturamento no mês', val:U.pct(pct,1), destaque:true, pt:nv, nota:'teto '+U.pct(rg.teto,1)})+
+    UI.kpi({rot:'ROAS do mês', val:U.num(roas,2), pt:roas? (roas>=rg.roasMin?'ok':'cr'):'nu', nota:'mínimo '+U.num(rg.roasMin,2), ajuda:'Faturamento real ÷ investimento. ROAS mínimo = 100 ÷ teto.'})+
+    UI.kpi({rot:'CPA do mês', val:ped?U.brl(cpa):'—', pequeno:true, pt:ped?(cpa<=rg.teto/100*tk?'ok':'cr'):'nu', nota:'máximo '+U.brl(rg.teto/100*tk)+' (ticket '+U.brl(tk,0)+')', ajuda:'Investimento ÷ pedidos reais. CPA máximo = ticket × teto.'})+
+    UI.kpi({rot:'Investido no mês', val:U.brl(mkt,0), pequeno:true, nota:U.brl(fat,0)+' faturados · '+U.num(ped)+' pedidos'})+
+  '</div>';
+
+  var linhaDia = function(rot, d){
+    if(!d || (!d.fat && !d.mkt)) return UI.kpi({rot:rot, val:'—', pequeno:true, nota:'sem dados ainda'});
+    var p = U.div(d.mkt, d.fat)*100;
+    return UI.kpi({rot:rot, val:U.pct(p,1), pequeno:true, pt:Mk.nivel(p, rg.teto),
+      nota:'ROAS '+U.num(U.div(d.fat,d.mkt),2)+' · CPA '+(d.pedidos?U.brl(U.div(d.mkt,d.pedidos),0):'—')+' · '+U.num(d.pedidos)+' ped.'});
+  };
+  h += '<div class="grade g4" style="margin-bottom:12px">'+
+    linhaDia('Hoje', dHoje)+ linhaDia('Ontem', dOntem)+
+    UI.kpi({rot:'Faturamento mínimo/dia', val:U.brl(fatNec,0), pequeno:true, nota:'para a estrutura de '+U.brl(orc,0)+'/dia ≈ '+U.num(U.div(fatNec,tk),1)+' pedidos', ajuda:'Orçamento diário ÷ teto. Abaixo disso, o dia estoura o teto.'})+
+    UI.kpi({rot:'Com os testes ligados', val:U.brl(fatNecT,0), pequeno:true, nota:U.brl(orcT,0)+'/dia ≈ '+U.num(U.div(fatNecT,tk),1)+' pedidos'})+
+  '</div>';
+
+  if(serie.some(function(d){ return d.fat||d.mkt; })){
+    var ate = serie.filter(function(d){ return d.data<=hoje; });
+    h += '<div class="cartao"><div class="cartao-tit">Faturamento × marketing, dia a dia</div>'+
+      '<div class="cartao-sub">A linha tracejada é o marketing máximo permitido pelo faturamento de cada dia.</div>'+
+      Chart.linha({titulo:'Marketing', labels:ate.map(function(d){ return String(d.dia); }), series:[
+        {nome:'Faturamento', cor:'#5a332e', pontos:ate.map(function(d){ return d.fat; }), area:true},
+        {nome:'Marketing', cor:'#1f9d6c', pontos:ate.map(function(d){ return d.mkt; }), marcarFim:true},
+        {nome:'Teto ('+U.pct(rg.teto,0)+')', cor:'#a8322c', tracejado:true, pontos:ate.map(function(d){ return d.fat*rg.teto/100; })}
+      ]})+'</div>';
+  }
+  h += '<div class="info" style="margin-top:12px">Os números desta página vêm das vendas reais e do gasto com marketing do Financeiro (sincronize Loja e Anúncios em Integrações). O que manda é o % acumulado do mês: um dia ruim sozinho não estoura o mês.</div>';
+  return h;
+};
+
+Views.mkDiario = function(){
+  var ym = UI.ym, serie = Calc.serieDiaria(ym), md = Mk.metaDia(ym), hoje = U.hoje();
+  var rg = Mk.regua();
+  var linhas = serie.filter(function(d){ return d.data<=hoje && (d.fat||d.mkt); }).reverse();
+  if(!linhas.length) return UI.vazio('Sem dias com dados em '+U.nomeMes(ym), 'O diário usa as vendas e o gasto com marketing do Financeiro. Sincronize a loja e os anúncios em Integrações.', '<button class="btn" data-ir="integracoes">Abrir Integrações</button>');
+  var h = '<div class="tabela-env"><table><thead><tr><th>Dia</th><th class="r">Investido</th><th class="r">Faturamento</th><th class="r">Pedidos</th>'+
+    '<th class="r">% mkt</th><th class="r">ROAS</th><th class="r">CPA</th><th class="r">Ticket</th><th class="r">CTR</th><th class="r">CPM</th><th class="c"></th></tr></thead><tbody>';
+  var t = {mkt:0, fat:0, ped:0};
+  linhas.forEach(function(d){
+    var p = U.div(d.mkt,d.fat)*100, nv = Mk.nivel(p, rg.teto), m = md[d.data]||{};
+    t.mkt+=d.mkt; t.fat+=d.fat; t.ped+=d.pedidos;
+    h += '<tr><td>'+U.dataBr(d.data).slice(0,5)+' <span style="color:var(--texto-fraco)">'+U.diaSemana(d.data)+'</span></td>'+
+      '<td class="r">'+U.brl(d.mkt,0)+'</td><td class="r">'+U.brl(d.fat,0)+'</td><td class="r">'+U.num(d.pedidos)+'</td>'+
+      '<td class="r" style="font-weight:600">'+(d.fat?U.pct(p,1):'—')+'</td>'+
+      '<td class="r">'+(d.mkt?U.num(U.div(d.fat,d.mkt),2):'—')+'</td>'+
+      '<td class="r">'+(d.pedidos?U.brl(U.div(d.mkt,d.pedidos),0):'—')+'</td>'+
+      '<td class="r">'+(d.pedidos?U.brl(U.div(d.fat,d.pedidos),0):'—')+'</td>'+
+      '<td class="r">'+(m.impressoes?U.pct(U.div(m.cliques,m.impressoes)*100,2):'—')+'</td>'+
+      '<td class="r">'+(m.impressoes?U.brl(U.div(m.gasto,m.impressoes)*1000,2):'—')+'</td>'+
+      '<td class="c"><span class="pt '+nv+'"></span></td></tr>';
+  });
+  var pt = U.div(t.mkt,t.fat)*100;
+  h += '<tr class="total"><td>Mês</td><td class="r">'+U.brl(t.mkt,0)+'</td><td class="r">'+U.brl(t.fat,0)+'</td><td class="r">'+U.num(t.ped)+'</td>'+
+    '<td class="r">'+U.pct(pt,1)+'</td><td class="r">'+U.num(U.div(t.fat,t.mkt),2)+'</td><td class="r">'+(t.ped?U.brl(U.div(t.mkt,t.ped),0):'—')+'</td>'+
+    '<td class="r">'+(t.ped?U.brl(U.div(t.fat,t.ped),0):'—')+'</td><td></td><td></td><td class="c"><span class="pt '+Mk.nivel(pt,rg.teto)+'"></span></td></tr>';
+  h += '</tbody></table></div><div class="info" style="margin-top:12px">Verde: até 85% do teto. Amarelo: entre 85% e o teto. Vermelho: acima do teto de '+U.pct(rg.teto,1)+'. CTR e CPM vêm da Meta.</div>';
+  return h;
+};
+
+Views.mkEstrutura = function(){
+  var d = Mk.d(), base = Mk.base(), tot = Mk.total(base), testes = Mk.testes();
+  var real = Mk.real(UI.ym), porId = {}; real.forEach(function(r){ porId[r.id]=r; });
+  var etapa = {topo:0, meio:0, fundo:0};
+  base.forEach(function(e){ etapa[e.etapa] += Mk.num(e.valor); });
+  var rg = Mk.regua();
+
+  var h = '<div class="grade g4" style="margin-bottom:12px">'+
+    UI.kpi({rot:'Estrutura validada', val:U.brl(tot,0)+'/dia', destaque:true, nota:base.length+' campanhas · '+U.brl(tot*30,0)+'/mês'})+
+    ['topo','meio','fundo'].map(function(k){
+      return UI.kpi({rot:Mk.ETAPAS[k]+' de funil', val:U.pct(U.div(etapa[k],tot)*100,1), pequeno:true, nota:U.brl(etapa[k],0)+'/dia'});
+    }).join('')+'</div>';
+
+  h += '<div class="tabela-env" style="margin-bottom:12px"><table><thead><tr><th>Campanha</th><th>Etapa</th><th class="r">R$/dia</th><th class="r">% estrutura</th>'+
+    '<th>Filtro no nome (Meta) '+UI.ajuda('Parte do nome da campanha no Gerenciador. É assim que o painel liga esta linha aos dados reais da Meta.')+'</th>'+
+    '<th class="c">Teste</th><th class="c">Ativa</th><th class="r">Gasto mês</th><th class="r">CPA</th><th class="r">ROAS</th><th></th></tr></thead><tbody>';
+  d.estrutura.forEach(function(e, i){
+    var r = porId[e.id]||{};
+    h += '<tr'+(e.ativa?'':' style="opacity:.55"')+'><td><input data-mkset="estrutura.'+i+'.nome" value="'+U.esc(e.nome)+'" style="min-width:220px"></td>'+
+      '<td><select data-mkset="estrutura.'+i+'.etapa" style="min-width:92px">'+Object.keys(Mk.ETAPAS).map(function(k){ return '<option value="'+k+'"'+(e.etapa===k?' selected':'')+'>'+Mk.ETAPAS[k]+'</option>'; }).join('')+'</select></td>'+
+      '<td class="r"><input type="number" class="lg-num" step="1" min="0" data-mkset="estrutura.'+i+'.valor" value="'+e.valor+'"></td>'+
+      '<td class="r">'+(e.teste||!e.ativa ? '<span class="etq pen">fora</span>' : U.pct(U.div(Mk.num(e.valor),tot)*100,1))+'</td>'+
+      '<td><input data-mkset="estrutura.'+i+'.filtro" value="'+U.esc(e.filtro)+'" style="width:150px"></td>'+
+      '<td class="c"><input type="checkbox" data-mkset="estrutura.'+i+'.teste"'+(e.teste?' checked':'')+'></td>'+
+      '<td class="c"><input type="checkbox" data-mkset="estrutura.'+i+'.ativa"'+(e.ativa?' checked':'')+'></td>'+
+      '<td class="r">'+(r.gasto?U.brl(r.gasto,0):'—')+'</td>'+
+      '<td class="r">'+(r.compras?U.brl(r.cpa,0):'—')+'</td>'+
+      '<td class="r">'+(r.gasto?'<span style="color:'+(r.roas>=rg.roasMin?'var(--verde)':'var(--rubro)')+';font-weight:600">'+U.num(r.roas,2)+'</span>':'—')+'</td>'+
+      '<td class="c"><button class="btn sm perigo" data-mk="delEst" data-i="'+i+'">×</button></td></tr>';
+  });
+  h += '</tbody></table></div><button class="btn sec" data-mk="addEst" style="margin-bottom:18px">+ Campanha</button>';
+
+  /* calculadora de escala */
+  var alvo = Views._mkAlvo || Math.round(tot*1.2);
+  var salto = U.div(alvo-tot, tot)*100, degrau = Mk.num(d.config.degrau);
+  h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Calculadora de escala</div>'+
+    '<div class="cartao-sub">Digite o novo orçamento diário da estrutura. O painel divide na mesma proporção que vendeu. Os testes ficam de fora.</div>'+
+    '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:10px 0">'+
+      '<div class="campo" style="margin:0"><label>Novo total (R$/dia)</label><input type="number" id="mkAlvo" min="0" step="1" value="'+alvo+'" style="width:130px"></div>'+
+      '<div class="campo" style="margin:0"><label>Degrau máximo (%)</label><input type="number" data-mkset="config.degrau" min="1" step="1" value="'+degrau+'" style="width:90px"></div>'+
+      '<button class="btn sec" data-mk="calc">Calcular</button>'+
+      '<button class="btn" data-mk="aplicar">Aplicar à estrutura</button></div>'+
+    (salto>degrau ? '<div class="aviso">Aumento de '+U.pct(salto,0)+' de uma vez. Acima de '+U.pct(degrau,0)+' a campanha tende a voltar para a fase de aprendizado. Suba em degraus e espere 2 a 3 dias entre eles.</div>' : '')+
+    '<div class="tabela-env"><table><thead><tr><th>Campanha</th><th class="r">Hoje</th><th class="r">Novo</th><th class="r">Diferença</th></tr></thead><tbody>'+
+    base.map(function(e){
+      var v = Math.round(Mk.num(e.valor)*U.div(alvo,tot));
+      return '<tr><td>'+U.esc(e.nome)+'</td><td class="r">'+U.brl(Mk.num(e.valor),0)+'</td><td class="r" style="font-weight:600">'+U.brl(v,0)+'</td><td class="r">'+(v>=e.valor?'+':'')+U.brl(v-Mk.num(e.valor),0)+'</td></tr>';
+    }).join('')+
+    '<tr class="total"><td>Total</td><td class="r">'+U.brl(tot,0)+'</td><td class="r">'+U.brl(alvo,0)+'</td><td class="r">'+U.pct(salto,0)+'</td></tr></tbody></table></div>'+
+    '<div class="info" style="margin-top:10px">Com '+U.brl(alvo,0)+'/dia, a loja precisa faturar pelo menos '+U.brl(rg.teto>0?alvo/(rg.teto/100):0,0)+'/dia para ficar no teto de '+U.pct(rg.teto,0)+'.</div></div>';
+
+  /* testes × principal */
+  if(testes.length){
+    var princ = base.filter(function(e){ return e.etapa==='fundo'; }).sort(function(x,y){ return y.valor-x.valor; })[0];
+    var rp = princ ? porId[princ.id] : null;
+    h += '<div class="cartao"><div class="cartao-tit">Testes em andamento</div><div class="cartao-sub">Verba separada da estrutura. O teste vence se o CPA ficar abaixo da campanha principal.</div>';
+    testes.forEach(function(e){
+      var r = porId[e.id]||{};
+      var ok = r.compras && rp && rp.compras && r.cpa < rp.cpa;
+      h += '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--linha);flex-wrap:wrap"><div><b>'+U.esc(e.nome)+'</b><div style="font-size:12px;color:var(--texto-medio)">'+U.brl(Mk.num(e.valor),0)+'/dia · gasto no mês '+U.brl(r.gasto||0,0)+'</div></div>'+
+        '<div style="font-size:13px">CPA '+(r.compras?U.brl(r.cpa,0):'—')+' vs principal '+(rp&&rp.compras?U.brl(rp.cpa,0):'—')+' '+
+        (r.compras&&rp&&rp.compras ? '<span class="etq '+(ok?'rec':'fal')+'">'+(ok?'vencendo':'perdendo')+'</span>' : '<span class="etq pag">sem dados</span>')+'</div></div>';
+    });
+    h += '</div>';
+  }
+  return h;
+};
+
+Views.mkCriativos = function(){
+  var cr = Mk.d().criativos, hoje = U.hoje(), dc = Mk.num(Mk.d().config.diasCiclo)||90;
+  var venc = cr.filter(function(x){ return x.status==='vencedor'; });
+  var f = Views._mkFiltro || '';
+  var h = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn" data-mk="novoCri">+ Criativo</button>'+
+    ['','topo','meio','fundo'].map(function(k){ return '<button class="btn sm '+(f===k?'':'sec')+'" data-mk="filtro" data-v="'+k+'">'+(k?Mk.ETAPAS[k]:'Todos')+'</button>'; }).join('')+'</div>';
+  if(venc.length){
+    h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Mural dos vencedores</div><div class="cartao-sub">Referência para a próxima rodada: o que funcionou e por quê.</div><div class="grade g3" style="margin-top:10px">'+
+      venc.map(function(x){ return '<div style="border:1px solid var(--linha);border-radius:var(--r);padding:12px;background:var(--verde-fundo)"><div style="font-weight:600">'+U.esc(x.nome)+'</div>'+
+        '<div style="font-size:12px;color:var(--texto-medio);margin:3px 0 6px">'+Mk.ETAPAS[x.etapa]+' · '+U.esc(x.formato||'')+(x.cpa?' · CPA '+U.brl(Mk.num(x.cpa),0):'')+(x.roas?' · ROAS '+U.num(Mk.num(x.roas),2):'')+'</div>'+
+        '<div style="font-size:12.5px">'+U.esc(x.motivo||x.angulo||'')+'</div></div>'; }).join('')+'</div></div>';
+  }
+  var lista = cr.filter(function(x){ return !f || x.etapa===f; });
+  if(!lista.length) return h + UI.vazio('Nenhum criativo cadastrado', 'Cadastre cada anúncio com etapa, ângulo e data de subida para acompanhar vencedores e fadiga.', '');
+  h += '<div class="tabela-env"><table><thead><tr><th>Criativo</th><th>Etapa</th><th>Ângulo / copy</th><th>Formato</th><th class="r">Subiu</th><th class="r">CTR</th><th class="r">CPA</th><th class="r">ROAS</th><th class="c">Status</th><th></th></tr></thead><tbody>';
+  lista.forEach(function(x){
+    var idade = x.subida ? Mk.diasEntre(x.subida, hoje) : 0;
+    var st = {teste:'pen', vencedor:'rec', fadiga:'fal', pausado:'pag'}[x.status]||'pag';
+    h += '<tr><td style="font-weight:500">'+(x.link?'<a href="'+U.esc(x.link)+'" target="_blank" rel="noopener">'+U.esc(x.nome)+'</a>':U.esc(x.nome))+'</td><td>'+Mk.ETAPAS[x.etapa]+'</td>'+
+      '<td style="max-width:260px;font-size:12.5px">'+U.esc(x.angulo||'')+'</td><td>'+U.esc(x.formato||'')+'</td>'+
+      '<td class="r">'+(x.subida?U.dataBr(x.subida).slice(0,5)+(idade>=dc&&x.status!=='pausado'?' <span class="etq fal">'+idade+'d</span>':' <span style="color:var(--texto-fraco)">'+idade+'d</span>'):'—')+'</td>'+
+      '<td class="r">'+(x.ctr?U.pct(Mk.num(x.ctr),2):'—')+'</td><td class="r">'+(x.cpa?U.brl(Mk.num(x.cpa),0):'—')+'</td><td class="r">'+(x.roas?U.num(Mk.num(x.roas),2):'—')+'</td>'+
+      '<td class="c"><span class="etq '+st+'">'+Mk.STATUS[x.status]+'</span></td>'+
+      '<td class="c" style="white-space:nowrap"><button class="btn sm sec" data-mk="editCri" data-id="'+x.id+'">Editar</button> <button class="btn sm perigo" data-mk="delCri" data-id="'+x.id+'">×</button></td></tr>';
+  });
+  h += '</tbody></table></div><div class="info" style="margin-top:12px">A etiqueta vermelha de dias aparece quando o criativo passa de '+dc+' dias no ar: hora de renovar. Fadiga antes disso: frequência subindo e CTR caindo.</div>';
+  return h;
+};
+
+Views.mkCiclo = function(){
+  var d = Mk.d(), hoje = U.hoje(), dc = Mk.num(d.config.diasCiclo)||90;
+  var h = '<div class="grade g3" style="margin-bottom:12px">';
+  ['topo','meio','fundo'].forEach(function(k){
+    var ci = d.ciclos[k] || (d.ciclos[k]={ultima:'',check:{}});
+    var prox = ci.ultima ? Mk.somaDias(ci.ultima, dc) : '';
+    var falta = prox ? Mk.diasEntre(hoje, prox) : null;
+    var nv = falta===null ? 'nu' : (falta<0 ? 'cr' : (falta<=21 ? 'at' : 'ok'));
+    var feitos = Mk.CHECK.filter(function(_,i){ return ci.check[i]; }).length;
+    h += '<div class="cartao"><div class="cartao-tit">'+Mk.ETAPAS[k]+' de funil</div>'+
+      '<div class="cartao-sub"><span class="pt '+nv+'"></span> '+(falta===null?'Informe a data da última renovação':(falta<0?'Renovação atrasada '+(-falta)+' dias':'Próxima renovação em '+falta+' dias ('+U.dataBr(prox)+')'))+'</div>'+
+      '<div class="campo" style="margin:10px 0"><label>Última renovação</label><input type="date" data-mkset="ciclos.'+k+'.ultima" value="'+(ci.ultima||'')+'"></div>'+
+      '<div style="font-size:12px;color:var(--texto-medio);margin-bottom:6px">Checklist da próxima rodada · '+feitos+'/'+Mk.CHECK.length+'</div>'+
+      Mk.CHECK.map(function(t,i){ return '<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0"><input type="checkbox" data-mkset="ciclos.'+k+'.check.'+i+'"'+(ci.check[i]?' checked':'')+'> '+t+'</label>'; }).join('')+
+      '<button class="btn sm" data-mk="fecharCiclo" data-v="'+k+'" style="margin-top:10px">Concluir renovação hoje</button></div>';
+  });
+  h += '</div><div class="campo" style="max-width:260px"><label>Intervalo entre renovações (dias)</label><input type="number" min="7" step="1" data-mkset="config.diasCiclo" value="'+dc+'"></div>';
+  return h;
+};
+
+Views.mkDecisoes = function(){
+  var ds = Mk.d().decisoes;
+  var h = '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Registrar decisão</div><div class="cartao-sub">O que mudou e por quê. É o que ensina a operação com o tempo.</div>'+
+    '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="mkDec" placeholder="Ex.: escalei a principal +20% porque o CPA estava em R$ 58" style="flex:1;min-width:240px"><button class="btn" data-mk="addDec">Registrar</button></div></div>';
+  if(!ds.length) return h + UI.vazio('Nenhuma decisão registrada', 'Aplicações da calculadora de escala e renovações de ciclo entram aqui sozinhas.', '');
+  h += '<div class="tabela-env"><table><thead><tr><th style="width:110px">Data</th><th>Decisão</th><th></th></tr></thead><tbody>'+
+    ds.map(function(x){ return '<tr><td>'+U.dataBr(x.data)+'</td><td>'+U.esc(x.texto)+'</td><td class="c"><button class="btn sm perigo" data-mk="delDec" data-id="'+x.id+'">×</button></td></tr>'; }).join('')+
+    '</tbody></table></div>';
+  return h;
+};
+
+Views.mkOrganico = function(){
+  var d = Mk.d(), ps = d.posts, hoje = U.hoje();
+  var TIPOS = {feed:'Feed', reels:'Reels', story:'Story', carrossel:'Carrossel'};
+  var ST = {ideia:['Ideia','pag'], produzindo:['Produzindo','pen'], agendado:['Agendado','des'], publicado:['Publicado','rec']};
+  var h = '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Novo conteúdo</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:flex-end">'+
+    '<div class="campo" style="margin:0"><label>Data (vazio = banco de ideias)</label><input type="date" id="mkPData"></div>'+
+    '<div class="campo" style="margin:0"><label>Tipo</label><select id="mkPTipo">'+Object.keys(TIPOS).map(function(k){ return '<option value="'+k+'">'+TIPOS[k]+'</option>'; }).join('')+'</select></div>'+
+    '<div class="campo" style="margin:0;flex:1;min-width:220px"><label>Tema</label><input id="mkPTema" placeholder="Ex.: bastidores da estampa, santo do dia, enquete de cor"></div>'+
+    '<button class="btn" data-mk="addPost">Adicionar</button></div></div>';
+
+  /* próximos 14 dias */
+  h += '<div class="cartao" style="margin-bottom:12px"><div class="cartao-tit">Próximos 14 dias</div><div class="cartao-sub">Meta de '+d.config.storiesDia+' stories por dia para manter a comunidade por perto.</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,minmax(90px,1fr));gap:6px;margin-top:10px;overflow-x:auto">';
+  for(var i=0;i<14;i++){
+    var dia = Mk.somaDias(hoje,i), doDia = ps.filter(function(p){ return p.data===dia; });
+    var st = doDia.filter(function(p){ return p.tipo==='story'; }).length;
+    h += '<div style="border:1px solid var(--linha);border-radius:var(--r-sm);padding:7px;min-height:78px;background:'+(i===0?'var(--papel)':'#fff')+'">'+
+      '<div style="font-size:11px;color:var(--texto-fraco)">'+U.diaSemana(dia)+' '+U.dataBr(dia).slice(0,5)+'</div>'+
+      doDia.filter(function(p){ return p.tipo!=='story'; }).map(function(p){ return '<div style="font-size:11.5px;margin-top:3px"><b>'+TIPOS[p.tipo]+'</b> '+U.esc(p.tema)+'</div>'; }).join('')+
+      '<div style="font-size:11px;margin-top:4px;color:'+(st>=d.config.storiesDia?'var(--verde)':'var(--texto-fraco)')+'">'+st+'/'+d.config.storiesDia+' stories</div></div>';
+  }
+  h += '</div></div>';
+
+  var ord = ps.slice().sort(function(x,y){ return (x.data||'9999').localeCompare(y.data||'9999'); });
+  if(ord.length){
+    h += '<div class="tabela-env"><table><thead><tr><th>Data</th><th>Tipo</th><th>Tema</th><th class="c">Status</th><th></th></tr></thead><tbody>'+
+      ord.map(function(p){
+        return '<tr'+(p.data&&p.data<hoje&&p.status!=='publicado'?' style="background:var(--rubro-fundo)"':'')+'><td>'+(p.data?U.dataBr(p.data):'<span class="etq pag">ideia</span>')+'</td><td>'+TIPOS[p.tipo]+'</td><td>'+U.esc(p.tema)+'</td>'+
+          '<td class="c"><select data-mkset="posts.'+ps.indexOf(p)+'.status">'+Object.keys(ST).map(function(k){ return '<option value="'+k+'"'+(p.status===k?' selected':'')+'>'+ST[k][0]+'</option>'; }).join('')+'</select></td>'+
+          '<td class="c"><button class="btn sm perigo" data-mk="delPost" data-id="'+p.id+'">×</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
+  h += '<div class="campo" style="max-width:240px;margin-top:12px"><label>Meta de stories por dia</label><input type="number" min="0" step="1" data-mkset="config.storiesDia" value="'+d.config.storiesDia+'"></div>';
+  return h;
+};
+
+/* ---------------- FORMULÁRIO DE CRIATIVO ---------------- */
+Mk.formCri = function(id){
+  var x = id ? Mk.d().criativos.find(function(c){ return c.id===id; }) : {etapa:'fundo', status:'teste', subida:U.hoje()};
+  if(!x) return;
+  var sel = function(nome, mapa, v){ return '<select id="'+nome+'">'+Object.keys(mapa).map(function(k){ return '<option value="'+k+'"'+(v===k?' selected':'')+'>'+mapa[k]+'</option>'; }).join('')+'</select>'; };
+  var inp = function(nome, rot, v, tipo){ return '<div class="campo"><label>'+rot+'</label><input id="'+nome+'" type="'+(tipo||'text')+'"'+(tipo==='number'?' step="any"':'')+' value="'+U.esc(v===undefined?'':v)+'"></div>'; };
+  UI.modal({
+    titulo: id ? 'Editar criativo' : 'Novo criativo', larga:true,
+    corpo: inp('cNome','Nome do criativo',x.nome)+
+      '<div class="grade g3"><div class="campo"><label>Etapa</label>'+sel('cEtapa',Mk.ETAPAS,x.etapa)+'</div>'+
+      '<div class="campo"><label>Status</label>'+sel('cStatus',Mk.STATUS,x.status)+'</div>'+inp('cSubida','Data de subida',x.subida,'date')+'</div>'+
+      '<div class="grade g2">'+inp('cFormato','Formato (vídeo, carrossel, imagem…)',x.formato)+inp('cCamp','Campanha',x.campanha)+'</div>'+
+      inp('cAngulo','Ângulo / copy / gancho',x.angulo)+
+      '<div class="grade g3">'+inp('cCtr','CTR (%)',x.ctr,'number')+inp('cCpa','CPA (R$)',x.cpa,'number')+inp('cRoas','ROAS',x.roas,'number')+'</div>'+
+      inp('cLink','Link do anúncio ou do arquivo',x.link)+inp('cMotivo','Por que venceu / perdeu',x.motivo),
+    rodape: '<button class="btn sec" data-fechar>Cancelar</button><button class="btn" id="cSalvar">Salvar</button>',
+    aoAbrir: function(el, fechar){
+      el.querySelector('#cSalvar').addEventListener('click', function(){
+        var g = function(s){ return el.querySelector(s).value; };
+        if(!g('#cNome').trim()){ UI.toast('Dê um nome ao criativo.'); return; }
+        var o = {id:id||U.id(), nome:g('#cNome').trim(), etapa:g('#cEtapa'), status:g('#cStatus'), subida:g('#cSubida'),
+          formato:g('#cFormato'), campanha:g('#cCamp'), angulo:g('#cAngulo'), ctr:g('#cCtr'), cpa:g('#cCpa'), roas:g('#cRoas'), link:g('#cLink'), motivo:g('#cMotivo')};
+        var lista = Mk.d().criativos, i = lista.findIndex(function(c){ return c.id===o.id; });
+        if(i>=0) lista[i]=o; else lista.unshift(o);
+        Mk.salvar('Criativo salvo'); fechar(); App.render();
+      });
+    }
+  });
+};
+
+/* ---------------- EVENTOS ---------------- */
+(function(){
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-mk]'); if(!t) return;
+    var ac = t.getAttribute('data-mk'), id = t.getAttribute('data-id'), d = Mk.d();
+    if(ac==='addEst'){ d.estrutura.push({id:U.id(), nome:'Nova campanha', etapa:'fundo', valor:0, filtro:'', teste:false, ativa:true}); Mk.salvar(); App.render(); return; }
+    if(ac==='delEst'){ var i = +t.getAttribute('data-i'); UI.confirmar('Remover campanha da estrutura?', 'Os dados da Meta não são apagados, só esta linha.', function(){ d.estrutura.splice(i,1); Mk.salvar('Removida'); App.render(); }, 'Remover'); return; }
+    if(ac==='calc'){ Views._mkAlvo = Mk.num(document.getElementById('mkAlvo').value); App.render(); return; }
+    if(ac==='aplicar'){
+      var alvo = Mk.num(document.getElementById('mkAlvo').value), base = Mk.base(), tot = Mk.total(base);
+      if(!alvo || !tot){ UI.toast('Informe o novo total.'); return; }
+      UI.confirmar('Aplicar o novo orçamento?', 'A estrutura passa de '+U.brl(tot,0)+' para '+U.brl(alvo,0)+' por dia, mantendo a proporção. Lembre de ajustar também no Gerenciador de Anúncios.', function(){
+        base.forEach(function(e){ e.valor = Math.round(Mk.num(e.valor)*alvo/tot); });
+        Mk.decidir('Estrutura ajustada de '+U.brl(tot,0)+' para '+U.brl(alvo,0)+'/dia ('+(alvo>=tot?'+':'')+U.pct((alvo-tot)/tot*100,0)+')');
+        Views._mkAlvo = null; Mk.salvar('Estrutura atualizada'); App.render();
+      }, 'Aplicar');
+      return;
+    }
+    if(ac==='filtro'){ Views._mkFiltro = t.getAttribute('data-v'); App.render(); return; }
+    if(ac==='novoCri'){ Mk.formCri(); return; }
+    if(ac==='editCri'){ Mk.formCri(id); return; }
+    if(ac==='delCri'){ UI.confirmar('Excluir criativo?', 'Ele sai da biblioteca e do mural.', function(){ d.criativos = d.criativos.filter(function(c){ return c.id!==id; }); Mk.salvar('Excluído'); App.render(); }); return; }
+    if(ac==='fecharCiclo'){
+      var k = t.getAttribute('data-v');
+      UI.confirmar('Concluir a renovação de '+Mk.ETAPAS[k]+'?', 'A data da última renovação vira hoje e o checklist recomeça.', function(){
+        d.ciclos[k] = {ultima:U.hoje(), check:{}}; Mk.decidir('Criativos de '+Mk.ETAPAS[k].toLowerCase()+' de funil renovados'); Mk.salvar('Ciclo renovado'); App.render();
+      }, 'Concluir');
+      return;
+    }
+    if(ac==='addDec'){ var v = (document.getElementById('mkDec').value||'').trim(); if(!v) return; Mk.decidir(v); Mk.salvar('Decisão registrada'); App.render(); return; }
+    if(ac==='delDec'){ d.decisoes = d.decisoes.filter(function(x){ return x.id!==id; }); Mk.salvar(); App.render(); return; }
+    if(ac==='addPost'){
+      var tema = (document.getElementById('mkPTema').value||'').trim(); if(!tema){ UI.toast('Escreva o tema.'); return; }
+      d.posts.push({id:U.id(), data:document.getElementById('mkPData').value, tipo:document.getElementById('mkPTipo').value, tema:tema, status:'ideia'});
+      Mk.salvar('Adicionado'); App.render(); return;
+    }
+    if(ac==='delPost'){ d.posts = d.posts.filter(function(x){ return x.id!==id; }); Mk.salvar(); App.render(); return; }
+  });
+  document.addEventListener('change', function(e){
+    var el = e.target, cam = el.getAttribute && el.getAttribute('data-mkset'); if(!cam) return;
+    var p = cam.split('.'), o = Mk.d();
+    for(var i=0;i<p.length-1;i++){ if(o[p[i]]===undefined||o[p[i]]===null) o[p[i]] = {}; o = o[p[i]]; }
+    var ult = p[p.length-1];
+    o[ult] = el.type==='checkbox' ? el.checked : (el.type==='number' ? Mk.num(el.value) : el.value);
+    Mk.salvar(); App.render();
   });
 })();
 
