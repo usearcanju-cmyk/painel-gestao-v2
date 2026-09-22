@@ -1239,6 +1239,7 @@ function renderDinheiro(){
     const ph = k => di.antes ? '' : String(Math.round(di[k]));
     linhas.push(`<tr${sameDay(d,HOJE)?' style="background:var(--sunk)"':''}><td style="white-space:nowrap">${fmtDL(d)}</td>
       <td class="r">${numInput('caixa',`dias.${iso}.pedidos`,{step:1,ph:ph('pedidos'),label:'Pedidos',cls:'w-s'})}</td>
+      <td class="r">${numInput('caixa',`dias.${iso}.camisetas`,{step:1,ph:String(Math.round(di.pedidos||0)*n(CFG.oferta.pecas)||''),label:'Camisetas',cls:'w-s'})}</td>
       <td class="r">${numInput('caixa',`dias.${iso}.fat`,{ph:ph('fat'),label:'Faturamento',cls:'w-s'})}</td>
       <td class="r">${numInput('caixa',`dias.${iso}.pix`,{ph:ph('pix'),label:'Pix',cls:'w-s'})}</td>
       <td class="r">${numInput('caixa',`dias.${iso}.ads`,{ph:ph('ads'),label:'Anúncio',cls:'w-s'})}</td></tr>`);
@@ -1250,11 +1251,15 @@ function renderDinheiro(){
   ${ini?'':`<div class="note bad">Escolha o primeiro dia de vendas na aba Hoje.</div>`}
   <div id="dinOut"></div>
   <div class="grid g2" style="margin-top:16px">
+    <div class="panel" id="divisaoPanel">
+      <h3 style="margin-bottom:4px">Quanto mover entre as contas</h3>
+      <div id="divisaoOut"></div>
+    </div>
     <div class="panel">
       <h3>Vendas e anúncios de cada dia</h3>
       <p class="small muted" style="margin-top:-6px">O número apagado é a previsão. Digite o real ou importe o CSV da Nuvemshop. Anúncio é o que você recarregou na Meta.</p>
       <div class="row" style="margin-bottom:8px"><input type="file" id="csvDias" accept=".csv,text/csv" style="max-width:240px;font-size:13px"><span id="csvDiasMsg" class="small"></span></div>
-      <div class="tw" style="max-height:520px;overflow:auto"><table><thead><tr><th>Dia</th><th class="r">Pedidos</th><th class="r">Faturou</th><th class="r">Pix</th><th class="r">Anúncio</th></tr></thead><tbody>${linhas.join('')}</tbody></table></div>
+      <div class="tw" style="max-height:520px;overflow:auto"><table><thead><tr><th>Dia</th><th class="r">Pedidos</th><th class="r">Camisetas</th><th class="r">Faturou</th><th class="r">Pix</th><th class="r">Anúncio</th></tr></thead><tbody>${linhas.join('')}</tbody></table></div>
     </div>
     <div>
       <div class="panel" style="margin-bottom:16px">
@@ -1291,10 +1296,87 @@ function renderDinheiro(){
   $('#addCofre').onclick=()=>{ CAIXA.cofre=CAIXA.cofre||[]; CAIXA.cofre.push({data:fmtISO(HOJE),valor:0,origem:'op'}); persist('caixa'); renderAll(); };
   $$('[data-rmcofre]').forEach(b=>b.onclick=()=>{ CAIXA.cofre.splice(Number(b.dataset.rmcofre),1); persist('caixa'); renderAll(); });
   $('#csvDias').onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return;
-    try{ const peds=lerNuvemshop(await lerArquivo(f)); mesclarDias(peds); renderDinheiro(); $('#csvDiasMsg').innerHTML=`<span class="chip ok">${peds.length} pedidos anotados</span>`; }
+    try{ const peds=lerNuvemshop(await lerArquivo(f)); mesclarDias(peds); renderDinheiro(); renderDivisao(); $('#csvDiasMsg').innerHTML=`<span class="chip ok">${peds.length} pedidos anotados</span>`; }
     catch(e){ $('#csvDiasMsg').innerHTML=`<span class="chip bad">Não importou</span> ${esc(e.message)}`; } };
   renderDinheiroOut();
+  renderDivisao();
 }
+
+function renderDivisao(){
+  const box=document.getElementById('divisaoOut'); if(!box) return;
+  const ini=inicioData(); if(!ini){ box.innerHTML='<p class="small muted">Escolha o primeiro dia de vendas na aba Hoje.</p>'; return; }
+  // dias com pedidos reais no mês selecionado
+  const dias=Object.entries((CAIXA.dias||{}))
+    .filter(([iso])=>iso.startsWith(mesSel) && !vazio((CAIXA.dias||{})[iso]?.pedidos))
+    .sort(([a],[b])=>a<b?-1:1)
+    .slice(-7); // últimos 7 dias anotados
+  if(!dias.length){ box.innerHTML='<p class="small muted">Anote os pedidos do dia na tabela abaixo para ver a divisão.</p>'; return; }
+  // custo variável por camiseta + fixos por pedido
+  const pecasPadrao = n(CFG.oferta.pecas) || 2;
+  const custoVar = n(CFG.conta.camiseta); // custo por camiseta (malha+costura+DTF)
+  const custoFixo = n(CFG.conta.brindes) + n(CFG.oferta.frete); // por pedido independente de qtd
+  const impPct = n(CFG.taxas.imposto)/100;
+  const cofPorCamiseta = dv => {
+    // se tiver faturamento real, usa para calcular imposto real
+    const pedidos = n(dv?.pedidos)||0;
+    const fat = n(dv?.fat)||(pedidos*n(CFG.oferta.preco));
+    const cams = n(dv?.camisetas)||(pedidos*pecasPadrao);
+    return cams*custoVar + pedidos*custoFixo + fat*impPct;
+  };
+  const adsD = adsDia(CFG);
+  let html='<div class="tw" style="margin-top:8px"><table><thead><tr><th>Dia</th><th>Pedidos</th><th>Camisetas</th><th class="r" style="color:var(--ok)">Resgate<br><small>Appmax→Operação</small></th><th class="r">Cofrinho</th><th class="r">Anúncio<br><small>Meta</small></th><th class="r" style="color:var(--ok)">Sobra na<br>Operação</th></tr></thead><tbody>';
+  let totFat=0, totCof=0, totAds=0, totSob=0, totPed=0, totCam=0;
+  dias.forEach(([iso,dv])=>{
+    const ped = n(dv.pedidos), fat = n(dv.fat)||(ped*n(CFG.oferta.preco));
+    const cams = n(dv.camisetas)||(ped*pecasPadrao);
+    const ads = !vazio(dv.ads) ? n(dv.ads) : adsD;
+    const cof = cofPorCamiseta(dv);
+    const sob = fat - cof - ads;
+    totFat+=fat; totCof+=cof; totAds+=ads; totSob+=sob; totPed+=ped; totCam+=cams;
+    const d=parseD(iso);
+    const cofLabel = cams===ped*pecasPadrao
+      ? `${ped}×${brl(cofrinhoPorPedido(CFG))}`
+      : `${cams} cam.×${brl(custoVar)}+${ped}×fixos+imp.`;
+    html+=`<tr>
+      <td style="white-space:nowrap">${fmtDL(d)}</td>
+      <td class="r">${int(ped)}</td>
+      <td class="r">${int(cams)}</td>
+      <td class="r" style="color:var(--ok);font-weight:600">${brl(fat)}</td>
+      <td class="r">${brl(cof)}<span class="small muted" style="display:block;font-size:11px">${cofLabel}</span></td>
+      <td class="r">${brl(ads)}</td>
+      <td class="r" style="font-weight:600;color:${sob>=0?'inherit':'var(--risk)'}">${brl(sob)}</td></tr>`;
+  });
+  html+=`<tr class="total"><td>Total</td><td class="r">${int(totPed)}</td><td class="r">${int(totCam)}</td><td class="r">${brl(totFat)}</td><td class="r">${brl(totCof)}</td><td class="r">${brl(totAds)}</td><td class="r" style="color:${totSob>=0?'inherit':'var(--risk)'}">${brl(totSob)}</td></tr>`;
+  html+='</tbody></table></div>';
+  // caixa "Para fazer agora": soma todos os dias não resgatados até ontem
+  {
+    const feitos = CAIXA.feitos||{};
+    const ontem = fmtISO(addCal(HOJE,-1));
+    let totFatP=0, totCofP=0, totPedP=0, totCamP=0, diasP=[];
+    Object.entries(CAIXA.dias||{}).forEach(([iso,dv])=>{
+      if(iso>ontem || vazio(dv?.pedidos)) return;
+      const ped=n(dv.pedidos), fat=n(dv.fat)||(ped*n(CFG.oferta.preco));
+      const cams=n(dv.camisetas)||(ped*pecasPadrao);
+      totPedP+=ped; totCamP+=cams; totFatP+=fat; totCofP+=cofPorCamiseta(dv);
+      diasP.push(iso);
+    });
+    if(totPedP>0){
+      const label = diasP.length===1
+        ? fmtDL(parseD(diasP[0]))
+        : `${fmtDL(parseD(diasP[0]))} a ${fmtDL(parseD(diasP[diasP.length-1]))}`;
+      html=`<div class="note" style="background:var(--sunk);border:none;padding:14px 16px;border-radius:10px;margin-bottom:12px">
+        <b>Para fazer agora — ${totPedP} pedido${totPedP!=1?'s':''}, ${totCamP} camiseta${totCamP!=1?'s':''} (${label})</b>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">
+          <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">1. Resgate da Appmax</div><div style="font-size:22px;font-weight:700;color:var(--ok)">${brl(totFatP)}</div><div style="font-size:11px;opacity:.7">→ Conta Operação</div></div>
+          <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">2. Passar ao Cofrinho</div><div style="font-size:22px;font-weight:700">${brl(totCofP)}</div><div style="font-size:11px;opacity:.7">${totCamP} cam. · ${totPedP} ped.</div></div>
+          <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">3. Recarregar na Meta</div><div style="font-size:22px;font-weight:700">${brl(adsDia(CFG))}</div><div style="font-size:11px;opacity:.7">→ Anúncio do dia</div></div>
+        </div>
+      </div>`+html;
+    }
+  }
+  box.innerHTML=html;
+}
+
 function renderDinheiroOut(){
   const box=$('#dinOut'); if(!box) return;
   const a=agendaDe(mesSel); if(!a){ box.innerHTML=''; return; }
