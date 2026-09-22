@@ -722,7 +722,8 @@ function diasDosPedidos(pedidos){
   const dias={}; if (!pedidos.length) return dias;
   const datas = pedidos.map(p=>p.data).sort();
   for (let d=parseD(datas[0]); d<=parseD(datas[datas.length-1]); d=addCal(d,1)) dias[fmtISO(d)]={pedidos:0,fat:0,pix:0};
-  pedidos.forEach(p=>{ const d=dias[p.data]; d.pedidos++; d.fat+=p.total; if(p.pix) d.pix+=p.total; });
+  pedidos.forEach(p=>{ const d=dias[p.data]; d.pedidos++; d.fat+=p.total; if(p.pix) d.pix+=p.total;
+    const cams=(p.itens||[]).reduce((a,i)=>a+n(i.qty),0); d.camisetas=(d.camisetas||0)+cams; });
   Object.values(dias).forEach(d=>{ d.fat=Math.round(d.fat*100)/100; d.pix=Math.round(d.pix*100)/100; });
   return dias;
 }
@@ -1116,7 +1117,7 @@ function renderLoteBox(){
 async function lerArquivo(f){ const buf=await f.arrayBuffer(); try{ return new TextDecoder('utf-8',{fatal:true}).decode(buf); }catch(e){ return new TextDecoder('windows-1252').decode(buf); } }
 function mesclarDias(peds){
   const dias=diasDosPedidos(peds);
-  Object.entries(dias).forEach(([k,v])=>{ const cur=CAIXA.dias[k]||{}; CAIXA.dias[k]={...cur, pedidos:v.pedidos, fat:v.fat, pix:v.pix}; });
+  Object.entries(dias).forEach(([k,v])=>{ const cur=CAIXA.dias[k]||{}; CAIXA.dias[k]={...cur, pedidos:v.pedidos, fat:v.fat, pix:v.pix, camisetas:v.camisetas||0}; });
   persist('caixa');
 }
 function renderLoteOut(){
