@@ -1367,10 +1367,11 @@ function renderDivisao(){
         : `${fmtDL(parseD(diasP[0]))} a ${fmtDL(parseD(diasP[diasP.length-1]))}`;
       html=`<div class="note" style="background:var(--sunk);border:none;padding:14px 16px;border-radius:10px;margin-bottom:12px">
         <b>Para fazer agora — ${totPedP} pedido${totPedP!=1?'s':''}, ${totCamP} camiseta${totCamP!=1?'s':''} (${label})</b>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">
           <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">1. Resgate da Appmax</div><div style="font-size:22px;font-weight:700;color:var(--ok)">${brl(totFatP)}</div><div style="font-size:11px;opacity:.7">→ Conta Operação</div></div>
           <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">2. Passar ao Cofrinho</div><div style="font-size:22px;font-weight:700">${brl(totCofP)}</div><div style="font-size:11px;opacity:.7">${totCamP} cam. · ${totPedP} ped.</div></div>
           <div style="text-align:center"><div style="font-size:11px;opacity:.7;margin-bottom:2px">3. Recarregar na Meta</div><div style="font-size:22px;font-weight:700">${brl(adsDia(CFG))}</div><div style="font-size:11px;opacity:.7">→ Anúncio do dia</div></div>
+          <div style="text-align:center;border-left:1px solid rgba(255,255,255,.15);padding-left:10px"><div style="font-size:11px;opacity:.7;margin-bottom:2px">Sobra na Operação</div><div style="font-size:22px;font-weight:700;color:${totFatP-totCofP-adsDia(CFG)>=0?'var(--ok)':'var(--risk)'}">${brl(totFatP-totCofP-adsDia(CFG))}</div><div style="font-size:11px;opacity:.7">fica na conta</div></div>
         </div>
       </div>`+html;
     }
