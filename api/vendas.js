@@ -1,6 +1,6 @@
 // GET /api/vendas?de=2026-09-01&ate=2026-09-30
 // Devolve um item por pedido pago da Nuvemshop.
-import { cors, autorizado, periodo, erro, pedidosNuvemshop, pedidoValido, pecasDoPedido } from './_lib.js';
+import { cors, autorizado, periodo, erro, pedidosNuvemshop, pedidoValido, pecasDoPedido, pecasPorModelo } from './_lib.js';
 
 export default async function handler(req, res) {
   cors(res);
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       const desconto = Number(p.discount) || Number(p.promotional_discount) ||
         Math.max(0, bruto + freteCobrado - total);
       const endereco = p.shipping_address || {};
+      const modelo = pecasPorModelo(p);
       return {
         id: String(p.id),
         data: String(p.created_at || p.completed_at || '').slice(0, 10),
@@ -33,6 +34,8 @@ export default async function handler(req, res) {
         uf: String(endereco.province || endereco.state || '').slice(0, 2).toUpperCase(),
         pedidos: 1,
         camisetas: pecasDoPedido(p),
+        camisetasBaby: modelo.baby,
+        camisetasTrad: modelo.trad,
         canal: 'Loja (Nuvemshop)',
         status: 'pago',
         referencia: String(p.number || p.id)

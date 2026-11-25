@@ -86,3 +86,17 @@ export function pecasDoPedido(p) {
     .filter((i) => ehCamiseta(i, termos))
     .reduce((s, i) => s + (Number(i.quantity) || 0), 0);
 }
+
+// Peças por modelagem: baby look (nome com "baby" ou "feminina") e tradicional (o resto).
+// O painel usa isso para o custo exato de cada pedido (baby look e tradicional custam diferente).
+export function pecasPorModelo(p) {
+  const r = { baby: 0, trad: 0 };
+  if (!Array.isArray(p.products)) return r;
+  const termos = termosIgnorados();
+  p.products.filter((i) => ehCamiseta(i, termos)).forEach((i) => {
+    const nome = String(i.name || i.product_name || '').toLowerCase();
+    const q = Number(i.quantity) || 0;
+    if (/baby|feminina/.test(nome)) r.baby += q; else r.trad += q;
+  });
+  return r;
+}

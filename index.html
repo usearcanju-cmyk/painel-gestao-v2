@@ -463,6 +463,8 @@ button.etq{cursor:pointer;border:none}
    UTIL
 ------------------------------------------------------------ */
 var U = {
+  /* número opcional: vazio quando não informado */
+  opt: function(v){ return (v===undefined||v===null||v==='') ? '' : (Number(v)||0); },
   brl: function(v, casas){
     if(v===null||v===undefined||isNaN(v)) v=0;
     var c = (casas===undefined)?2:casas;
@@ -544,7 +546,7 @@ function estadoPadrao(){
     onboarding: false,
     config: {
       /* Taxas e percentuais — premissas editáveis */
-      gateway: 4.88,          /* Appmax — já inclui D+1, não somar antecipação de novo */
+      gateway: 3.39,          /* Appmax — taxa de processamento conferida nos pedidos (nov/2026) */
       gatewayFixo: 0.99,      /* taxa fixa em R$ por pedido */
       checkout: 0.7,          /* Nuvemshop */
       imposto: 6.7,
@@ -562,7 +564,7 @@ function estadoPadrao(){
       reservaMetaMeses: 3,
       /* Cadastros */
       produtos: [
-        {id:'p1', nome:'Camiseta — média do mix (57% baby look)', custo:13.29, fornecedor:'baby look R$ 12 · tradicional R$ 15', padrao:true},
+        {id:'p1', nome:'Camiseta — custo médio (só para projeções)', custo:13.29, fornecedor:'média do mix: 57% BL a R$ 12, 43% trad. a R$ 15', padrao:true},
         {id:'p2', nome:'Camiseta baby look', custo:12, fornecedor:'', padrao:false},
         {id:'p3', nome:'Camiseta tradicional', custo:15, fornecedor:'', padrao:false}
       ],
@@ -676,7 +678,9 @@ var Store = {
       if(!bruto){ Store.dados = estadoPadrao(); Store.salvar(); return Store.dados; }
       var d = JSON.parse(bruto);
       Store.dados = Store.migrar(d);
-      if(Store.atualizarCustos2611(Store.dados)) Store.salvar();
+      var mudou1 = Store.atualizarCustos2611(Store.dados);
+      var mudou2 = Store.atualizarGateway2611(Store.dados);
+      if(mudou1 || mudou2) Store.salvar();
       return Store.dados;
     }catch(e){
       console.error('Falha ao ler dados salvos:', e);
@@ -736,6 +740,8 @@ var Store = {
         uf: l.uf || '',
         pedidos: U.n(l.pedidos),
         camisetas: U.n(l.camisetas),
+        camisetasBaby: U.opt(l.camisetasBaby),
+        camisetasTrad: U.opt(l.camisetasTrad),
         pagamento: l.pagamento || '',
         status: l.status==='pendente'?'pendente':'pago',
         obs: l.obs || '',
@@ -801,6 +807,19 @@ var Store = {
       } else d.ofertas.push(JSON.parse(JSON.stringify(bo)));
     });
     if(d.marketing && d.marketing.config && U.n(d.marketing.config.ticket)===249.9) d.marketing.config.ticket = 179;
+    d.atualizacoes[MARCA] = new Date().toISOString();
+    return true;
+  },
+
+  /* Appmax a 3,39% a partir de nov/2026 (taxa conferida nos pedidos). Roda uma vez. */
+  atualizarGateway2611: function(d){
+    var MARCA = '2026-11-appmax-339';
+    d.atualizacoes = d.atualizacoes || {};
+    if(d.atualizacoes[MARCA]) return false;
+    (d.vigencias||[]).forEach(function(v){ if(v.desde>='2026-11' && v.premissas) v.premissas.gateway = 3.39; });
+    var vs = (d.vigencias||[]).slice().sort(function(a,b){ return a.desde<b.desde?-1:1; });
+    var ult = vs[vs.length-1];
+    if(!ult || ult.desde>='2026-11') d.config.gateway = 3.39;
     d.atualizacoes[MARCA] = new Date().toISOString();
     return true;
   },
@@ -1066,6 +1085,46 @@ var Calc = {
     var p = ps.find(function(x){ return x.padrao; }) || ps[0];
     return p ? U.n(p.custo) : 0;
   },
+  /* custo de cada modelagem (cadastro de produtos: "baby look" e "tradicional") */
+  custoModelo: function(tipo, ym){
+    var ps = Calc.cfgM(ym).produtos || [];
+    var re = tipo==='baby' ? /baby/i : /tradicional/i;
+    var p = ps.find(function(x){ return re.test(x.nome||'') && !/m[eé]di|mix|proje/i.test(x.nome||''); });
+    return p ? U.n(p.custo) : Calc.custoCamiseta(ym);
+  },
+  /* CMV exato de uma venda: baby look × custo da baby look + tradicional × custo da tradicional.
+     Só cai no custo padrão para as peças sem modelagem informada (lançamento manual antigo). */
+  cmvDe: function(l, ym){
+    var cam = Calc.camisetasDe(l);
+    var b = l.camisetasBaby, t = l.camisetasTrad;
+    if(b===''||b===undefined||b===null) b = null;
+    if(t===''||t===undefined||t===null) t = null;
+    if(b===null && t===null) return cam * Calc.custoCamiseta(ym);
+    b = U.n(b); t = U.n(t);
+    var resto = Math.max(0, cam - b - t);
+    return b*Calc.custoModelo('baby', ym) + t*Calc.custoModelo('trad', ym) + resto*Calc.custoCamiseta(ym);
+  },
+  /* brindes que um pedido de N camisetas leva, pela promoção correspondente (1 camiseta = nenhum) */
+  brindesPorQtd: function(q, ym){
+    var c = Calc.cfgM(ym);
+    if(!c.brindesPorOferta) return 0;
+    var ofs = Store.promocoes(true).slice().sort(function(a,b){ return U.n(a.camisetas)-U.n(b.camisetas); });
+    if(!ofs.length) return 0;
+    var esc = null;
+    ofs.forEach(function(o){ if(U.n(o.camisetas,1)<=q) esc = o; });
+    if(!esc) esc = ofs[0];
+    return Calc.custoBrindes(esc.itens, ym);
+  },
+  /* embalagem e brindes de uma venda. Pedido único: conta exata (caixa + brindes só se 2+ camisetas
+     + saquinho por camiseta). Lançamento com vários pedidos juntos: estimativa pela média. */
+  embalagemDeLanc: function(l, ym){
+    var ped = U.n(l.pedidos), cam = Calc.camisetasDe(l);
+    if(ped===1){
+      var q = Math.max(1, Math.round(cam||1));
+      return Calc.kitEmbalagem(q, ym) + Calc.insumosPorPedido(ym) + Calc.brindesPorQtd(q, ym) + q*Calc.insumosPorCamiseta(ym);
+    }
+    return Calc.embalagemDe(ped, cam, ym);
+  },
   /* custo do kit de embalagem para um pedido com N camisetas */
   kitEmbalagem: function(qtd, ym){
     var faixas = (Calc.cfgM(ym).embalagemFaixas||[]).slice()
@@ -1139,6 +1198,7 @@ var Calc = {
     var a = {
       ym: ym, temDados: ls.length>0,
       faturamento:0, outrasReceitas:0, freteCobrado:0, pedidos:0, camisetas:0,
+      cmvExato:0, embExato:0, camisetasBaby:0, camisetasTrad:0,
       manual:{}, auto:{}, custo:{}, conflitos:[],
       recebido:0, aReceber:0, pagoSaida:0, aPagar:0
     };
@@ -1153,6 +1213,10 @@ var Calc = {
           a.freteCobrado += U.n(l.freteCobrado);
           a.pedidos += U.n(l.pedidos);
           a.camisetas += Calc.camisetasDe(l);
+          a.camisetasBaby += U.n(l.camisetasBaby);
+          a.camisetasTrad += U.n(l.camisetasTrad);
+          a.cmvExato += Calc.cmvDe(l, ym);
+          a.embExato += Calc.embalagemDeLanc(l, ym);
         } else a.outrasReceitas += v;
         if(l.status==='pago') a.recebido += v; else a.aReceber += v;
       }else{
@@ -1164,8 +1228,8 @@ var Calc = {
     a.baseTaxavel     = a.faturamento + a.freteCobrado;
     a.auto.taxas      = a.baseTaxavel * Calc.pctTaxas(ym)/100 + a.pedidos * U.n(c.gatewayFixo);
     a.auto.imposto    = a.baseTaxavel * U.n(c.imposto)/100;
-    a.auto.cmv        = a.camisetas * Calc.custoCamiseta(ym);
-    a.auto.embalagem  = Calc.embalagemDe(a.pedidos, a.camisetas, ym);
+    a.auto.cmv        = a.cmvExato;
+    a.auto.embalagem  = a.embExato;
     a.auto.frete      = a.pedidos * U.n(c.freteMedio);
     a.auto.operacional= a.faturamento * U.n(c.operacionalPct)/100;
 
@@ -1260,12 +1324,12 @@ var Calc = {
     var mapa = {};
     for(var d=1; d<=dias; d++){
       var iso = ym+'-'+String(d).padStart(2,'0');
-      mapa[iso] = {data:iso, dia:d, fat:0, freteCob:0, pedidos:0, camisetas:0, mkt:0, outrasDesp:0, falha:0};
+      mapa[iso] = {data:iso, dia:d, fat:0, freteCob:0, pedidos:0, camisetas:0, cmv:0, emb:0, mkt:0, outrasDesp:0, falha:0};
     }
     ls.forEach(function(l){
       var m = mapa[l.data]; if(!m) return;
       if(l.tipo==='receita'){
-        if(l.grupo==='vendas'){ m.fat+=U.n(l.valor); m.freteCob+=U.n(l.freteCobrado); m.pedidos+=U.n(l.pedidos); m.camisetas+=Calc.camisetasDe(l); }
+        if(l.grupo==='vendas'){ m.fat+=U.n(l.valor); m.freteCob+=U.n(l.freteCobrado); m.pedidos+=U.n(l.pedidos); m.camisetas+=Calc.camisetasDe(l); m.cmv+=Calc.cmvDe(l, ym); m.emb+=Calc.embalagemDeLanc(l, ym); }
       }else{
         if(l.grupo==='marketing'||l.grupo==='comissao') m.mkt+=U.n(l.valor);
         else if(l.grupo==='falha') m.falha+=U.n(l.valor);
@@ -1281,8 +1345,8 @@ var Calc = {
       var baseT = d.fat + d.freteCob;
       if(c.modo.taxas==='auto')      autoCustos += baseT*Calc.pctTaxas(ym)/100 + d.pedidos*U.n(c.gatewayFixo);
       if(c.modo.imposto==='auto')    autoCustos += baseT*U.n(c.imposto)/100;
-      if(c.modo.cmv==='auto')        autoCustos += d.camisetas*Calc.custoCamiseta(ym);
-      if(c.modo.embalagem==='auto')  autoCustos += Calc.embalagemDe(d.pedidos, d.camisetas, ym);
+      if(c.modo.cmv==='auto')        autoCustos += d.cmv;
+      if(c.modo.embalagem==='auto')  autoCustos += d.emb;
       if(c.modo.frete==='auto')      autoCustos += d.pedidos*U.n(c.freteMedio);
       if(c.modo.operacional==='auto')autoCustos += d.fat*U.n(c.operacionalPct)/100;
       d.custoAuto = autoCustos;
@@ -4462,7 +4526,8 @@ var Integra = {
         canal:x.canal||'Loja (Nuvemshop)', referencia:numero, valor:U.n(x.valor),
         freteCobrado:U.n(x.freteCobrado), valorBruto:U.n(x.valorBruto), desconto:U.n(x.desconto),
         uf:(x.uf||'').toUpperCase(),
-        pedidos:U.n(x.pedidos,1)||1, camisetas:U.n(x.camisetas), pagamento:x.pagamento||'',
+        pedidos:U.n(x.pedidos,1)||1, camisetas:U.n(x.camisetas),
+        camisetasBaby:U.opt(x.camisetasBaby), camisetasTrad:U.opt(x.camisetasTrad), pagamento:x.pagamento||'',
         status:(x.status==='pendente'?'pendente':'pago'), obs:'', origem:'loja', externoId:id
       };
     }
@@ -5034,6 +5099,10 @@ Form.lancamento = function(id, presets){
         '<div class="campo"><label>Camisetas '+UI.ajuda('Se ficar vazio, o sistema usa a média configurada de camisetas por pedido para calcular o CMV.')+'</label><input type="number" id="lCam" step="1" value="'+(l.camisetas===''||!U.n(l.camisetas)?'':U.n(l.camisetas))+'"></div>'+
       '</div>'+
       '<div class="linha-campos lc2">'+
+        '<div class="campo"><label>Baby look (peças) '+UI.ajuda('Para o custo exato: baby look e tradicional custam diferente. Nas vendas puxadas da Nuvemshop isso vem sozinho.')+'</label><input type="number" id="lBaby" step="1" value="'+(l.camisetasBaby===''||l.camisetasBaby===undefined?'':U.n(l.camisetasBaby))+'"></div>'+
+        '<div class="campo"><label>Tradicional (peças)</label><input type="number" id="lTrad" step="1" value="'+(l.camisetasTrad===''||l.camisetasTrad===undefined?'':U.n(l.camisetasTrad))+'"></div>'+
+      '</div>'+
+      '<div class="linha-campos lc2">'+
         '<div class="campo"><label>Frete cobrado do cliente (R$) '+UI.ajuda('Só quando o frete não é grátis. Entra como receita e paga taxas e imposto junto com o produto.')+'</label><input type="number" id="lFreteCob" step="0.01" value="'+(U.n(l.freteCobrado)?U.n(l.freteCobrado):'')+'"></div>'+
         '<div class="campo"><label>Estado (UF)</label><input type="text" id="lUf" maxlength="2" placeholder="MG" value="'+U.esc(l.uf||'')+'" style="text-transform:uppercase"></div>'+
       '</div>'+
@@ -5093,12 +5162,15 @@ Form.lancamento = function(id, presets){
           uf:(el.querySelector('#lUf')?el.querySelector('#lUf').value:'').trim().toUpperCase(),
           pedidos:U.n(el.querySelector('#lPed')?el.querySelector('#lPed').value:0),
           camisetas:U.n(el.querySelector('#lCam')?el.querySelector('#lCam').value:0),
+          camisetasBaby:U.opt(el.querySelector('#lBaby')?el.querySelector('#lBaby').value:''),
+          camisetasTrad:U.opt(el.querySelector('#lTrad')?el.querySelector('#lTrad').value:''),
           pagamento:el.querySelector('#lPag').value.trim(),
           status:el.querySelector('#lStatus').value,
           obs:el.querySelector('#lObs').value.trim(),
           origem: id ? (Store.getLancamento(id).origem||'manual') : 'manual',
           externoId: id ? (Store.getLancamento(id).externoId||'') : ''
         };
+        if(!novo.camisetas && (novo.camisetasBaby!=='' || novo.camisetasTrad!=='')) novo.camisetas = U.n(novo.camisetasBaby)+U.n(novo.camisetasTrad);
         if(id) Store.editLancamento(id, novo); else Store.addLancamento(novo);
         if(U.ym(data)!==UI.ym){ UI.ym = U.ym(data); }
         fechar(); App.render();
