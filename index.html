@@ -550,7 +550,7 @@ function estadoPadrao(){
       imposto: 6.7,
       marketingBase: 29,      /* cenário-base de marketing, % do faturamento */
       operacionalPct: 7.74,   /* usado só quando o operacional está no modo automático */
-      freteMedio: 18,
+      freteMedio: 16,         /* média real nov/2026: maioria R$ 12–15, longe R$ 20–30, raros R$ 70–80 */
       metaMargem: 30,         /* margem líquida alvo estrutural */
       humor: 70,              /* nível de humor da interface, em % */
       camisetasPorPedidoPadrao: 2,
@@ -562,13 +562,14 @@ function estadoPadrao(){
       reservaMetaMeses: 3,
       /* Cadastros */
       produtos: [
-        {id:'p1', nome:'Camiseta pronta e estampada', custo:15, fornecedor:'', padrao:true}
+        {id:'p1', nome:'Camiseta — média do mix (57% baby look)', custo:13.29, fornecedor:'baby look R$ 12 · tradicional R$ 15', padrao:true},
+        {id:'p2', nome:'Camiseta baby look', custo:12, fornecedor:'', padrao:false},
+        {id:'p3', nome:'Camiseta tradicional', custo:15, fornecedor:'', padrao:false}
       ],
       /* Kit de embalagem por tamanho do pedido. É o jeito mais fiel: o custo dá um salto
          quando o pedido deixa de caber na embalagem menor. */
       embalagemFaixas: [
-        {ate:3,  custo:0.50},
-        {ate:99, custo:0.90}
+        {ate:99, custo:1.80}   /* caixa Use Arcanju (substituiu o saquinho preto e o transparente) */
       ],
       /* Quando ligado, os brindes de cada oferta são escolhidos na tela da promoção
          e os insumos abaixo deixam de ser somados automaticamente em todo pedido. */
@@ -577,7 +578,7 @@ function estadoPadrao(){
       insumos: [
         {id:'i1', nome:'Capelinha',             custo:4,    base:'pedido', ativo:true},
         {id:'i2', nome:'Sacolinha',             custo:4,    base:'pedido', ativo:true},
-        {id:'i3', nome:'Saquinho transparente', custo:0.40, base:'pedido', ativo:true},
+        {id:'i3', nome:'Saquinho da camiseta',  custo:0.10, base:'camiseta', ativo:true},
         {id:'i5', nome:'Cartinha',              custo:0,    base:'pedido', ativo:true, aDefinir:true},
         {id:'i6', nome:'Cheirinho',             custo:0,    base:'pedido', ativo:true, aDefinir:true}
       ],
@@ -586,18 +587,18 @@ function estadoPadrao(){
     lancamentos: [],
     metas: {},      /* '2026-09': {faturamento, lucro, pedidos, margem, cpaMax} */
     ofertas: [      /* promoções: o que está no ar hoje */
-      {id:'o1', nome:'1 camiseta', camisetas:1, preco:139.90, freteGratis:false, freteCobrado:18, frete:18,
-       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
-       ativa:true, itens:['i3'], obs:''},
-      {id:'o2', nome:'2 camisetas + frete grátis', camisetas:2, preco:249.90, freteGratis:true, freteCobrado:0, frete:18,
-       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
-       ativa:true, itens:['i1','i2','i3'], obs:'capelinha e sacolinha de presente'},
-      {id:'o3', nome:'3 camisetas + frete grátis', camisetas:3, preco:319.90, freteGratis:true, freteCobrado:0, frete:18,
-       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
-       ativa:true, itens:['i1','i2','i3'], obs:''},
-      {id:'o4', nome:'4 camisetas + frete grátis', camisetas:4, preco:399.90, freteGratis:true, freteCobrado:0, frete:18,
-       modoMkt:'pct', marketingPct:29, cpa:60, brindes:0, operacionalPct:7.74, margemAlvo:30, precos:{},
-       ativa:true, itens:['i1','i2','i3'], obs:''}
+      {id:'o1', nome:'1 camiseta', camisetas:1, preco:97, freteGratis:false, freteCobrado:16, frete:16,
+       modoMkt:'pct', marketingPct:29, cpa:50, brindes:0, operacionalPct:7.74, margemAlvo:20, precos:{},
+       ativa:true, itens:[], obs:'só a camiseta: sem capelinha, sem sacolinha; a cliente paga o frete'},
+      {id:'o2', nome:'2 camisetas por R$ 179 + frete grátis', camisetas:2, preco:179, freteGratis:true, freteCobrado:0, frete:16,
+       modoMkt:'pct', marketingPct:29, cpa:50, brindes:0, operacionalPct:7.74, margemAlvo:20, precos:{},
+       ativa:true, itens:['i1','i2'], obs:'capelinha e sacolinha de presente (sem tercinho)'},
+      {id:'o3', nome:'3 camisetas + frete grátis', camisetas:3, preco:276, freteGratis:true, freteCobrado:0, frete:16,
+       modoMkt:'pct', marketingPct:29, cpa:50, brindes:0, operacionalPct:7.74, margemAlvo:20, precos:{},
+       ativa:true, itens:['i1','i2'], obs:'3 × R$ 97 − R$ 15 de desconto por quantidade'},
+      {id:'o4', nome:'4 camisetas + frete grátis', camisetas:4, preco:373, freteGratis:true, freteCobrado:0, frete:16,
+       modoMkt:'pct', marketingPct:29, cpa:50, brindes:0, operacionalPct:7.74, margemAlvo:20, precos:{},
+       ativa:true, itens:['i1','i2'], obs:'4 × R$ 97 − R$ 15 de desconto por quantidade'}
     ],
     reservaMovs: [],/* aportes e retiradas da reserva */
     contas: [
@@ -675,6 +676,7 @@ var Store = {
       if(!bruto){ Store.dados = estadoPadrao(); Store.salvar(); return Store.dados; }
       var d = JSON.parse(bruto);
       Store.dados = Store.migrar(d);
+      if(Store.atualizarCustos2611(Store.dados)) Store.salvar();
       return Store.dados;
     }catch(e){
       console.error('Falha ao ler dados salvos:', e);
@@ -743,6 +745,64 @@ var Store = {
       };
     });
     return d;
+  },
+
+  /* ---- Atualização de custos e da oferta — nov/2026 ----
+     Roda uma vez em cada navegador. Os meses anteriores ficam com os custos da época
+     (vigência), e a partir de 2026-11 valem os novos. */
+  atualizarCustos2611: function(d){
+    var MARCA = '2026-11-custos';
+    d.atualizacoes = d.atualizacoes || {};
+    if(d.atualizacoes[MARCA]) return false;
+    var c = d.config, base = estadoPadrao();
+    var foto = function(cfg){
+      var o = {};
+      Store.CAMPOS_VIGENCIA.forEach(function(k){ o[k] = JSON.parse(JSON.stringify(cfg[k])); });
+      return o;
+    };
+    d.vigencias = Array.isArray(d.vigencias) ? d.vigencias : [];
+    /* guarda os custos antigos para os meses que já passaram */
+    if(!d.vigencias.some(function(v){ return v.desde < '2026-11'; })){
+      var meses = (d.lancamentos||[]).map(function(l){ return String(l.data||'').slice(0,7); }).filter(Boolean).sort();
+      var desde = meses.length && meses[0] < '2026-11' ? meses[0] : '2026-01';
+      d.vigencias.push({desde:desde, premissas:foto(c), obs:'Custos usados antes de nov/2026', em:new Date().toISOString()});
+    }
+    /* novos custos */
+    c.freteMedio = 16;
+    c.produtos = JSON.parse(JSON.stringify(base.config.produtos));
+    c.embalagemFaixas = JSON.parse(JSON.stringify(base.config.embalagemFaixas));
+    var ins = (c.insumos||[]).filter(function(i){ return !/ter[cç]/i.test(i.nome||''); });
+    var poe = function(id, nome, custo, baseCalc){
+      var i = ins.find(function(x){ return x.id===id; });
+      if(i){ i.nome = nome; i.custo = custo; i.base = baseCalc; i.ativo = true; }
+      else ins.push({id:id, nome:nome, custo:custo, base:baseCalc, ativo:true});
+    };
+    poe('i1','Capelinha',4,'pedido');
+    poe('i2','Sacolinha',4,'pedido');
+    poe('i3','Saquinho da camiseta',0.10,'camiseta');
+    c.insumos = ins;
+    c.brindesPorOferta = true;
+    var nova = foto(c);
+    d.vigencias = d.vigencias.filter(function(v){ return v.desde!=='2026-11'; });
+    d.vigencias.push({desde:'2026-11', premissas:nova,
+      obs:'Baby look R$ 12, tradicional R$ 15 (média 13,29), capelinha+sacolinha R$ 8, frete médio R$ 16, caixa R$ 1,80, saquinho R$ 0,10. Sem tercinho.',
+      em:new Date().toISOString()});
+    d.vigencias.sort(function(a,b){ return a.desde<b.desde?-1:1; });
+    /* se houver vigência futura já cadastrada, ela continua mandando na configuração atual */
+    var ultima = d.vigencias[d.vigencias.length-1];
+    Object.keys(ultima.premissas).forEach(function(k){ c[k] = JSON.parse(JSON.stringify(ultima.premissas[k])); });
+    /* promoção principal de volta aos valores antigos */
+    d.ofertas = Array.isArray(d.ofertas) ? d.ofertas : [];
+    base.ofertas.forEach(function(bo){
+      var o = d.ofertas.find(function(x){ return x.id===bo.id || U.n(x.camisetas)===bo.camisetas; });
+      if(o){
+        o.nome = bo.nome; o.preco = bo.preco; o.freteGratis = bo.freteGratis; o.freteCobrado = bo.freteCobrado;
+        o.frete = bo.frete; o.itens = bo.itens.slice(); o.obs = bo.obs; o.ativa = true;
+      } else d.ofertas.push(JSON.parse(JSON.stringify(bo)));
+    });
+    if(d.marketing && d.marketing.config && U.n(d.marketing.config.ticket)===249.9) d.marketing.config.ticket = 179;
+    d.atualizacoes[MARCA] = new Date().toISOString();
+    return true;
   },
 
   salvar: function(){
@@ -1635,7 +1695,7 @@ var Calc = {
     var c = Calc.cfg();
     var fat = U.n(o.faturamento);
     var camPorPedido = Math.max(0.01, U.n(o.camisetasPorPedido, 2));
-    var ticket = Math.max(0.01, U.n(o.ticket, 249.90));
+    var ticket = Math.max(0.01, U.n(o.ticket, 179));
     var dias = U.diasNoMes(o.ym || U.ymAtual());
 
     var g = {faturamento:fat, ticket:ticket, camisetasPorPedido:camPorPedido, dias:dias};
@@ -2458,8 +2518,8 @@ Views.sim = null;
 Views.simPadrao = function(){
   var c = Calc.cfg();
   return {
-    nome:'2 camisetas por R$ 249,90 + frete grátis',
-    camisetas:2, preco:249.90, freteGratis:true, frete:U.n(c.freteMedio), freteCobrado:0,
+    nome:'2 camisetas por R$ 179 + frete grátis',
+    camisetas:2, preco:179, freteGratis:true, frete:U.n(c.freteMedio), freteCobrado:0,
     modoMkt:'pct', marketingPct:U.n(c.marketingBase), cpa:60, gatewayFixo:U.n(c.gatewayFixo),
     brindes:0, operacionalPct:U.n(c.operacionalPct), margemAlvo:U.n(c.metaMargem),
     precos:{}
@@ -3488,7 +3548,7 @@ Views.gestPadrao = function(){
   var c = Calc.cfg(), mx = Calc.mix();
   var real = Calc.distribuicaoReal().dist;
   /* preços puxados das ofertas salvas, quando existirem */
-  var precos = {1:139.90, 2:249.90, 3:319.90, 4:399.90, 5:479.90};
+  var precos = {1:97, 2:179, 3:276, 4:373, 5:470};
   (Store.dados.ofertas||[]).forEach(function(o){
     var q = U.n(o.camisetas);
     if(q>=1 && q<=5) precos[q] = U.n(o.preco) + (o.freteGratis===false ? U.n(o.freteCobrado) : 0);
@@ -8466,7 +8526,7 @@ var Mk = {
   CHECK: ['Roteiros e ângulos definidos','Gravação','Edição','Subida dos anúncios','Teste (7 dias)','Escolha dos vencedores'],
   padrao: function(){
     return {
-      config: { teto:29, ticket:249.90, degrau:20, diasCiclo:90, storiesDia:3 },
+      config: { teto:29, ticket:179, degrau:20, diasCiclo:90, storiesDia:3 },
       estrutura: [
         {id:'e1', nome:'Post viral turbinado (Instagram)', etapa:'topo',  valor:23,  filtro:'Publicação', teste:false, ativa:true},
         {id:'e2', nome:'Engajamento ThruPlay — topo de funil', etapa:'topo',  valor:52,  filtro:'TOPO DE FUNIL', teste:false, ativa:true},

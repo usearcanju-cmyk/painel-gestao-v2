@@ -240,12 +240,12 @@ const TAMS_ALL = ['PP','P','M','G','GG','XG'];
 const DEFAULT_CONFIG = {
   versao: 1,
   inicio: '',
-  oferta: { preco:249.90, pecas:2, frete:18 },
+  oferta: { preco:179, pecas:2, frete:16 },
   taxas: { marketing:29, appmax:4.9, antifraude:0.99, nuvem:0.7, imposto:6.7, pix:57 },
   recebe: { pix:1, cartao:2 },
   custos: { malhaClara:37.90, malhaEscura:42.90, kgPeca:0.2, corte:1, costura:3, dtfMetro:30, dtfPorMetro:8,
-            kit:8, saqT:0.40, saqP:0.50, etiquetaPacote:178, etiquetasPacote:1800, cheirinho:100, cheirinhoRende:500 },
-  conta: { camiseta:17, brindes:11 },
+            kit:8, saqT:0.10, saqP:1.80, etiquetaPacote:178, etiquetasPacote:1800, cheirinho:100, cheirinhoRende:500 },
+  conta: { camiseta:13.29, brindes:8 },
   cores: [ { id:'OFF', nome:'Off-white', clara:true }, { id:'PRETO', nome:'Preto', clara:false } ],
   tamanhos: ['P','M','G','GG'],
   mods: ['Tradicional','Baby look'],
@@ -746,6 +746,16 @@ let tab='hoje', loteSel=null, mesSel=ymOf(HOJE), esconderRotina=false, csvCache=
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
 function setSync(m){ $('#sync').textContent=m; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify({CFG,EST,CAIXA,LOTES})); }catch(e){} }
+/* Custos e oferta de nov/2026: baby look R$ 12 e tradicional R$ 15 (média 13,29), capelinha+sacolinha R$ 8,
+   frete médio R$ 16, caixa R$ 1,80, saquinho R$ 0,10, 2 camisetas por R$ 179. Aplica uma vez. */
+function atualizarCustos2611(c){
+  if (!c || (c.atualizacao||'') >= '2026-11') return false;
+  c.oferta = Object.assign({}, c.oferta, {preco:179, frete:16});
+  c.conta = Object.assign({}, c.conta, {camiseta:13.29, brindes:8});
+  c.custos = Object.assign({}, c.custos, {kit:8, saqT:0.10, saqP:1.80});
+  c.atualizacao = '2026-11';
+  return true;
+}
 function loadLocal(){ try{ const o=JSON.parse(localStorage.getItem(LS)||'null'); if(!o) return;
   if(o.CFG) CFG=deepMerge(clone(DEFAULT_CONFIG),o.CFG);
   if(o.EST) EST=deepMerge(clone(DEFAULT_ESTOQUE),o.EST);
@@ -785,7 +795,7 @@ async function initDB(){
   const onErr = ()=>setSync('Sem sincronização agora');
   const sub = (path, get, set, def, kind) => db.doc(path).onSnapshot(s=>{
     if (s.metadata.hasPendingWrites) return;
-    if (s.exists){ const inc=deepMerge(clone(def), clone(s.data())); if (JSON.stringify(inc)!==JSON.stringify(get())){ set(inc); saveLocal(); safeRender(); } }
+    if (s.exists){ const inc=deepMerge(clone(def), clone(s.data())); const mudou = kind==='cfg' && atualizarCustos2611(inc); if (mudou || JSON.stringify(inc)!==JSON.stringify(get())){ set(inc); saveLocal(); safeRender(); if (mudou) writeNow('cfg'); } }
     else writeNow(kind);
     setSync('Salvo e compartilhado');
   }, onErr);
@@ -1712,6 +1722,7 @@ function renderAjustesOut(){
 }
 
 loadLocal();
+if (atualizarCustos2611(CFG)) saveLocal();
 renderAll();
 initDB();
 
